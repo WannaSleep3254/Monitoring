@@ -271,6 +271,121 @@ struct FairinoMonitorService::Impl
         }
     }
 
+
+    bool startJog(int ref, int axis, int dir, float vel, float acc, float max_dis)
+    {
+        std::lock_guard<std::mutex> lock(sdk_mutex);
+
+        const int rtn = robot.StartJOG(
+            static_cast<uint8_t>(ref),
+            static_cast<uint8_t>(axis),
+            static_cast<uint8_t>(dir),
+            vel,
+            acc,
+            max_dis
+            );
+
+        if (rtn != 0) {
+            std::lock_guard<std::mutex> state_lock(state_mutex);
+            last.last_error_code = rtn;
+            last.last_error = "StartJOG failed: code=" + std::to_string(rtn);
+        }
+
+        return rtn == 0;
+    }
+
+    bool stopJog(int ref)
+    {
+        std::lock_guard<std::mutex> lock(sdk_mutex);
+
+        const int rtn = robot.StopJOG(static_cast<uint8_t>(ref));
+
+        if (rtn != 0) {
+            std::lock_guard<std::mutex> state_lock(state_mutex);
+            last.last_error_code = rtn;
+            last.last_error = "StopJOG failed: code=" + std::to_string(rtn);
+        }
+
+        return rtn == 0;
+    }
+
+    bool immStopJog()
+    {
+        std::lock_guard<std::mutex> lock(sdk_mutex);
+
+        const int rtn = robot.ImmStopJOG();
+
+        if (rtn != 0) {
+            std::lock_guard<std::mutex> state_lock(state_mutex);
+            last.last_error_code = rtn;
+            last.last_error = "ImmStopJOG failed: code=" + std::to_string(rtn);
+        }
+
+        return rtn == 0;
+    }
+
+    bool robotEnable(bool enable)
+    {
+        std::lock_guard<std::mutex> lock(sdk_mutex);
+
+        const int rtn = robot.RobotEnable(enable ? 1 : 0);
+
+        if (rtn != 0) {
+            std::lock_guard<std::mutex> state_lock(state_mutex);
+            last.last_error_code = rtn;
+            last.last_error = std::string("RobotEnable failed: code=") + std::to_string(rtn);
+        }
+
+        return rtn == 0;
+    }
+
+    bool setManualMode()
+    {
+        std::lock_guard<std::mutex> lock(sdk_mutex);
+
+        // SDK 기준: 0 = Auto, 1 = Manual
+        const int rtn = robot.Mode(1);
+
+        if (rtn != 0) {
+            std::lock_guard<std::mutex> state_lock(state_mutex);
+            last.last_error_code = rtn;
+            last.last_error = "Mode(Manual) failed: code=" + std::to_string(rtn);
+        }
+
+        return rtn == 0;
+    }
+
+    bool setAutoMode()
+    {
+        std::lock_guard<std::mutex> lock(sdk_mutex);
+
+        // SDK 기준: 0 = Auto, 1 = Manual
+        const int rtn = robot.Mode(0);
+
+        if (rtn != 0) {
+            std::lock_guard<std::mutex> state_lock(state_mutex);
+            last.last_error_code = rtn;
+            last.last_error = "Mode(Auto) failed: code=" + std::to_string(rtn);
+        }
+
+        return rtn == 0;
+    }
+
+    bool clearError()
+    {
+        std::lock_guard<std::mutex> lock(sdk_mutex);
+
+        const int rtn = robot.ResetAllError();
+
+        if (rtn != 0) {
+            std::lock_guard<std::mutex> state_lock(state_mutex);
+            last.last_error_code = rtn;
+            last.last_error = "ResetAllError failed: code=" + std::to_string(rtn);
+        }
+
+        return rtn == 0;
+    }
+
     bool queryStaticInfo()
     {
         std::lock_guard<std::mutex> lock(sdk_mutex);

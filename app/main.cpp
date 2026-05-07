@@ -112,6 +112,11 @@ int main(int argc, char *argv[])
     QObject::connect(&a, &QCoreApplication::aboutToQuit, [&](){
         svc.stop();
     });
+
+    QTimer::singleShot(1000, &a, [&]() {
+        svc.stop();
+        a.quit();
+    });
 #endif
 
     return a.exec();

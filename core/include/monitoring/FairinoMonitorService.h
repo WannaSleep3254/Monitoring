@@ -74,6 +74,16 @@ public:
     // (선택) fr_test에서 출력하던 버전/하드웨어/설치각도 정보를 한 번에 조회
     bool queryAndPrintStaticInfo();
 
+    // ---- Manual control API ----
+    bool startJog(int ref, int axis, int dir, float vel, float acc, float max_dis);
+    bool stopJog(int ref);
+    bool immStopJog();
+
+    bool robotEnable(bool enable);
+    bool setManualMode();
+    bool setAutoMode();
+    bool clearError();
+
 private:
     struct Impl;
     std::unique_ptr<Impl> d;
