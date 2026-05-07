@@ -118,18 +118,17 @@ struct FairinoMonitorService::Impl
     {
         RobotSnapshot s{};
         s.connected = true;
-
-        const auto now_steady = std::chrono::steady_clock::now();
-        const auto now_system = std::chrono::system_clock::now();
-
-        std::unique_lock<std::mutex> sdk_lock(sdk_mutex, std::try_to_lock);
         {
-            int rtn = 0;
+            std::unique_lock<std::mutex> sdk_lock(sdk_mutex, std::try_to_lock);
+            if (!sdk_lock.owns_lock()) {
+                return;
+            }
 
+            int rtn = 0;
             // joint pos deg
             JointPos j_deg{};
             rtn=robot.GetActualJointPosDegree(opt.robot_id, &j_deg);
-    /*
+/*
             if (rtn != 0) {
                 s.connected = false;
                 s.last_error_code = rtn;
@@ -137,7 +136,7 @@ struct FairinoMonitorService::Impl
                                + std::to_string(rtn);
                 goto error_exit;  // 조기 종료
             }
-    */
+*/
             for (int i=0;i<6;i++) s.joint_pos_deg[i] = j_deg.jPos[i];
 
             // joint speeds deg
@@ -232,10 +231,30 @@ struct FairinoMonitorService::Impl
             // temperatures / driver torque
             double temp[6] = {0};
             rtn=robot.GetJointDriverTemperature(temp);
+            if (rtn == 0) {
+                for (int i = 0; i < 6; ++i) {
+                    s.driver_temperature[i] = temp[i];
+                }
+                s.temperature_valid = true;
+                s.last_temperature_error = 0;
+            } else {
+                s.temperature_valid = false;
+                s.last_temperature_error = rtn;
+            }
             for (int i=0;i<6;i++) s.driver_temperature[i] = temp[i];
 
             double torque[6] = {0};
             rtn=robot.GetJointDriverTorque(torque);
+            if (rtn == 0) {
+                for (int i = 0; i < 6; ++i) {
+                    s.driver_torque[i] = torque[i];
+                }
+                s.driver_torque_valid = true;
+                s.last_driver_torque_error = 0;
+            } else {
+                s.driver_torque_valid = false;
+                s.last_driver_torque_error = rtn;
+            }
             for (int i=0;i<6;i++) s.driver_torque[i] = torque[i];
         }
         // (원본 fr_test 마지막) realtime pkg

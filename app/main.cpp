@@ -51,21 +51,6 @@ int main(int argc, char *argv[])
     const std::string ip = "192.168.57.121";
 
     // 콜백: 업데이트마다 출력(너무 잦으면 로그 폭발 주의)
-#if false
-    svc.setCallback([](const monitoring::RobotSnapshot& s){
-        if (!s.connected) {
-            qDebug() << "[MON] disconnected, err=" << s.last_error << "\n";
-            return;
-        }
-        qDebug() << "[MON] q(deg)="
-                  << s.joint_pos_deg[0] << ", "
-                  << s.joint_pos_deg[1] << ", "
-                  << s.joint_pos_deg[2] << ", "
-                  << s.joint_pos_deg[3] << ", "
-                  << s.joint_pos_deg[4] << ", "
-                  << s.joint_pos_deg[5] << "\n";
-    });
-#else
     svc.setCallback([](const monitoring::FairinoMonitorService::SnapshotWithMeta& meta){
         const auto& s = meta.snapshot;  // 스냅샷 추출
 
@@ -83,7 +68,7 @@ int main(int argc, char *argv[])
                   << s.joint_pos_deg[4] << ", "
                   << s.joint_pos_deg[5] << "\n";
     });
-#endif
+
     if (!svc.start(ip, opt)) {
         std::cerr << "svc.start() failed\n";
         return -1;
