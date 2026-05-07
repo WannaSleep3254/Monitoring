@@ -1,3 +1,4 @@
+```
 Monitoring/
 ├── CMakeLists.txt
 ├── CMakePresets.json                 # (권장) Debug/Release, Qt 경로 표준화
@@ -47,3 +48,4 @@ Monitoring/
 │
 ├── deploy/                           # (선택) 패키징 산출물
 └── build/                            # (gitignore) 빌드 출력
+```
