@@ -1,0 +1,30 @@
+# CMake
+build/
+cmake-build-*/
+*.cmake
+CMakeCache.txt
+CMakeFiles/
+
+# Visual Studio
+.vs/
+*.sln.DotSettings.user
+*.vcxproj.user
+
+# Qt
+*.pro.user
+moc_*.cpp
+ui_*.h
+
+# Binaries
+*.exe
+*.dll
+*.so
+*.a
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Dependencies (3rdparty는 필요시만 포함)
+3rdparty/fairino/lib/  # ← SDK DLL/LIB 제외 (크기 때문)

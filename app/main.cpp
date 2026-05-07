@@ -1,0 +1,69 @@
+//#include "gui/mainwindow.h"
+
+
+
+//#include <QApplication>
+#include <QCoreApplication>
+#include <QTimer>
+#include <iostream>
+#include "monitoring/FairinoMonitorService.h"
+
+int main(int argc, char *argv[])
+{
+//    QApplication a(argc, argv);
+    //MainWindow w;
+    //w.show();
+//    fr_test();
+//    return a.exec();
+    QCoreApplication a(argc, argv);
+
+    monitoring::FairinoMonitorService svc;
+    monitoring::FairinoMonitorService::Options opt;
+    opt.poll_period_ms = 200;     // 200ms마다 폴링
+    opt.robot_id = 0;
+    opt.logger_level = 1;
+    opt.enable_reconnect = true;
+
+    const std::string ip = "192.168.57.121";
+
+    // 콜백: 업데이트마다 출력(너무 잦으면 로그 폭발 주의)
+    svc.setCallback([](const monitoring::RobotSnapshot& s){
+        if (!s.connected) {
+            std::cout << "[MON] disconnected, err=" << s.last_error << "\n";
+            return;
+        }
+        std::cout << "[MON] q(deg)="
+                  << s.joint_pos_deg[0] << ", "
+                  << s.joint_pos_deg[1] << ", "
+                  << s.joint_pos_deg[2] << ", "
+                  << s.joint_pos_deg[3] << ", "
+                  << s.joint_pos_deg[4] << ", "
+                  << s.joint_pos_deg[5] << "\n";
+    });
+
+    if (!svc.start(ip, opt)) {
+        std::cerr << "svc.start() failed\n";
+        return -1;
+    }
+
+    // (선택) 정적 정보 한번 출력(연결 후)
+    svc.queryAndPrintStaticInfo();
+
+    // latest()를 주기적으로 읽어서 출력하는 방식(콜백 대신 사용 가능)
+    QTimer t;
+    QObject::connect(&t, &QTimer::timeout, [&](){
+        auto s = svc.latest();
+        std::cout << "[TICK] motion_done=" << int(s.motion_done)
+                  << " e-stop=" << int(s.emergency_stop)
+                  << " queue=" << s.motion_queue_len
+                  << "\n";
+    });
+    t.start(1000); // 1초마다
+
+    // 종료 처리(CTRL+C는 콘솔에서)
+    QObject::connect(&a, &QCoreApplication::aboutToQuit, [&](){
+        svc.stop();
+    });
+
+    return a.exec();
+}
