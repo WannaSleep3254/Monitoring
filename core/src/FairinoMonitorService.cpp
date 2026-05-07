@@ -241,7 +241,7 @@ struct FairinoMonitorService::Impl
                 s.temperature_valid = false;
                 s.last_temperature_error = rtn;
             }
-            for (int i=0;i<6;i++) s.driver_temperature[i] = temp[i];
+            //for (int i=0;i<6;i++) s.driver_temperature[i] = temp[i];
 
             double torque[6] = {0};
             rtn=robot.GetJointDriverTorque(torque);
@@ -255,7 +255,7 @@ struct FairinoMonitorService::Impl
                 s.driver_torque_valid = false;
                 s.last_driver_torque_error = rtn;
             }
-            for (int i=0;i<6;i++) s.driver_torque[i] = torque[i];
+            //for (int i=0;i<6;i++) s.driver_torque[i] = torque[i];
         }
         // (원본 fr_test 마지막) realtime pkg
         // ROBOT_STATE_PKG pkg{};
@@ -347,7 +347,7 @@ bool FairinoMonitorService::start(const std::string& ip, const Options& opt)
     if (!d->connect()) {
         // 연결 실패 상태 기록
         //std::lock_guard<std::mutex> lk(d->mtx);
-        std::lock_guard<std::mutex> lock(d->sdk_mutex);
+        std::lock_guard<std::mutex> lock(d->state_mutex);
         d->last.connected = false;
         d->last.last_error = "RPC connect failed";
         return false;
@@ -366,7 +366,7 @@ void FairinoMonitorService::stop()
     d->disconnect();
 
     //std::lock_guard<std::mutex> lk(d->mtx);
-    std::lock_guard<std::mutex> lock(d->sdk_mutex);
+    std::lock_guard<std::mutex> lock(d->state_mutex);
     d->last.connected = false;
 }
 
@@ -378,14 +378,14 @@ bool FairinoMonitorService::isRunning() const
 RobotSnapshot FairinoMonitorService::latest() const
 {
     //std::lock_guard<std::mutex> lk(d->mtx);
-    std::lock_guard<std::mutex> lock(d->sdk_mutex);
+    std::lock_guard<std::mutex> lock(d->state_mutex);
     return d->last;
 }
 
 void FairinoMonitorService::setCallback(SnapshotCallback cb)
 {
     //std::lock_guard<std::mutex> lk(d->mtx);
-    std::lock_guard<std::mutex> lock(d->sdk_mutex);
+    std::lock_guard<std::mutex> lock(d->state_mutex);
     d->cb = std::move(cb);
 }
 
