@@ -490,6 +490,41 @@ void FairinoMonitorService::setCallback(SnapshotCallback cb)
     d->cb = std::move(cb);
 }
 
+bool FairinoMonitorService::startJog(int ref, int axis, int dir, float vel, float acc, float max_dis)
+{
+    return d->startJog(ref, axis, dir, vel, acc, max_dis);
+}
+
+bool FairinoMonitorService::stopJog(int ref)
+{
+    return d->stopJog(ref);
+}
+
+bool FairinoMonitorService::immStopJog()
+{
+    return d->immStopJog();
+}
+
+bool FairinoMonitorService::robotEnable(bool enable)
+{
+    return d->robotEnable(enable);
+}
+
+bool FairinoMonitorService::setManualMode()
+{
+    return d->setManualMode();
+}
+
+bool FairinoMonitorService::setAutoMode()
+{
+    return d->setAutoMode();
+}
+
+bool FairinoMonitorService::clearError()
+{
+    return d->clearError();
+}
+
 bool FairinoMonitorService::queryAndPrintStaticInfo()
 {
     // start() 호출 전에 쓰면 연결이 안 되어있으니,

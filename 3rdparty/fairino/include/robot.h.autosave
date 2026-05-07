@@ -12,6 +12,7 @@
 #endif // WIN32
 
 #include "robot_types.h"
+#include <iostream>
 #include <list>
 #include <vector>
 #include <memory>

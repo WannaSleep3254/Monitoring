@@ -113,7 +113,7 @@ int main(int argc, char *argv[])
         svc.stop();
     });
 
-    QTimer::singleShot(1000, &a, [&]() {
+    QTimer::singleShot(1500, &a, [&]() {
         svc.stop();
         a.quit();
     });
