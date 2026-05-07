@@ -1,13 +1,14 @@
 //#include "gui/mainwindow.h"
 
-
-
 //#include <QApplication>
 #include <QCoreApplication>
 #include <QTimer>
 #include <iostream>
 #include "monitoring/FairinoMonitorService.h"
 
+//#include "robot.h"
+//#include <thread>
+//#include <QDebug>
 int main(int argc, char *argv[])
 {
 //    QApplication a(argc, argv);
@@ -16,6 +17,29 @@ int main(int argc, char *argv[])
 //    fr_test();
 //    return a.exec();
     QCoreApplication a(argc, argv);
+#if false
+    const char* ip = "192.168.57.121";
+
+    FRRobot robot1;
+    FRRobot robot2;
+
+    qDebug() << "[TEST 1] robot1 RPC...\n";
+    int ret1 = robot1.RPC(ip);
+    qDebug() << "robot1.RPC ret = " << ret1 << "\n";
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+    qDebug() << "[TEST 2] robot2 RPC...\n";
+    int ret2 = robot2.RPC(ip);
+    qDebug() << "robot2.RPC ret = " << ret2 << "\n";
+
+    qDebug() << "[RESULT]\n";
+    qDebug() << "robot1 = " << ret1 << "\n";
+    qDebug() << "robot2 = " << ret2 << "\n";
+
+    robot1.CloseRPC();
+    robot2.CloseRPC();
+#else
 
     monitoring::FairinoMonitorService svc;
     monitoring::FairinoMonitorService::Options opt;
@@ -27,12 +51,13 @@ int main(int argc, char *argv[])
     const std::string ip = "192.168.57.121";
 
     // 콜백: 업데이트마다 출력(너무 잦으면 로그 폭발 주의)
+#if false
     svc.setCallback([](const monitoring::RobotSnapshot& s){
         if (!s.connected) {
-            std::cout << "[MON] disconnected, err=" << s.last_error << "\n";
+            qDebug() << "[MON] disconnected, err=" << s.last_error << "\n";
             return;
         }
-        std::cout << "[MON] q(deg)="
+        qDebug() << "[MON] q(deg)="
                   << s.joint_pos_deg[0] << ", "
                   << s.joint_pos_deg[1] << ", "
                   << s.joint_pos_deg[2] << ", "
@@ -40,7 +65,25 @@ int main(int argc, char *argv[])
                   << s.joint_pos_deg[4] << ", "
                   << s.joint_pos_deg[5] << "\n";
     });
+#else
+    svc.setCallback([](const monitoring::FairinoMonitorService::SnapshotWithMeta& meta){
+        const auto& s = meta.snapshot;  // 스냅샷 추출
 
+        if (!s.connected) {
+            std::cout << "[MON] disconnected, err=" << s.last_error << "\n";
+            return;
+        }
+
+        std::cout << "[MON] [Seq=" << meta.sequence_number << "] "
+                  << "q(deg)="
+                  << s.joint_pos_deg[0] << ", "
+                  << s.joint_pos_deg[1] << ", "
+                  << s.joint_pos_deg[2] << ", "
+                  << s.joint_pos_deg[3] << ", "
+                  << s.joint_pos_deg[4] << ", "
+                  << s.joint_pos_deg[5] << "\n";
+    });
+#endif
     if (!svc.start(ip, opt)) {
         std::cerr << "svc.start() failed\n";
         return -1;
@@ -64,6 +107,7 @@ int main(int argc, char *argv[])
     QObject::connect(&a, &QCoreApplication::aboutToQuit, [&](){
         svc.stop();
     });
+#endif
 
     return a.exec();
 }

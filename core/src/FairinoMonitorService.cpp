@@ -22,6 +22,8 @@ struct FairinoMonitorService::Impl
     RobotSnapshot last{};
 
     SnapshotCallback cb;
+    //추가
+    uint64_t polling_sequence = 0;
 
     // 내부 유틸: 배열 복사
     template<typename T, size_t N>
@@ -69,108 +71,118 @@ struct FairinoMonitorService::Impl
     {
         RobotSnapshot s{};
         s.connected = true;
+        int rtn = 0;
 
         // joint pos deg
         JointPos j_deg{};
-        robot.GetActualJointPosDegree(opt.robot_id, &j_deg);
+        rtn=robot.GetActualJointPosDegree(opt.robot_id, &j_deg);
+/*
+        if (rtn != 0) {
+            s.connected = false;
+            s.last_error_code = rtn;
+            s.last_error = "GetActualJointPosDegree failed: code="
+                           + std::to_string(rtn);
+            goto error_exit;  // 조기 종료
+        }
+*/
         for (int i=0;i<6;i++) s.joint_pos_deg[i] = j_deg.jPos[i];
 
         // joint speeds deg
         float jointSpeed[6] = {0};
-        robot.GetActualJointSpeedsDegree(opt.robot_id, jointSpeed);
+        rtn=robot.GetActualJointSpeedsDegree(opt.robot_id, jointSpeed);
         for (int i=0;i<6;i++) s.joint_speed_deg[i] = jointSpeed[i];
 
         // joint acc deg
         float jointAcc[6] = {0};
-        robot.GetActualJointAccDegree(opt.robot_id, jointAcc);
+        rtn=robot.GetActualJointAccDegree(opt.robot_id, jointAcc);
         for (int i=0;i<6;i++) s.joint_acc_deg[i] = jointAcc[i];
 
         // TCP composite speed (target/actual)
         float tcp_speed = 0.0f;
         float ori_speed = 0.0f;
-        robot.GetTargetTCPCompositeSpeed(opt.robot_id, &tcp_speed, &ori_speed);
+        rtn=robot.GetTargetTCPCompositeSpeed(opt.robot_id, &tcp_speed, &ori_speed);
         s.target_tcp_speed_comp = tcp_speed;
         s.target_ori_speed_comp = ori_speed;
 
-        robot.GetActualTCPCompositeSpeed(opt.robot_id, &tcp_speed, &ori_speed);
+        rtn=robot.GetActualTCPCompositeSpeed(opt.robot_id, &tcp_speed, &ori_speed);
         s.actual_tcp_speed_comp = tcp_speed;
         s.actual_ori_speed_comp = ori_speed;
 
         // TCP speed 6dof (target/actual)
         float targetSpeed[6] = {0};
-        robot.GetTargetTCPSpeed(opt.robot_id, targetSpeed);
+        rtn=robot.GetTargetTCPSpeed(opt.robot_id, targetSpeed);
         for (int i=0;i<6;i++) s.target_tcp_speed_6[i] = targetSpeed[i];
 
         float actualSpeed[6] = {0};
-        robot.GetActualTCPSpeed(opt.robot_id, actualSpeed);
+        rtn=robot.GetActualTCPSpeed(opt.robot_id, actualSpeed);
         for (int i=0;i<6;i++) s.actual_tcp_speed_6[i] = actualSpeed[i];
 
         // TCP pose
         DescPose tcp{};
-        robot.GetActualTCPPose(opt.robot_id, &tcp);
+        rtn=robot.GetActualTCPPose(opt.robot_id, &tcp);
         s.tcp_pose = { tcp.tran.x, tcp.tran.y, tcp.tran.z, tcp.rpy.rx, tcp.rpy.ry, tcp.rpy.rz };
 
         // Flange pose
         DescPose flange{};
-        robot.GetActualToolFlangePose(opt.robot_id, &flange);
+        rtn=robot.GetActualToolFlangePose(opt.robot_id, &flange);
         s.flange_pose = { flange.tran.x, flange.tran.y, flange.tran.z, flange.rpy.rx, flange.rpy.ry, flange.rpy.rz };
 
         // tcp/wobj num
         int id = 0;
-        robot.GetActualTCPNum(opt.robot_id, &id);
+        rtn=robot.GetActualTCPNum(opt.robot_id, &id);
         s.tcp_num = id;
 
-        robot.GetActualWObjNum(opt.robot_id, &id);
+        rtn=robot.GetActualWObjNum(opt.robot_id, &id);
         s.wobj_num = id;
 
         // torques
         float jtorque[6] = {0};
-        robot.GetJointTorques(opt.robot_id, jtorque);
+        rtn=robot.GetJointTorques(opt.robot_id, jtorque);
         for (int i=0;i<6;i++) s.joint_torque[i] = jtorque[i];
 
         // system clock
         float t_ms = 0.0f;
-        robot.GetSystemClock(&t_ms);
+        rtn=robot.GetSystemClock(&t_ms);
         s.system_clock_ms = t_ms;
 
         // joint config
         int config = 0;
-        robot.GetRobotCurJointsConfig(&config);
+        rtn=robot.GetRobotCurJointsConfig(&config);
         s.joints_config = config;
 
         // motion done
         uint8_t motionDone = 0;
-        robot.GetRobotMotionDone(&motionDone);
+        rtn=robot.GetRobotMotionDone(&motionDone);
         s.motion_done = motionDone;
 
         // queue length
         int len = 0;
-        robot.GetMotionQueueLength(&len);
+        rtn=robot.GetMotionQueueLength(&len);
         s.motion_queue_len = len;
 
         // emergency stop
         uint8_t emergState = 0;
-        robot.GetRobotEmergencyStopState(&emergState);
+        rtn=robot.GetRobotEmergencyStopState(&emergState);
         s.emergency_stop = emergState;
 
         // sdk com state
         int comstate = 0;
-        robot.GetSDKComState(&comstate);
+        rtn=robot.GetSDKComState(&comstate);
         s.sdk_com_state = comstate;
 
         // safety stop state
         uint8_t si0 = 0, si1 = 0;
-        robot.GetSafetyStopState(&si0, &si1);
+        rtn=robot.GetSafetyStopState(&si0, &si1);
         s.safety_si0 = si0;
         s.safety_si1 = si1;
 
         // temperatures / driver torque
         double temp[6] = {0};
-        robot.GetJointDriverTemperature(temp);
+        rtn=robot.GetJointDriverTemperature(temp);
         for (int i=0;i<6;i++) s.driver_temperature[i] = temp[i];
 
         double torque[6] = {0};
-        robot.GetJointDriverTorque(torque);
+        rtn=robot.GetJointDriverTorque(torque);
         for (int i=0;i<6;i++) s.driver_torque[i] = torque[i];
 
         // (원본 fr_test 마지막) realtime pkg
@@ -185,7 +197,26 @@ struct FairinoMonitorService::Impl
         }
 
         // 콜백
+//error_exit: // 공통 저장 로직 (정상/에러 모두)
+#if false
         if (cb) cb(s);
+#else
+        SnapshotCallback temp_cb;
+        {
+            std::lock_guard<std::mutex> lk(mtx);
+            last = s;
+            temp_cb = cb;
+        }
+        if (temp_cb) {
+            // 콜백이 오래 걸릴 수 있으므로 락 밖에서 호출
+            SnapshotWithMeta meta{
+                s,                                      // ✅ RobotSnapshot
+                std::chrono::system_clock::now(),     // ✅ 타임스탬프
+                polling_sequence++                  // ✅ 시퀀스
+            };
+            temp_cb(meta);  // ✅ SnapshotWithMeta 전달
+        }
+#endif
     }
 
     void loop()
@@ -203,7 +234,25 @@ struct FairinoMonitorService::Impl
                     std::lock_guard<std::mutex> lk(mtx);
                     last = s;
                 }
+#if false
                 if (cb) cb(s);
+#else
+                SnapshotCallback temp_cb;
+                {
+                    std::lock_guard<std::mutex> lk(mtx);
+                    last = s;
+                    temp_cb = cb;
+                }
+
+                if (temp_cb) {
+                    SnapshotWithMeta meta{
+                        s,
+                        std::chrono::system_clock::now(),
+                        polling_sequence++  // ✅ 정확히 증가
+                    };
+                    temp_cb(meta);
+                }
+#endif
             }
 
             std::this_thread::sleep_for(std::chrono::milliseconds(opt.poll_period_ms));
@@ -305,6 +354,7 @@ RobotSnapshot FairinoMonitorService::latest() const
 
 void FairinoMonitorService::setCallback(SnapshotCallback cb)
 {
+    std::lock_guard<std::mutex> lk(d->mtx);
     d->cb = std::move(cb);
 }
 

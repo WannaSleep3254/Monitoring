@@ -48,6 +48,7 @@ struct RobotSnapshot
 
     // ---- Meta ----
     std::string last_error;        // 에러 텍스트(필요 시)
+    int last_error_code = 0;       // 에러 코드(필요 시)
 };
 
 } // namespace monitoring
