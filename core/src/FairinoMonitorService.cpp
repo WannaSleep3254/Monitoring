@@ -81,6 +81,95 @@ struct FairinoMonitorService::Impl
         std::lock_guard<std::mutex> lock(sdk_mutex);
         robot.CloseRPC();
     }
+    // 빠르게 읽어야 하는 상태 (joint pos 등)만 별도 함수로 분리, pollOnce에서 필요 시 호출
+    bool readFastState(RobotSnapshot& s)
+    {
+        int rtn = 0;
+
+        JointPos j_deg{};
+        rtn = robot.GetActualJointPosDegree(opt.robot_id, &j_deg);
+        if (rtn != 0) {
+            s.connected = false;
+            s.last_error_code = rtn;
+            s.last_error = "GetActualJointPosDegree failed: code=" + std::to_string(rtn);
+            return false;
+        }
+
+        for (int i = 0; i < 6; ++i) {
+            s.joint_pos_deg[i] = j_deg.jPos[i];
+        }
+
+        return true;
+    }
+    // 온도/드라이버 토크는 상대적으로 느리게 변할 것으로 예상되어 별도 함수로 분리, pollOnce에서 필요 시 호출
+    void readDriverTemperature(RobotSnapshot& s)
+    {
+        double temp[6] = {0};
+
+        int rtn = robot.GetJointDriverTemperature(temp);
+        if (rtn != 0) {
+            s.temperature_valid = false;
+            s.last_temperature_error = rtn;
+            return;
+        }
+
+        for (int i = 0; i < 6; ++i) {
+            s.driver_temperature[i] = temp[i];
+        }
+
+        s.temperature_valid = true;
+        s.last_temperature_error = 0;
+    }
+    // 드라이버 토크 읽기도 별도 함수로 분리, 필요 시 pollOnce에서 호출
+    void readDriverTorque(RobotSnapshot& s)
+    {
+        double torque[6] = {0};
+
+        int rtn = robot.GetJointDriverTorque(torque);
+        if (rtn != 0) {
+            s.driver_torque_valid = false;
+            s.last_driver_torque_error = rtn;
+            return;
+        }
+
+        for (int i = 0; i < 6; ++i) {
+            s.driver_torque[i] = torque[i];
+        }
+
+        s.driver_torque_valid = true;
+        s.last_driver_torque_error = 0;
+    }
+    // 기타 상태 읽기도 별도 함수로 분리, 필요 시 pollOnce에서 호출
+    void readExtraStatus(RobotSnapshot& s)
+    {
+        uint8_t motionDone = 0;
+        if (robot.GetRobotMotionDone(&motionDone) == 0) {
+            s.motion_done = motionDone;
+        }
+
+        int len = 0;
+        if (robot.GetMotionQueueLength(&len) == 0) {
+            s.motion_queue_len = len;
+        }
+
+        uint8_t emergState = 0;
+        if (robot.GetRobotEmergencyStopState(&emergState) == 0) {
+            s.emergency_stop = emergState;
+        }
+
+        int comstate = 0;
+        if (robot.GetSDKComState(&comstate) == 0) {
+            s.sdk_com_state = comstate;
+        }
+
+        uint8_t si0 = 0;
+        uint8_t si1 = 0;
+        if (robot.GetSafetyStopState(&si0, &si1) == 0) {
+            s.safety_si0 = si0;
+            s.safety_si1 = si1;
+        }
+    }
+
     // 스냅샷 저장 + 콜백 호출 (공통 로직 분리, pollOnce과 에러 처리에서 모두 사용)
     void publishSnapshot(RobotSnapshot s)
     {
@@ -117,152 +206,49 @@ struct FairinoMonitorService::Impl
     void pollOnce()
     {
         RobotSnapshot s{};
+        // 저주기 항목이 매 cycle마다 초기화되지 않도록 이전 snapshot을 기반으로 시작
+        {
+            std::lock_guard<std::mutex> lock(state_mutex);
+            s = last;
+        }
         s.connected = true;
+        s.last_error.clear();
+        s.last_error_code = 0;
+
+        const auto now = std::chrono::steady_clock::now();
+
         {
             std::unique_lock<std::mutex> sdk_lock(sdk_mutex, std::try_to_lock);
             if (!sdk_lock.owns_lock()) {
                 return;
             }
+            // Fast state는 매 polling마다 읽음
+            const bool fast_ok = readFastState(s);
 
-            int rtn = 0;
-            // joint pos deg
-            JointPos j_deg{};
-            rtn=robot.GetActualJointPosDegree(opt.robot_id, &j_deg);
-/*
-            if (rtn != 0) {
-                s.connected = false;
-                s.last_error_code = rtn;
-                s.last_error = "GetActualJointPosDegree failed: code="
-                               + std::to_string(rtn);
-                goto error_exit;  // 조기 종료
-            }
-*/
-            for (int i=0;i<6;i++) s.joint_pos_deg[i] = j_deg.jPos[i];
-
-            // joint speeds deg
-            float jointSpeed[6] = {0};
-            rtn=robot.GetActualJointSpeedsDegree(opt.robot_id, jointSpeed);
-            for (int i=0;i<6;i++) s.joint_speed_deg[i] = jointSpeed[i];
-
-            // joint acc deg
-            float jointAcc[6] = {0};
-            rtn=robot.GetActualJointAccDegree(opt.robot_id, jointAcc);
-            for (int i=0;i<6;i++) s.joint_acc_deg[i] = jointAcc[i];
-
-            // TCP composite speed (target/actual)
-            float tcp_speed = 0.0f;
-            float ori_speed = 0.0f;
-            rtn=robot.GetTargetTCPCompositeSpeed(opt.robot_id, &tcp_speed, &ori_speed);
-            s.target_tcp_speed_comp = tcp_speed;
-            s.target_ori_speed_comp = ori_speed;
-
-            rtn=robot.GetActualTCPCompositeSpeed(opt.robot_id, &tcp_speed, &ori_speed);
-            s.actual_tcp_speed_comp = tcp_speed;
-            s.actual_ori_speed_comp = ori_speed;
-
-            // TCP speed 6dof (target/actual)
-            float targetSpeed[6] = {0};
-            rtn=robot.GetTargetTCPSpeed(opt.robot_id, targetSpeed);
-            for (int i=0;i<6;i++) s.target_tcp_speed_6[i] = targetSpeed[i];
-
-            float actualSpeed[6] = {0};
-            rtn=robot.GetActualTCPSpeed(opt.robot_id, actualSpeed);
-            for (int i=0;i<6;i++) s.actual_tcp_speed_6[i] = actualSpeed[i];
-
-            // TCP pose
-            DescPose tcp{};
-            rtn=robot.GetActualTCPPose(opt.robot_id, &tcp);
-            s.tcp_pose = { tcp.tran.x, tcp.tran.y, tcp.tran.z, tcp.rpy.rx, tcp.rpy.ry, tcp.rpy.rz };
-
-            // Flange pose
-            DescPose flange{};
-            rtn=robot.GetActualToolFlangePose(opt.robot_id, &flange);
-            s.flange_pose = { flange.tran.x, flange.tran.y, flange.tran.z, flange.rpy.rx, flange.rpy.ry, flange.rpy.rz };
-
-            // tcp/wobj num
-            int id = 0;
-            rtn=robot.GetActualTCPNum(opt.robot_id, &id);
-            s.tcp_num = id;
-
-            rtn=robot.GetActualWObjNum(opt.robot_id, &id);
-            s.wobj_num = id;
-
-            // torques
-            float jtorque[6] = {0};
-            rtn=robot.GetJointTorques(opt.robot_id, jtorque);
-            for (int i=0;i<6;i++) s.joint_torque[i] = jtorque[i];
-
-            // system clock
-            float t_ms = 0.0f;
-            rtn=robot.GetSystemClock(&t_ms);
-            s.system_clock_ms = t_ms;
-
-            // joint config
-            int config = 0;
-            rtn=robot.GetRobotCurJointsConfig(&config);
-            s.joints_config = config;
-
-            // motion done
-            uint8_t motionDone = 0;
-            rtn=robot.GetRobotMotionDone(&motionDone);
-            s.motion_done = motionDone;
-
-            // queue length
-            int len = 0;
-            rtn=robot.GetMotionQueueLength(&len);
-            s.motion_queue_len = len;
-
-            // emergency stop
-            uint8_t emergState = 0;
-            rtn=robot.GetRobotEmergencyStopState(&emergState);
-            s.emergency_stop = emergState;
-
-            // sdk com state
-            int comstate = 0;
-            rtn=robot.GetSDKComState(&comstate);
-            s.sdk_com_state = comstate;
-
-            // safety stop state
-            uint8_t si0 = 0, si1 = 0;
-            rtn=robot.GetSafetyStopState(&si0, &si1);
-            s.safety_si0 = si0;
-            s.safety_si1 = si1;
-
-            // temperatures / driver torque
-            double temp[6] = {0};
-            rtn=robot.GetJointDriverTemperature(temp);
-            if (rtn == 0) {
-                for (int i = 0; i < 6; ++i) {
-                    s.driver_temperature[i] = temp[i];
-                }
-                s.temperature_valid = true;
-                s.last_temperature_error = 0;
+            if (!fast_ok) {
+                // readFastState() 내부에서 connected=false, last_error 설정한다고 가정
+                // SDK lock은 이 블록이 끝나면 자동 해제
             } else {
-                s.temperature_valid = false;
-                s.last_temperature_error = rtn;
-            }
-            //for (int i=0;i<6;i++) s.driver_temperature[i] = temp[i];
-
-            double torque[6] = {0};
-            rtn=robot.GetJointDriverTorque(torque);
-            if (rtn == 0) {
-                for (int i = 0; i < 6; ++i) {
-                    s.driver_torque[i] = torque[i];
+                // Driver torque: 200ms 주기 예시
+                if (now - last_torque_poll >= std::chrono::milliseconds(200)) {
+                    readDriverTorque(s);
+                    last_torque_poll = now;
                 }
-                s.driver_torque_valid = true;
-                s.last_driver_torque_error = 0;
-            } else {
-                s.driver_torque_valid = false;
-                s.last_driver_torque_error = rtn;
+
+                // Driver temperature: 1초 주기 예시
+                if (now - last_temp_poll >= std::chrono::seconds(1)) {
+                    readDriverTemperature(s);
+                    last_temp_poll = now;
+                }
+
+                // Extra status: 500ms 주기 예시
+                if (now - last_extra_poll >= std::chrono::milliseconds(500)) {
+                    readExtraStatus(s);
+                    last_extra_poll = now;
+                }
             }
-            //for (int i=0;i<6;i++) s.driver_torque[i] = torque[i];
         }
-        // (원본 fr_test 마지막) realtime pkg
-        // ROBOT_STATE_PKG pkg{};
-        // robot.GetRobotRealTimeState(&pkg);
-        // -> 필요하면 RobotSnapshot에 pkg에서 뽑아낼 항목을 추가해 확장
-        // 콜백
-//error_exit: // 공통 저장 로직 (정상/에러 모두)
+        // 반드시 sdk_mutex 해제 후 호출
         publishSnapshot(s);
     }
 
