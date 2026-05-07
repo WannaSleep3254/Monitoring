@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
             std::cout << "[MON] disconnected, err=" << s.last_error << "\n";
             return;
         }
-
+        // 연결된 경우, 주요 상태 출력
         std::cout << "[MON] [Seq=" << meta.sequence_number << "] "
                   << "q(deg)="
                   << s.joint_pos_deg[0] << ", "
@@ -67,6 +67,26 @@ int main(int argc, char *argv[])
                   << s.joint_pos_deg[3] << ", "
                   << s.joint_pos_deg[4] << ", "
                   << s.joint_pos_deg[5] << "\n";
+        // 온도/드라이버 토크는 유효한 경우에만 출력
+        if (s.temperature_valid) {
+            std::cout << "[TEMP] "
+                      << s.driver_temperature[0] << ", "
+                      << s.driver_temperature[1] << ", "
+                      << s.driver_temperature[2] << ", "
+                      << s.driver_temperature[3] << ", "
+                      << s.driver_temperature[4] << ", "
+                      << s.driver_temperature[5] << "\n";
+        }
+        // 드라이버 토크는 유효한 경우에만 출력
+        if (s.driver_torque_valid) {
+            std::cout << "[DRV_TORQUE] "
+                      << s.driver_torque[0] << ", "
+                      << s.driver_torque[1] << ", "
+                      << s.driver_torque[2] << ", "
+                      << s.driver_torque[3] << ", "
+                      << s.driver_torque[4] << ", "
+                      << s.driver_torque[5] << "\n";
+        }
     });
 
     if (!svc.start(ip, opt)) {
