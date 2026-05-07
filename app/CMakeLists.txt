@@ -42,7 +42,7 @@ endif()
 target_include_directories(MonitoringApp PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/gui
-    ${FAIRINO_INCLUDE_DIR} # 일시적으로 core에서 필요한 경로도 추가 (core이외에 app에서도 직접 include할 경우 대비
+    #${FAIRINO_INCLUDE_DIR} # 일시적으로 core에서 필요한 경로도 추가 (core이외에 app에서도 직접 include할 경우 대비
 )
 
 # Qt + core 링크

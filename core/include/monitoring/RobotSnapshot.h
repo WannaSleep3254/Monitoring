@@ -2,6 +2,7 @@
 #include <array>
 #include <cstdint>
 #include <string>
+#include <chrono>
 
 namespace monitoring {
 
@@ -36,6 +37,12 @@ struct RobotSnapshot
     std::array<double,6> driver_temperature{};  // GetJointDriverTemperature (double)
     std::array<double,6> driver_torque{};       // GetJointDriverTorque (double)
 
+    bool temperature_valid = false;
+    bool driver_torque_valid = false;
+
+    int last_temperature_error = 0;
+    int last_driver_torque_error = 0;
+
     // ---- System / state ----
     float system_clock_ms = 0.0f;  // GetSystemClock
     int joints_config = 0;         // GetRobotCurJointsConfig
@@ -49,6 +56,10 @@ struct RobotSnapshot
     // ---- Meta ----
     std::string last_error;        // 에러 텍스트(필요 시)
     int last_error_code = 0;       // 에러 코드(필요 시)
+
+    uint64_t sequence_number = 0;
+    std::chrono::system_clock::time_point system_timestamp{};
+    std::chrono::steady_clock::time_point steady_timestamp{};
 };
 
 } // namespace monitoring

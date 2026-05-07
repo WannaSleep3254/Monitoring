@@ -18,12 +18,19 @@ struct FairinoMonitorService::Impl
     std::atomic<bool> running{false};
     std::thread th;
 
-    mutable std::mutex mtx;
-    RobotSnapshot last{};
+//    mutable std::mutex mtx;
+    std::mutex sdk_mutex;           // SDK 호출 보호
+    mutable std::mutex state_mutex; // latest/callback 보호
 
+    RobotSnapshot last{};
     SnapshotCallback cb;
     //추가
     uint64_t polling_sequence = 0;
+
+    std::chrono::steady_clock::time_point last_fast_poll{};
+    std::chrono::steady_clock::time_point last_torque_poll{};
+    std::chrono::steady_clock::time_point last_temp_poll{};
+    std::chrono::steady_clock::time_point last_extra_poll{};
 
     // 내부 유틸: 배열 복사
     template<typename T, size_t N>
@@ -39,6 +46,8 @@ struct FairinoMonitorService::Impl
 
     bool connect()
     {
+        std::lock_guard<std::mutex> lock(sdk_mutex);
+
         robot.LoggerInit();
         robot.SetLoggerLevel(opt.logger_level);
 
@@ -58,11 +67,18 @@ struct FairinoMonitorService::Impl
             robot.SetReConnectParam(true, opt.reconnect_timeout_ms, opt.reconnect_interval_ms);
         }
 
+        auto now = std::chrono::steady_clock::now();
+        last_fast_poll = now;
+        last_torque_poll = now;
+        last_temp_poll = now;
+        last_extra_poll = now;
+
         return true;
     }
 
     void disconnect()
     {
+        std::lock_guard<std::mutex> lock(sdk_mutex);
         robot.CloseRPC();
     }
 
@@ -71,6 +87,10 @@ struct FairinoMonitorService::Impl
     {
         RobotSnapshot s{};
         s.connected = true;
+
+        const auto now_steady = std::chrono::steady_clock::now();
+        const auto now_system = std::chrono::system_clock::now();
+
         int rtn = 0;
 
         // joint pos deg
@@ -189,30 +209,38 @@ struct FairinoMonitorService::Impl
         // ROBOT_STATE_PKG pkg{};
         // robot.GetRobotRealTimeState(&pkg);
         // -> 필요하면 RobotSnapshot에 pkg에서 뽑아낼 항목을 추가해 확장
-
+        // 콜백
+//error_exit: // 공통 저장 로직 (정상/에러 모두)
+#if false
         // 최신값 저장
         {
             std::lock_guard<std::mutex> lk(mtx);
             last = s;
         }
-
-        // 콜백
-//error_exit: // 공통 저장 로직 (정상/에러 모두)
-#if false
         if (cb) cb(s);
 #else
         SnapshotCallback temp_cb;
         {
-            std::lock_guard<std::mutex> lk(mtx);
+            //std::lock_guard<std::mutex> lk(mtx);
+            std::lock_guard<std::mutex> lock(sdk_mutex);
             last = s;
             temp_cb = cb;
         }
         if (temp_cb) {
             // 콜백이 오래 걸릴 수 있으므로 락 밖에서 호출
+            const auto system_now = std::chrono::system_clock::now();
+            const auto steady_now = std::chrono::steady_clock::now();
+            const auto seq = polling_sequence++;
+
+            s.system_timestamp = system_now;
+            s.steady_timestamp = steady_now;
+            s.sequence_number = seq;
+
             SnapshotWithMeta meta{
                 s,                                      // ✅ RobotSnapshot
-                std::chrono::system_clock::now(),     // ✅ 타임스탬프
-                polling_sequence++                  // ✅ 시퀀스
+                system_now,
+                steady_now,
+                seq
             };
             temp_cb(meta);  // ✅ SnapshotWithMeta 전달
         }
@@ -230,25 +258,31 @@ struct FairinoMonitorService::Impl
                 RobotSnapshot s{};
                 s.connected = false;
                 s.last_error = "Exception in pollOnce()";
-                {
-                    std::lock_guard<std::mutex> lk(mtx);
-                    last = s;
-                }
 #if false
                 if (cb) cb(s);
 #else
                 SnapshotCallback temp_cb;
                 {
-                    std::lock_guard<std::mutex> lk(mtx);
+                    //std::lock_guard<std::mutex> lk(mtx);
+                    std::lock_guard<std::mutex> lock(sdk_mutex);
                     last = s;
                     temp_cb = cb;
                 }
 
                 if (temp_cb) {
+                    const auto system_now = std::chrono::system_clock::now();
+                    const auto steady_now = std::chrono::steady_clock::now();
+                    const auto seq = polling_sequence++;
+
+                    s.system_timestamp = system_now;
+                    s.steady_timestamp = steady_now;
+                    s.sequence_number = seq;
+
                     SnapshotWithMeta meta{
-                        s,
-                        std::chrono::system_clock::now(),
-                        polling_sequence++  // ✅ 정확히 증가
+                        s,                                      // ✅ RobotSnapshot
+                        system_now,
+                        steady_now,
+                        seq
                     };
                     temp_cb(meta);
                 }
@@ -319,7 +353,8 @@ bool FairinoMonitorService::start(const std::string& ip, const Options& opt)
 
     if (!d->connect()) {
         // 연결 실패 상태 기록
-        std::lock_guard<std::mutex> lk(d->mtx);
+        //std::lock_guard<std::mutex> lk(d->mtx);
+        std::lock_guard<std::mutex> lock(d->sdk_mutex);
         d->last.connected = false;
         d->last.last_error = "RPC connect failed";
         return false;
@@ -337,7 +372,8 @@ void FairinoMonitorService::stop()
     if (d->th.joinable()) d->th.join();
     d->disconnect();
 
-    std::lock_guard<std::mutex> lk(d->mtx);
+    //std::lock_guard<std::mutex> lk(d->mtx);
+    std::lock_guard<std::mutex> lock(d->sdk_mutex);
     d->last.connected = false;
 }
 
@@ -348,13 +384,15 @@ bool FairinoMonitorService::isRunning() const
 
 RobotSnapshot FairinoMonitorService::latest() const
 {
-    std::lock_guard<std::mutex> lk(d->mtx);
+    //std::lock_guard<std::mutex> lk(d->mtx);
+    std::lock_guard<std::mutex> lock(d->sdk_mutex);
     return d->last;
 }
 
 void FairinoMonitorService::setCallback(SnapshotCallback cb)
 {
-    std::lock_guard<std::mutex> lk(d->mtx);
+    //std::lock_guard<std::mutex> lk(d->mtx);
+    std::lock_guard<std::mutex> lock(d->sdk_mutex);
     d->cb = std::move(cb);
 }
 

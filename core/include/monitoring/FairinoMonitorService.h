@@ -42,7 +42,8 @@ public:
     */
     struct SnapshotWithMeta {
         RobotSnapshot snapshot;                          // ✅ 값 복사
-        std::chrono::system_clock::time_point timestamp; // 콜백 발생 시간
+        std::chrono::system_clock::time_point timestamp; // 콜백 발생 시간, 로그, DB 저장, GUI 표시용
+        std::chrono::steady_clock::time_point steady_timestamp; // 콜백 발생 시간 (steady_clock), polling 주기 계산, stale 판단, 지연 측정용
         uint64_t sequence_number;                        // 폴링 순서
     };
 
