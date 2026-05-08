@@ -57,6 +57,19 @@ struct RobotSnapshot
     std::string last_error;        // 에러 텍스트(필요 시)
     int last_error_code = 0;       // 에러 코드(필요 시)
 
+    // ---- Polling error ----
+    std::string last_poll_error;
+    int last_poll_error_code = 0;
+
+    // ---- Command result ----
+    std::string last_command_name;
+    std::string last_command_error;
+    int last_command_error_code = 0;
+    bool last_command_ok = true;
+    uint64_t command_sequence_number = 0;
+    std::chrono::system_clock::time_point last_command_timestamp{};
+
+
     uint64_t sequence_number = 0;
     std::chrono::system_clock::time_point system_timestamp{};
     std::chrono::steady_clock::time_point steady_timestamp{};

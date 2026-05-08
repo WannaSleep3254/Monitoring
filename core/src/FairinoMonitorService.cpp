@@ -26,6 +26,7 @@ struct FairinoMonitorService::Impl
     SnapshotCallback cb;
     //추가
     uint64_t polling_sequence = 0;
+    uint64_t command_sequence = 0;
 
     std::chrono::steady_clock::time_point last_fast_poll{};
     std::chrono::steady_clock::time_point last_torque_poll{};
@@ -89,9 +90,18 @@ struct FairinoMonitorService::Impl
         JointPos j_deg{};
         rtn = robot.GetActualJointPosDegree(opt.robot_id, &j_deg);
         if (rtn != 0) {
+            const std::string msg =
+                "GetActualJointPosDegree failed: code=" + std::to_string(rtn);
+
             s.connected = false;
+
+            // polling error
+            s.last_poll_error_code = rtn;
+            s.last_poll_error = msg;
+
+            // 기존 호환용 summary
             s.last_error_code = rtn;
-            s.last_error = "GetActualJointPosDegree failed: code=" + std::to_string(rtn);
+            s.last_error = msg;
             return false;
         }
 
@@ -180,6 +190,13 @@ struct FairinoMonitorService::Impl
 
         {
             std::lock_guard<std::mutex> lock(state_mutex);
+            // command 상태는 polling snapshot이 덮어쓰지 않도록 보존
+            s.last_command_name = last.last_command_name;
+            s.last_command_error = last.last_command_error;
+            s.last_command_error_code = last.last_command_error_code;
+            s.last_command_ok = last.last_command_ok;
+            s.command_sequence_number = last.command_sequence_number;
+            s.last_command_timestamp = last.last_command_timestamp;
 
             const auto seq = polling_sequence++;
 
@@ -212,6 +229,11 @@ struct FairinoMonitorService::Impl
             s = last;
         }
         s.connected = true;
+        // polling error만 초기화
+        s.last_poll_error.clear();
+        s.last_poll_error_code = 0;
+
+        // 기존 호환 필드도 polling 에러 기준으로 초기화
         s.last_error.clear();
         s.last_error_code = 0;
 
@@ -261,8 +283,17 @@ struct FairinoMonitorService::Impl
             } catch (...) {
                 // 예외 방어 (SDK가 예외를 던지지 않는다고 가정해도 안전)
                 RobotSnapshot s{};
+                {
+                    std::lock_guard<std::mutex> lock(state_mutex);
+                    s = last;
+                }
                 s.connected = false;
-                s.last_error = "Exception in pollOnce()";
+
+                s.last_poll_error_code = -1;
+                s.last_poll_error = "Exception in pollOnce()";
+
+                s.last_error_code = -1;
+                s.last_error = s.last_poll_error;
 
                 publishSnapshot(s);
             }
@@ -271,66 +302,112 @@ struct FairinoMonitorService::Impl
         }
     }
     // SDK 명령 실행 결과를 상태에 기록하는 공통 함수, 명령 함수에서 호출
-    void updateCommandResult(int rtn, const std::string& name)
+
+    CommandResult updateCommandResult(int rtn, const std::string& name)
     {
-        std::lock_guard<std::mutex> state_lock(state_mutex);
+        CommandResult result;
+        result.ok = (rtn == 0);
+        result.code = rtn;
+        result.name = name;
+        result.timestamp = std::chrono::system_clock::now();
 
         if (rtn != 0) {
-            last.last_error_code = rtn;
-            last.last_error = name + " failed: code=" + std::to_string(rtn);
-        } else {
-            last.last_error_code = 0;
-            last.last_error.clear();
-        }
-    }
-    // SDK 명령 함수 예시: StartJointJog, StopJointJog 등, 내부적으로 startJog/stopJog 호출
-    bool startJointJog(int joint, bool positive, float vel, float acc, float max_deg)
-    {
-        // joint: 1~6
-        if (joint < 1 || joint > 6) {
-            updateCommandResult(-10001, "startJointJog invalid joint");
-            return false;
+            result.message = name + " failed: code=" + std::to_string(rtn);
         }
 
-        // vel / acc: 0~100 %
+        {
+            std::lock_guard<std::mutex> state_lock(state_mutex);
+
+            result.sequence_number = ++command_sequence;
+
+            last.last_command_name = result.name;
+            last.last_command_timestamp = result.timestamp;
+            last.command_sequence_number = result.sequence_number;
+            last.last_command_ok = result.ok;
+            last.last_command_error_code = result.code;
+            last.last_command_error = result.message;
+        }
+
+        return result;
+    }
+    // SDK 명령 함수 예시: StartJointJog, StopJointJog 등, 내부적으로 startJog/stopJog 호출
+    CommandResult startJointJogEx(
+        int joint,
+        bool positive,
+        float vel,
+        float acc,
+        float max_deg)
+    {
+        if (joint < 1 || joint > 6) {
+            return makeValidationError(
+                -10001,
+                "startJointJog",
+                "Invalid joint index: " + std::to_string(joint)
+                );
+        }
+
         if (vel < 0.0f || vel > 100.0f) {
-            updateCommandResult(-10002, "startJointJog invalid vel");
-            return false;
+            return makeValidationError(
+                -10002,
+                "startJointJog",
+                "Invalid velocity percent: " + std::to_string(vel)
+                );
         }
 
         if (acc < 0.0f || acc > 100.0f) {
-            updateCommandResult(-10003, "startJointJog invalid acc");
-            return false;
+            return makeValidationError(
+                -10003,
+                "startJointJog",
+                "Invalid acceleration percent: " + std::to_string(acc)
+                );
         }
 
-        // max_deg: joint jog 기준 deg
-        if (max_deg <= 0.0f) {
-            updateCommandResult(-10004, "startJointJog invalid max_deg");
-            return false;
+        if (max_deg <= 0.0f || max_deg > 5.0f) {
+            return makeValidationError(
+                -10004,
+                "startJointJog",
+                "Invalid max degree: " + std::to_string(max_deg)
+                );
         }
 
-        return startJog(
-            0,                  // StartJOG ref: 0 = Joint jog
-            joint,              // axis: J1~J6
-            positive ? 1 : 0,   // dir: 1 = +, 0 = -
+        return startJogEx(
+            0,                  // StartJOG ref: Joint
+            joint,              // J1~J6
+            positive ? 1 : 0,   // + / -
             vel,
             acc,
             max_deg
             );
     }
 
-    bool stopJointJog()
+    bool startJointJog(
+        int joint,
+        bool positive,
+        float vel,
+        float acc,
+        float max_deg)
     {
-        return stopJog(1);      // StopJOG ref: 1 = Joint jog stop
+        return startJointJogEx(joint, positive, vel, acc, max_deg).ok;
     }
 
+    CommandResult stopJointJogEx()
+    {
+        return stopJogEx(1);    // StopJOG ref: Joint stop
+    }
+
+    bool stopJointJog()
+    {
+        return stopJointJogEx().ok;
+    }
 
     // SDK 명령 함수 예시: StartJOG, StopJOG, ImmStopJOG, RobotEnable, Mode, ResetAllError 등
-    bool startJog(int ref, int axis, int dir, float vel, float acc, float max_dis)
+    CommandResult startJogEx(int ref, int axis, int dir, float vel, float acc, float max_dis)
     {
         int rtn = 0;
+
         {
             std::lock_guard<std::mutex> lock(sdk_mutex);
+
             rtn = robot.StartJOG(
                 static_cast<uint8_t>(ref),
                 static_cast<uint8_t>(axis),
@@ -341,88 +418,144 @@ struct FairinoMonitorService::Impl
                 );
         }
 
-        updateCommandResult(rtn, "StartJOG");
-
-        return rtn == 0;
+        return updateCommandResult(rtn, "StartJOG");
     }
 
-    bool stopJog(int ref)
+    bool startJog(int ref, int axis, int dir, float vel, float acc, float max_dis)
+    {
+        return startJogEx(ref, axis, dir, vel, acc, max_dis).ok;
+    }
+
+    CommandResult stopJogEx(int ref)
     {
         int rtn = 0;
+
         {
             std::lock_guard<std::mutex> lock(sdk_mutex);
             rtn = robot.StopJOG(static_cast<uint8_t>(ref));
         }
 
-        updateCommandResult(rtn, "StopJOG");
-
-        return rtn == 0;
+        return updateCommandResult(rtn, "StopJOG");
     }
 
-    bool immStopJog()
+    bool stopJog(int ref)
+    {
+        return stopJogEx(ref).ok;
+    }
+
+    CommandResult immStopJogEx()
     {
         int rtn = 0;
+
         {
             std::lock_guard<std::mutex> lock(sdk_mutex);
             rtn = robot.ImmStopJOG();
         }
 
-        updateCommandResult(rtn, "ImmStopJOG");
-
-        return rtn == 0;
+        return updateCommandResult(rtn, "ImmStopJOG");
     }
 
-    bool robotEnable(bool enable)
+    bool immStopJog()
+    {
+        return immStopJogEx().ok;
+    }
+
+    CommandResult robotEnableEx(bool enable)
     {
         int rtn = 0;
+
         {
             std::lock_guard<std::mutex> lock(sdk_mutex);
             rtn = robot.RobotEnable(enable ? 1 : 0);
         }
 
-        updateCommandResult(rtn, "RobotEnable");
+        return updateCommandResult(rtn, "RobotEnable");
+    }
 
-        return rtn == 0;
+    bool robotEnable(bool enable)
+    {
+        return robotEnableEx(enable).ok;
+    }
+
+    CommandResult makeValidationError(
+        int code,
+        const std::string& name,
+        const std::string& message)
+    {
+        CommandResult result;
+        result.ok = false;
+        result.code = code;
+        result.name = name;
+        result.message = message;
+        result.timestamp = std::chrono::system_clock::now();
+
+        {
+            std::lock_guard<std::mutex> state_lock(state_mutex);
+
+            result.sequence_number = ++command_sequence;
+
+            last.last_command_name = result.name;
+            last.last_command_timestamp = result.timestamp;
+            last.command_sequence_number = result.sequence_number;
+            last.last_command_ok = false;
+            last.last_command_error_code = result.code;
+            last.last_command_error = result.message;
+        }
+
+        return result;
+    }
+
+    CommandResult setManualModeEx()
+    {
+        int rtn = 0;
+
+        {
+            std::lock_guard<std::mutex> lock(sdk_mutex);
+            rtn = robot.Mode(1);
+        }
+
+        return updateCommandResult(rtn, "Mode(Manual)");
     }
 
     bool setManualMode()
     {
+        return setManualModeEx().ok;
+    }
+
+    CommandResult setAutoModeEx()
+    {
         int rtn = 0;
+
         {
             std::lock_guard<std::mutex> lock(sdk_mutex);
-            // SDK 기준: 0 = Auto, 1 = Manual
-            rtn = robot.Mode(1);
+            rtn = robot.Mode(0);
         }
 
-        updateCommandResult(rtn, "Mode(Manual)");
-        return rtn == 0;
+        return updateCommandResult(rtn, "Mode(Auto)");
     }
 
     bool setAutoMode()
     {
-        int rtn = 0;
-        {
-            std::lock_guard<std::mutex> lock(sdk_mutex);
-            // SDK 기준: 0 = Auto, 1 = Manual
-            rtn = robot.Mode(0);
-        }
-        updateCommandResult(rtn, "Mode(Auto)");
-
-        return rtn == 0;
+        return setAutoModeEx().ok;
     }
 
-    bool clearError()
+    CommandResult clearErrorEx()
     {
         int rtn = 0;
+
         {
             std::lock_guard<std::mutex> lock(sdk_mutex);
             rtn = robot.ResetAllError();
         }
-        updateCommandResult(rtn, "ResetAllError");
 
-        return rtn == 0;
+        return updateCommandResult(rtn, "ResetAllError");
     }
 
+    bool clearError()
+    {
+        return clearErrorEx().ok;
+    }
+    // fr_test의 queryStaticInfo() 내용을 그대로 옮김, 필요 시 start()에서 호출하거나 외부에 공개하는 함수로 분리 가능
     bool queryStaticInfo()
     {
         std::lock_guard<std::mutex> lock(sdk_mutex);
@@ -575,6 +708,71 @@ bool FairinoMonitorService::setAutoMode()
 bool FairinoMonitorService::clearError()
 {
     return d->clearError();
+}
+
+FairinoMonitorService::CommandResult
+FairinoMonitorService::startJointJogEx(
+    int joint,
+    bool positive,
+    float vel,
+    float acc,
+    float max_deg)
+{
+    return d->startJointJogEx(joint, positive, vel, acc, max_deg);
+}
+
+FairinoMonitorService::CommandResult
+FairinoMonitorService::stopJointJogEx()
+{
+    return d->stopJointJogEx();
+}
+
+FairinoMonitorService::CommandResult
+FairinoMonitorService::startJogEx(
+    int ref,
+    int axis,
+    int dir,
+    float vel,
+    float acc,
+    float max_dis)
+{
+    return d->startJogEx(ref, axis, dir, vel, acc, max_dis);
+}
+
+FairinoMonitorService::CommandResult
+FairinoMonitorService::stopJogEx(int ref)
+{
+    return d->stopJogEx(ref);
+}
+
+FairinoMonitorService::CommandResult
+FairinoMonitorService::immStopJogEx()
+{
+    return d->immStopJogEx();
+}
+
+FairinoMonitorService::CommandResult
+FairinoMonitorService::robotEnableEx(bool enable)
+{
+    return d->robotEnableEx(enable);
+}
+
+FairinoMonitorService::CommandResult
+FairinoMonitorService::setManualModeEx()
+{
+    return d->setManualModeEx();
+}
+
+FairinoMonitorService::CommandResult
+FairinoMonitorService::setAutoModeEx()
+{
+    return d->setAutoModeEx();
+}
+
+FairinoMonitorService::CommandResult
+FairinoMonitorService::clearErrorEx()
+{
+    return d->clearErrorEx();
 }
 
 bool FairinoMonitorService::queryAndPrintStaticInfo()

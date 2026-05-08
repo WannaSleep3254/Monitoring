@@ -3,6 +3,8 @@
 #include <memory>
 #include <string>
 #include <chrono>
+#include <cstdint>
+
 #include "monitoring/RobotSnapshot.h"
 
 namespace monitoring {
@@ -30,14 +32,25 @@ public:
     };
 
     // 개선안
+    // SnapshotWithMeta 구조체: RobotSnapshot과 메타데이터(타임스탬프, 시퀀스 번호 등)를 함께 전달하는 구조체
     struct SnapshotWithMeta {
         RobotSnapshot snapshot;                          // ✅ 값 복사
         std::chrono::system_clock::time_point timestamp; // 콜백 발생 시간, 로그, DB 저장, GUI 표시용
         std::chrono::steady_clock::time_point steady_timestamp; // 콜백 발생 시간 (steady_clock), polling 주기 계산, stale 판단, 지연 측정용
         uint64_t sequence_number;                        // 폴링 순서
     };
-
+    // 콜백 타입 정의 (SnapshotWithMeta 전달)
     using SnapshotCallback = std::function<void(const SnapshotWithMeta&)>;
+
+    // 추가: 명령 실행 결과를 상태에 기록하는 구조체, updateCommandResult에서 사용
+    struct CommandResult {
+        bool ok = false;
+        int code = 0;
+        std::string name;
+        std::string message;
+        uint64_t sequence_number = 0;
+        std::chrono::system_clock::time_point timestamp{};
+    };
 
     FairinoMonitorService();
     ~FairinoMonitorService();
@@ -74,6 +87,18 @@ public:
     // ---- Safe convenience wrapper ----
     bool startJointJog(int joint, bool positive, float vel, float acc, float max_deg);
     bool stopJointJog();
+    // ---- CommandResult API ----
+    CommandResult startJogEx(int ref, int axis, int dir, float vel, float acc, float max_dis);
+    CommandResult stopJogEx(int ref);
+    CommandResult immStopJogEx();
+
+    CommandResult robotEnableEx(bool enable);
+    CommandResult setManualModeEx();
+    CommandResult setAutoModeEx();
+    CommandResult clearErrorEx();
+
+    CommandResult startJointJogEx(int joint, bool positive, float vel, float acc, float max_deg);
+    CommandResult stopJointJogEx();
 
 private:
     struct Impl;

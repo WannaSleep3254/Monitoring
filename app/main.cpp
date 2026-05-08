@@ -52,11 +52,26 @@ int main(int argc, char *argv[])
 
     // 콜백: 업데이트마다 출력(너무 잦으면 로그 폭발 주의)
     svc.setCallback([](const monitoring::FairinoMonitorService::SnapshotWithMeta& meta){
+        static uint64_t last_cmd_seq = 0;
         const auto& s = meta.snapshot;  // 스냅샷 추출
 
         if (!s.connected) {
-            std::cout << "[MON] disconnected, err=" << s.last_error << "\n";
+            std::cout << "[MON] disconnected"
+                      << " poll_err=" << s.last_poll_error
+                      << " code=" << s.last_poll_error_code
+                      << "\n";
             return;
+        }
+        // 명령 상태는 command_sequence_number가 바뀔 때만 출력
+        if (s.command_sequence_number != last_cmd_seq) {
+            last_cmd_seq = s.command_sequence_number;
+
+            std::cout << "[CMD_STATE] seq=" << s.command_sequence_number
+                      << " name=" << s.last_command_name
+                      << " ok=" << s.last_command_ok
+                      << " code=" << s.last_command_error_code
+                      << " err=" << s.last_command_error
+                      << "\n";
         }
         // 연결된 경우, 주요 상태 출력
         std::cout << "[MON] [Seq=" << meta.sequence_number << "] "
@@ -114,20 +129,28 @@ int main(int argc, char *argv[])
     });
 
     QTimer::singleShot(1000, &a, [&]() {
-        std::cout << "[CMD] startJog = "
-                  << svc.startJointJog(
+        auto res = svc.startJointJogEx(
                          1,      // J1
                          true,   // true:+,false:-
                          5.0f,   // vel %
                          10.0f,  // acc %
-                         5.5f    // max distance deg
-                         )
+                         0.5f    // max distance deg
+                         );
+        std::cout << "[CMD] seq=" << res.sequence_number
+                  << " name=" << res.name
+                  << " ok=" << res.ok
+                  << " code=" << res.code
+                  << " msg=" << res.message
                   << "\n";
     });
 
     QTimer::singleShot(2000, &a, [&]() {
-        std::cout << "[CMD] stopJog = "
-                  << svc.stopJointJog()   // joint stop
+        auto res = svc.stopJointJogEx();
+        std::cout << "[CMD] seq=" << res.sequence_number
+                  << " name=" << res.name
+                  << " ok=" << res.ok
+                  << " code=" << res.code
+                  << " msg=" << res.message
                   << "\n";
     });
 
