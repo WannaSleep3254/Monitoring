@@ -18,7 +18,7 @@ set(APP_SOURCES
 
 # UI 파일(선택)
 if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/gui/MainWindow.ui")
-    list(APPEND APP_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/gui/MainWindow.ui")
+    list(APPEND APP_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/gui/mainWindow.ui")
 endif()
 
 # 리소스 qrc(선택)
