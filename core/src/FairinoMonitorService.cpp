@@ -283,6 +283,48 @@ struct FairinoMonitorService::Impl
             last.last_error.clear();
         }
     }
+    // SDK 명령 함수 예시: StartJointJog, StopJointJog 등, 내부적으로 startJog/stopJog 호출
+    bool startJointJog(int joint, bool positive, float vel, float acc, float max_deg)
+    {
+        // joint: 1~6
+        if (joint < 1 || joint > 6) {
+            updateCommandResult(-10001, "startJointJog invalid joint");
+            return false;
+        }
+
+        // vel / acc: 0~100 %
+        if (vel < 0.0f || vel > 100.0f) {
+            updateCommandResult(-10002, "startJointJog invalid vel");
+            return false;
+        }
+
+        if (acc < 0.0f || acc > 100.0f) {
+            updateCommandResult(-10003, "startJointJog invalid acc");
+            return false;
+        }
+
+        // max_deg: joint jog 기준 deg
+        if (max_deg <= 0.0f) {
+            updateCommandResult(-10004, "startJointJog invalid max_deg");
+            return false;
+        }
+
+        return startJog(
+            0,                  // StartJOG ref: 0 = Joint jog
+            joint,              // axis: J1~J6
+            positive ? 1 : 0,   // dir: 1 = +, 0 = -
+            vel,
+            acc,
+            max_deg
+            );
+    }
+
+    bool stopJointJog()
+    {
+        return stopJog(1);      // StopJOG ref: 1 = Joint jog stop
+    }
+
+
     // SDK 명령 함수 예시: StartJOG, StopJOG, ImmStopJOG, RobotEnable, Mode, ResetAllError 등
     bool startJog(int ref, int axis, int dir, float vel, float acc, float max_dis)
     {
@@ -483,6 +525,21 @@ void FairinoMonitorService::setCallback(SnapshotCallback cb)
     //std::lock_guard<std::mutex> lk(d->mtx);
     std::lock_guard<std::mutex> lock(d->state_mutex);
     d->cb = std::move(cb);
+}
+
+bool FairinoMonitorService::startJointJog(
+    int joint,
+    bool positive,
+    float vel,
+    float acc,
+    float max_deg)
+{
+    return d->startJointJog(joint, positive, vel, acc, max_deg);
+}
+
+bool FairinoMonitorService::stopJointJog()
+{
+    return d->stopJointJog();
 }
 
 bool FairinoMonitorService::startJog(int ref, int axis, int dir, float vel, float acc, float max_dis)

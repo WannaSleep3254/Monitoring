@@ -115,10 +115,9 @@ int main(int argc, char *argv[])
 
     QTimer::singleShot(1000, &a, [&]() {
         std::cout << "[CMD] startJog = "
-                  << svc.startJog(
-                         0,      // joint jog
+                  << svc.startJointJog(
                          1,      // J1
-                         0,      // 1:+,0:-
+                         true,   // true:+,false:-
                          5.0f,   // vel %
                          10.0f,  // acc %
                          5.5f    // max distance deg
@@ -128,7 +127,7 @@ int main(int argc, char *argv[])
 
     QTimer::singleShot(2000, &a, [&]() {
         std::cout << "[CMD] stopJog = "
-                  << svc.stopJog(1)   // joint stop
+                  << svc.stopJointJog()   // joint stop
                   << "\n";
     });
 

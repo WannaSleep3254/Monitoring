@@ -28,18 +28,8 @@ public:
             , logger_level(1)
         {}
     };
-#if false
-    // 콜백발생 시간을 모름
-    using SnapshotCallback = std::function<void(const RobotSnapshot&)>;
-#else
+
     // 개선안
-    /* 미사용
-    struct CallbackData {
-        const RobotSnapshot& snapshot;
-        std::chrono::system_clock::time_point timestamp;
-        uint64_t sequence_number;  // 폴링 횟수
-    };
-    */
     struct SnapshotWithMeta {
         RobotSnapshot snapshot;                          // ✅ 값 복사
         std::chrono::system_clock::time_point timestamp; // 콜백 발생 시간, 로그, DB 저장, GUI 표시용
@@ -49,8 +39,6 @@ public:
 
     using SnapshotCallback = std::function<void(const SnapshotWithMeta&)>;
 
-
-#endif
     FairinoMonitorService();
     ~FairinoMonitorService();
 
@@ -83,6 +71,9 @@ public:
     bool setManualMode();
     bool setAutoMode();
     bool clearError();
+    // ---- Safe convenience wrapper ----
+    bool startJointJog(int joint, bool positive, float vel, float acc, float max_deg);
+    bool stopJointJog();
 
 private:
     struct Impl;
