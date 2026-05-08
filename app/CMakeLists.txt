@@ -12,13 +12,13 @@ set(CMAKE_AUTORCC ON)
 # 소스 목록
 set(APP_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/gui/mainWindow.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/gui/mainWindow.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/gui/mainwindow.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/gui/mainwindow.cpp
 )
 
 # UI 파일(선택)
 if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/gui/mainwindow.ui")
-    list(APPEND APP_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/gui/mainWindow.ui")
+    list(APPEND APP_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/gui/mainwindow.ui")
 endif()
 
 # 리소스 qrc(선택)
