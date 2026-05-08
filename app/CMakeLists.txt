@@ -12,8 +12,8 @@ set(CMAKE_AUTORCC ON)
 # 소스 목록
 set(APP_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/gui/MainWindow.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/gui/MainWindow.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/gui/mainWindow.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/gui/mainWindow.cpp
 )
 
 # UI 파일(선택)
