@@ -270,118 +270,113 @@ struct FairinoMonitorService::Impl
             std::this_thread::sleep_for(std::chrono::milliseconds(opt.poll_period_ms));
         }
     }
-
-
-    bool startJog(int ref, int axis, int dir, float vel, float acc, float max_dis)
+    // SDK 명령 실행 결과를 상태에 기록하는 공통 함수, 명령 함수에서 호출
+    void updateCommandResult(int rtn, const std::string& name)
     {
-        std::lock_guard<std::mutex> lock(sdk_mutex);
-
-        const int rtn = robot.StartJOG(
-            static_cast<uint8_t>(ref),
-            static_cast<uint8_t>(axis),
-            static_cast<uint8_t>(dir),
-            vel,
-            acc,
-            max_dis
-            );
+        std::lock_guard<std::mutex> state_lock(state_mutex);
 
         if (rtn != 0) {
-            std::lock_guard<std::mutex> state_lock(state_mutex);
             last.last_error_code = rtn;
-            last.last_error = "StartJOG failed: code=" + std::to_string(rtn);
+            last.last_error = name + " failed: code=" + std::to_string(rtn);
+        } else {
+            last.last_error_code = 0;
+            last.last_error.clear();
         }
+    }
+    // SDK 명령 함수 예시: StartJOG, StopJOG, ImmStopJOG, RobotEnable, Mode, ResetAllError 등
+    bool startJog(int ref, int axis, int dir, float vel, float acc, float max_dis)
+    {
+        int rtn = 0;
+        {
+            std::lock_guard<std::mutex> lock(sdk_mutex);
+            rtn = robot.StartJOG(
+                static_cast<uint8_t>(ref),
+                static_cast<uint8_t>(axis),
+                static_cast<uint8_t>(dir),
+                vel,
+                acc,
+                max_dis
+                );
+        }
+
+        updateCommandResult(rtn, "StartJOG");
 
         return rtn == 0;
     }
 
     bool stopJog(int ref)
     {
-        std::lock_guard<std::mutex> lock(sdk_mutex);
-
-        const int rtn = robot.StopJOG(static_cast<uint8_t>(ref));
-
-        if (rtn != 0) {
-            std::lock_guard<std::mutex> state_lock(state_mutex);
-            last.last_error_code = rtn;
-            last.last_error = "StopJOG failed: code=" + std::to_string(rtn);
+        int rtn = 0;
+        {
+            std::lock_guard<std::mutex> lock(sdk_mutex);
+            rtn = robot.StopJOG(static_cast<uint8_t>(ref));
         }
+
+        updateCommandResult(rtn, "StopJOG");
 
         return rtn == 0;
     }
 
     bool immStopJog()
     {
-        std::lock_guard<std::mutex> lock(sdk_mutex);
-
-        const int rtn = robot.ImmStopJOG();
-
-        if (rtn != 0) {
-            std::lock_guard<std::mutex> state_lock(state_mutex);
-            last.last_error_code = rtn;
-            last.last_error = "ImmStopJOG failed: code=" + std::to_string(rtn);
+        int rtn = 0;
+        {
+            std::lock_guard<std::mutex> lock(sdk_mutex);
+            rtn = robot.ImmStopJOG();
         }
+
+        updateCommandResult(rtn, "ImmStopJOG");
 
         return rtn == 0;
     }
 
     bool robotEnable(bool enable)
     {
-        std::lock_guard<std::mutex> lock(sdk_mutex);
-
-        const int rtn = robot.RobotEnable(enable ? 1 : 0);
-
-        if (rtn != 0) {
-            std::lock_guard<std::mutex> state_lock(state_mutex);
-            last.last_error_code = rtn;
-            last.last_error = std::string("RobotEnable failed: code=") + std::to_string(rtn);
+        int rtn = 0;
+        {
+            std::lock_guard<std::mutex> lock(sdk_mutex);
+            rtn = robot.RobotEnable(enable ? 1 : 0);
         }
+
+        updateCommandResult(rtn, "RobotEnable");
 
         return rtn == 0;
     }
 
     bool setManualMode()
     {
-        std::lock_guard<std::mutex> lock(sdk_mutex);
-
-        // SDK 기준: 0 = Auto, 1 = Manual
-        const int rtn = robot.Mode(1);
-
-        if (rtn != 0) {
-            std::lock_guard<std::mutex> state_lock(state_mutex);
-            last.last_error_code = rtn;
-            last.last_error = "Mode(Manual) failed: code=" + std::to_string(rtn);
+        int rtn = 0;
+        {
+            std::lock_guard<std::mutex> lock(sdk_mutex);
+            // SDK 기준: 0 = Auto, 1 = Manual
+            rtn = robot.Mode(1);
         }
 
+        updateCommandResult(rtn, "Mode(Manual)");
         return rtn == 0;
     }
 
     bool setAutoMode()
     {
-        std::lock_guard<std::mutex> lock(sdk_mutex);
-
-        // SDK 기준: 0 = Auto, 1 = Manual
-        const int rtn = robot.Mode(0);
-
-        if (rtn != 0) {
-            std::lock_guard<std::mutex> state_lock(state_mutex);
-            last.last_error_code = rtn;
-            last.last_error = "Mode(Auto) failed: code=" + std::to_string(rtn);
+        int rtn = 0;
+        {
+            std::lock_guard<std::mutex> lock(sdk_mutex);
+            // SDK 기준: 0 = Auto, 1 = Manual
+            rtn = robot.Mode(0);
         }
+        updateCommandResult(rtn, "Mode(Auto)");
 
         return rtn == 0;
     }
 
     bool clearError()
     {
-        std::lock_guard<std::mutex> lock(sdk_mutex);
-
-        const int rtn = robot.ResetAllError();
-
-        if (rtn != 0) {
-            std::lock_guard<std::mutex> state_lock(state_mutex);
-            last.last_error_code = rtn;
-            last.last_error = "ResetAllError failed: code=" + std::to_string(rtn);
+        int rtn = 0;
+        {
+            std::lock_guard<std::mutex> lock(sdk_mutex);
+            rtn = robot.ResetAllError();
         }
+        updateCommandResult(rtn, "ResetAllError");
 
         return rtn == 0;
     }

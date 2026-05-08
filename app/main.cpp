@@ -113,7 +113,26 @@ int main(int argc, char *argv[])
         svc.stop();
     });
 
-    QTimer::singleShot(1500, &a, [&]() {
+    QTimer::singleShot(1000, &a, [&]() {
+        std::cout << "[CMD] startJog = "
+                  << svc.startJog(
+                         0,      // joint jog
+                         1,      // J1
+                         0,      // 1:+,0:-
+                         5.0f,   // vel %
+                         10.0f,  // acc %
+                         5.5f    // max distance deg
+                         )
+                  << "\n";
+    });
+
+    QTimer::singleShot(2000, &a, [&]() {
+        std::cout << "[CMD] stopJog = "
+                  << svc.stopJog(1)   // joint stop
+                  << "\n";
+    });
+
+    QTimer::singleShot(2500, &a, [&]() {
         svc.stop();
         a.quit();
     });

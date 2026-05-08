@@ -12,6 +12,7 @@
 #endif // WIN32
 
 #include "robot_types.h"
+#include <iostream>
 #include <list>
 #include <vector>
 #include <memory>
@@ -728,7 +729,7 @@ public:
     *@brief  Error status clearing
     *@return  Error code
 	 */
-	errno_t  ResetAllError();
+    errno_t  ResetAllError();
 	
 	/**
     *@brief  Joint friction compensation switch
