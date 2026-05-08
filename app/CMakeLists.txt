@@ -17,7 +17,7 @@ set(APP_SOURCES
 )
 
 # UI 파일(선택)
-if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/gui/MainWindow.ui")
+if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/gui/mainwindow.ui")
     list(APPEND APP_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/gui/mainWindow.ui")
 endif()
 
