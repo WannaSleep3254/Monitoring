@@ -17,29 +17,6 @@ int main(int argc, char *argv[])
 //    fr_test();
 //    return a.exec();
     QCoreApplication a(argc, argv);
-#if false
-    const char* ip = "192.168.57.121";
-
-    FRRobot robot1;
-    FRRobot robot2;
-
-    qDebug() << "[TEST 1] robot1 RPC...\n";
-    int ret1 = robot1.RPC(ip);
-    qDebug() << "robot1.RPC ret = " << ret1 << "\n";
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
-    qDebug() << "[TEST 2] robot2 RPC...\n";
-    int ret2 = robot2.RPC(ip);
-    qDebug() << "robot2.RPC ret = " << ret2 << "\n";
-
-    qDebug() << "[RESULT]\n";
-    qDebug() << "robot1 = " << ret1 << "\n";
-    qDebug() << "robot2 = " << ret2 << "\n";
-
-    robot1.CloseRPC();
-    robot2.CloseRPC();
-#else
 
     monitoring::FairinoMonitorService svc;
     monitoring::FairinoMonitorService::Options opt;
@@ -127,7 +104,7 @@ int main(int argc, char *argv[])
     QObject::connect(&a, &QCoreApplication::aboutToQuit, [&](){
         svc.stop();
     });
-
+/*
     QTimer::singleShot(1000, &a, [&]() {
         auto res = svc.startJointJogEx(
                          1,      // J1
@@ -153,12 +130,11 @@ int main(int argc, char *argv[])
                   << " msg=" << res.message
                   << "\n";
     });
-
+*/
     QTimer::singleShot(2500, &a, [&]() {
         svc.stop();
         a.quit();
     });
-#endif
 
     return a.exec();
 }

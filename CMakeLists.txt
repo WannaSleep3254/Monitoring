@@ -43,3 +43,8 @@ message(STATUS "FAIRINO_LIB_DIR     = ${FAIRINO_LIB_DIR}")
 # ----------------------------
 add_subdirectory(core)
 add_subdirectory(app)
+option(BUILD_MONITORING_TESTS "Build monitoring manual test executables" ON)
+
+if (BUILD_MONITORING_TESTS)
+    add_subdirectory(tests)
+endif()
