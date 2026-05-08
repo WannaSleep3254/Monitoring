@@ -1,21 +1,26 @@
-//#include "gui/mainwindow.h"
+#ifndef MONITORING_GUI_MODE
+#define MONITORING_GUI_MODE 1
+#endif
 
-//#include <QApplication>
+#if MONITORING_GUI_MODE
+#include "gui/mainwindow.h"
+#include <QApplication>
+#else
 #include <QCoreApplication>
 #include <QTimer>
 #include <iostream>
 #include "monitoring/FairinoMonitorService.h"
+#endif
 
-//#include "robot.h"
-//#include <thread>
-//#include <QDebug>
 int main(int argc, char *argv[])
 {
-//    QApplication a(argc, argv);
-    //MainWindow w;
-    //w.show();
-//    fr_test();
-//    return a.exec();
+#if MONITORING_GUI_MODE
+    QApplication a(argc, argv);
+    MainWindow w;
+    w.show();
+
+    return a.exec();
+#else
     QCoreApplication a(argc, argv);
 
     monitoring::FairinoMonitorService svc;
@@ -137,4 +142,5 @@ int main(int argc, char *argv[])
     });
 
     return a.exec();
+#endif
 }
