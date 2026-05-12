@@ -1,0 +1,15 @@
+<RCC>
+    <qresource prefix="/">
+        <!-- 메인 패널 -->
+        <file alias="qml/Main.qml">../qml/Main.qml</file>
+        <!-- 탭 화면 -->
+        <file alias="qml/pages/MainPanel.qml">../qml/pages/MainPanel.qml</file>
+        <file alias="qml/pages/VisionPanel.qml">../qml/pages/VisionPanel.qml</file>
+        <file alias="qml/pages/RobotPanel.qml">../qml/pages/RobotPanel.qml</file>
+        <file alias="qml/pages/IoTPanel.qml">../qml/pages/IoTPanel.qml</file>
+        <file alias="qml/pages/DevPanel.qml">../qml/pages/DevPanel.qml</file>
+        <!-- 컴포넌트 -->
+        <file alias="qml/components/DeviceStatusBox.qml">../qml/components/DeviceStatusBox.qml</file>
+        <file alias="qml/components/DeviceControlStatusBox.qml">../qml/components/DeviceControlStatusBox.qml</file>
+    </qresource>
+</RCC>

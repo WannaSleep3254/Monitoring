@@ -15,7 +15,100 @@
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QGridLayout" name="gridLayout">
-    <item row="1" column="0">
+    <item row="2" column="1">
+     <widget class="QGroupBox" name="groupBox_ManualJog">
+      <property name="title">
+       <string>[Manual Jog]</string>
+      </property>
+      <layout class="QGridLayout" name="gridLayout_4">
+       <item row="0" column="0">
+        <widget class="QPushButton" name="pushButton_J1Minus">
+         <property name="text">
+          <string>J1-</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QPushButton" name="pushButton_J1Plus">
+         <property name="text">
+          <string>J1+</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QPushButton" name="pushButton_J2Minus">
+         <property name="text">
+          <string>J2-</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QPushButton" name="pushButton_J2Plus">
+         <property name="text">
+          <string>J2+</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="0">
+        <widget class="QPushButton" name="pushButton_J3Minus">
+         <property name="text">
+          <string>J3-</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="1">
+        <widget class="QPushButton" name="pushButton_J3Plus">
+         <property name="text">
+          <string>J3+</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="0">
+        <widget class="QPushButton" name="pushButton_J4Minus">
+         <property name="text">
+          <string>J4-</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="1">
+        <widget class="QPushButton" name="pushButton_J4Plus">
+         <property name="text">
+          <string>J4+</string>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="0">
+        <widget class="QPushButton" name="pushButton_J5Minus">
+         <property name="text">
+          <string>J5-</string>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="1">
+        <widget class="QPushButton" name="pushButton_J5Plus">
+         <property name="text">
+          <string>J5+</string>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="0">
+        <widget class="QPushButton" name="pushButton_J6Minus">
+         <property name="text">
+          <string>J6-</string>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="1">
+        <widget class="QPushButton" name="pushButton_J6Plus">
+         <property name="text">
+          <string>J6+</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item row="2" column="0">
      <widget class="QGroupBox" name="groupBox_JointPosition">
       <property name="title">
        <string>[Joint Position]</string>
@@ -240,99 +333,6 @@
       </layout>
      </widget>
     </item>
-    <item row="1" column="1">
-     <widget class="QGroupBox" name="groupBox_ManualJog">
-      <property name="title">
-       <string>[Manual Jog]</string>
-      </property>
-      <layout class="QGridLayout" name="gridLayout_4">
-       <item row="0" column="0">
-        <widget class="QPushButton" name="pushButton_J1Minus">
-         <property name="text">
-          <string>J1-</string>
-         </property>
-        </widget>
-       </item>
-       <item row="0" column="1">
-        <widget class="QPushButton" name="pushButton_J1Plus">
-         <property name="text">
-          <string>J1+</string>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="0">
-        <widget class="QPushButton" name="pushButton_J2Minus">
-         <property name="text">
-          <string>J2-</string>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="1">
-        <widget class="QPushButton" name="pushButton_J2Plus">
-         <property name="text">
-          <string>J2+</string>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="0">
-        <widget class="QPushButton" name="pushButton_J3Minus">
-         <property name="text">
-          <string>J3-</string>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="1">
-        <widget class="QPushButton" name="pushButton_J3Plus">
-         <property name="text">
-          <string>J3+</string>
-         </property>
-        </widget>
-       </item>
-       <item row="3" column="0">
-        <widget class="QPushButton" name="pushButton_J4Minus">
-         <property name="text">
-          <string>J4-</string>
-         </property>
-        </widget>
-       </item>
-       <item row="3" column="1">
-        <widget class="QPushButton" name="pushButton_J4Plus">
-         <property name="text">
-          <string>J4+</string>
-         </property>
-        </widget>
-       </item>
-       <item row="4" column="0">
-        <widget class="QPushButton" name="pushButton_J5Minus">
-         <property name="text">
-          <string>J5-</string>
-         </property>
-        </widget>
-       </item>
-       <item row="4" column="1">
-        <widget class="QPushButton" name="pushButton_J5Plus">
-         <property name="text">
-          <string>J5+</string>
-         </property>
-        </widget>
-       </item>
-       <item row="5" column="0">
-        <widget class="QPushButton" name="pushButton_J6Minus">
-         <property name="text">
-          <string>J6-</string>
-         </property>
-        </widget>
-       </item>
-       <item row="5" column="1">
-        <widget class="QPushButton" name="pushButton_J6Plus">
-         <property name="text">
-          <string>J6+</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </widget>
-    </item>
     <item row="0" column="0" colspan="2">
      <widget class="QGroupBox" name="groupBox_Connection">
       <property name="sizePolicy">
@@ -369,7 +369,7 @@
       </layout>
      </widget>
     </item>
-    <item row="2" column="0" colspan="2">
+    <item row="3" column="0" colspan="2">
      <widget class="QGroupBox" name="groupBox_CommandResult">
       <property name="sizePolicy">
        <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
@@ -385,6 +385,23 @@
         <widget class="QPlainTextEdit" name="plainTextEdit_CommandResult"/>
        </item>
       </layout>
+     </widget>
+    </item>
+    <item row="1" column="0" colspan="2">
+     <widget class="QGroupBox" name="groupBox">
+      <property name="title">
+       <string>GroupBox</string>
+      </property>
+      <widget class="QComboBox" name="comboBox">
+       <property name="geometry">
+        <rect>
+         <x>20</x>
+         <y>30</y>
+         <width>55</width>
+         <height>22</height>
+        </rect>
+       </property>
+      </widget>
      </widget>
     </item>
    </layout>

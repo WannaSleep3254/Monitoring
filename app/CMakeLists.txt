@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 
 # Qt 찾기 (Widgets 필수)
-find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets)
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets)
+find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets Quick Qml QuickControls2)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets Quick Qml QuickControls2)
 
 # Qt 자동 처리 (ui/moc/rcc)
 set(CMAKE_AUTOUIC ON)
@@ -35,6 +35,8 @@ if (QT_VERSION_MAJOR GREATER_EQUAL 6)
 else()
     add_executable(MonitoringApp
         ${APP_SOURCES}
+#        resources/app.qrc
+#        qml/RobotPanelPage.qml
     )
 endif()
 
@@ -48,6 +50,9 @@ target_include_directories(MonitoringApp PRIVATE
 # Qt + core 링크
 target_link_libraries(MonitoringApp PRIVATE
     Qt${QT_VERSION_MAJOR}::Widgets
+    Qt${QT_VERSION_MAJOR}::Quick
+    Qt${QT_VERSION_MAJOR}::Qml
+    Qt${QT_VERSION_MAJOR}::QuickControls2
     monitoring_core
 )
 

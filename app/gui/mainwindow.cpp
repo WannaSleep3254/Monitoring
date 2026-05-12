@@ -54,114 +54,24 @@ void MainWindow::setupConnections()
     // pressed  : start jog
     // released : stop jog
     // ----------------------------
-#if true
     bindJointJogButton(ui->pushButton_J1Minus, 1, false);
     bindJointJogButton(ui->pushButton_J1Plus,  1, true);
-#else
-    connect(ui->pushButton_J1Minus, &QPushButton::pressed, this, [this]() {
-        startJointJog(1, false);
-    });
 
-    connect(ui->pushButton_J1Minus, &QPushButton::released,
-            this, &MainWindow::stopJointJog);
-
-    connect(ui->pushButton_J1Plus, &QPushButton::pressed, this, [this]() {
-        startJointJog(1, true);
-    });
-
-    connect(ui->pushButton_J1Plus, &QPushButton::released,
-            this, &MainWindow::stopJointJog);
-#endif
-#if true
     bindJointJogButton(ui->pushButton_J2Minus, 2, false);
     bindJointJogButton(ui->pushButton_J2Plus,  2, true);
-#else
-    connect(ui->pushButton_J2Minus, &QPushButton::pressed, this, [this]() {
-        startJointJog(2, false);
-    });
 
-    connect(ui->pushButton_J2Minus, &QPushButton::released,
-            this, &MainWindow::stopJointJog);
-
-    connect(ui->pushButton_J2Plus, &QPushButton::pressed, this, [this]() {
-        startJointJog(2, true);
-    });
-
-    connect(ui->pushButton_J2Plus, &QPushButton::released,
-            this, &MainWindow::stopJointJog);
-#endif
-#if true
     bindJointJogButton(ui->pushButton_J3Minus, 3, false);
     bindJointJogButton(ui->pushButton_J3Plus,  3, true);
-#else
-    connect(ui->pushButton_J3Minus, &QPushButton::pressed, this, [this]() {
-        startJointJog(3, false);
-    });
 
-    connect(ui->pushButton_J3Minus, &QPushButton::released,
-            this, &MainWindow::stopJointJog);
-
-    connect(ui->pushButton_J3Plus, &QPushButton::pressed, this, [this]() {
-        startJointJog(3, true);
-    });
-
-    connect(ui->pushButton_J3Plus, &QPushButton::released,
-            this, &MainWindow::stopJointJog);
-#endif
-#if true
     bindJointJogButton(ui->pushButton_J4Minus, 4, false);
     bindJointJogButton(ui->pushButton_J4Plus,  4, true);
-#else
-    connect(ui->pushButton_J4Minus, &QPushButton::pressed, this, [this]() {
-        startJointJog(4, false);
-    });
 
-    connect(ui->pushButton_J4Minus, &QPushButton::released,
-            this, &MainWindow::stopJointJog);
-
-    connect(ui->pushButton_J4Plus, &QPushButton::pressed, this, [this]() {
-        startJointJog(4, true);
-    });
-
-    connect(ui->pushButton_J4Plus, &QPushButton::released,
-            this, &MainWindow::stopJointJog);
-#endif
-#if true
     bindJointJogButton(ui->pushButton_J5Minus, 5, false);
     bindJointJogButton(ui->pushButton_J5Plus,  5, true);
-#else
-    connect(ui->pushButton_J5Minus, &QPushButton::pressed, this, [this]() {
-        startJointJog(5, false);
-    });
 
-    connect(ui->pushButton_J5Minus, &QPushButton::released,
-            this, &MainWindow::stopJointJog);
-
-    connect(ui->pushButton_J5Plus, &QPushButton::pressed, this, [this]() {
-        startJointJog(5, true);
-    });
-
-    connect(ui->pushButton_J5Plus, &QPushButton::released,
-            this, &MainWindow::stopJointJog);
-#endif
-#if true
     bindJointJogButton(ui->pushButton_J6Minus, 6, false);
     bindJointJogButton(ui->pushButton_J6Plus,  6, true);
-#else
-    connect(ui->pushButton_J6Minus, &QPushButton::pressed, this, [this]() {
-        startJointJog(6, false);
-    });
 
-    connect(ui->pushButton_J6Minus, &QPushButton::released,
-            this, &MainWindow::stopJointJog);
-
-    connect(ui->pushButton_J6Plus, &QPushButton::pressed, this, [this]() {
-        startJointJog(6, true);
-    });
-
-    connect(ui->pushButton_J6Plus, &QPushButton::released,
-            this, &MainWindow::stopJointJog);
-#endif
     appendLog("[GUI] Signal connections initialized");
 }
 
@@ -175,35 +85,15 @@ void MainWindow::bindJointJogButton(QPushButton* button, int joint, bool positiv
     }
 
     connect(button, &QPushButton::pressed, this, [this, joint, positive]() {
-//        startJointJogDebug(joint, positive);
         startJointJog(joint, positive);
     });
 
     connect(button, &QPushButton::released,
-//            this, &MainWindow::stopJointJogDebug);
             this, &MainWindow::stopJointJog);
 }
 
 void MainWindow::handleConnectClicked()
 {
-#if false
-    ++debug_command_sequence_;
-
-    if (connected_) {
-        qDebug() << "[GUI][CONNECT] already connected";
-
-        appendLog(QString("[CMD] seq=%1 name=Connect ok=1 msg=Already connected")
-                      .arg(debug_command_sequence_));
-        return;
-    }
-    connected_ = true;
-
-    qDebug() << "[GUI][CONNECT] clicked";
-    qDebug() << "[GUI][CONNECT] connected_ =" << connected_;
-
-    appendLog(QString("[CMD] seq=%1 name=Connect ok=1")
-                  .arg(debug_command_sequence_));
-#else
     if (connected_) {
         appendLog("[MON] Already connected");
         return;
@@ -239,27 +129,10 @@ void MainWindow::handleConnectClicked()
 
     // 선택 사항: 정적 정보 콘솔 출력
     service_.queryAndPrintStaticInfo();
-#endif
 }
 
 void MainWindow::handleEnableClicked()
 {
-#if false
-    ++debug_command_sequence_;
-
-    if (!connected_) {
-        qDebug() << "[GUI][ENABLE] failed. not connected";
-
-        appendLog(QString("[CMD] seq=%1 name=Enable ok=0 msg=Not connected")
-                      .arg(debug_command_sequence_));
-        return;
-    }
-
-    qDebug() << "[GUI][ENABLE] clicked";
-
-    appendLog(QString("[CMD] seq=%1 name=Enable ok=1 msg=Debug enable")
-                  .arg(debug_command_sequence_));
-#else
     if (!connected_) {
         appendLog("[CMD] Enable failed: Not connected");
         return;
@@ -267,27 +140,10 @@ void MainWindow::handleEnableClicked()
 
     auto result = service_.robotEnableEx(true);
     appendCommandResult(result);
-#endif
 }
 
 void MainWindow::handleClearErrorClicked()
 {
-#if false
-    ++debug_command_sequence_;
-
-    if (!connected_) {
-        qDebug() << "[GUI][CLEAR_ERROR] failed. not connected";
-
-        appendLog(QString("[CMD] seq=%1 name=ClearError ok=0 msg=Not connected")
-                      .arg(debug_command_sequence_));
-        return;
-    }
-
-    qDebug() << "[GUI][CLEAR_ERROR] clicked";
-
-    appendLog(QString("[CMD] seq=%1 name=ClearError ok=1 msg=Debug clear error")
-                  .arg(debug_command_sequence_));
-#else
     if (!connected_) {
         appendLog("[CMD] ClearError failed: Not connected");
         return;
@@ -295,9 +151,8 @@ void MainWindow::handleClearErrorClicked()
 
     auto result = service_.clearErrorEx();
     appendCommandResult(result);
-#endif
 }
-
+#if false
 void MainWindow::startJointJogDebug(int joint, bool positive)
 {
     ++debug_command_sequence_;
@@ -343,7 +198,7 @@ void MainWindow::stopJointJogDebug()
     appendLog(QString("[CMD] seq=%1 name=StopJointJog ok=1")
                   .arg(debug_command_sequence_));
 }
-
+#endif
 void MainWindow::startJointJog(int joint, bool positive)
 {
     if (!connected_) {
