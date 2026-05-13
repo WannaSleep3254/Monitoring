@@ -68,6 +68,34 @@ Item {
         { text: "클램프2 해제", log: "Robot2 Clamp2 Release" }
     ]
 
+    property var toolChangeModel: [
+        { text: "벌크툴 장착",       log: "Mount Bulk Tool" },
+        { text: "벌크툴 탈거",       log: "Unmount Bulk Tool" },
+        { text: "소팅툴 장착",       log: "Mount Sorting Tool" },
+        { text: "소팅툴 탈거",       log: "Unmount Sorting Tool" },
+        { text: "벌크 → 소팅 교체",  log: "Change Bulk Tool to Sorting Tool" },
+        { text: "소팅 → 벌크 교체",  log: "Change Sorting Tool to Bulk Tool" }
+    ]
+
+    property var processUnitActionModel: [
+        { text: "벌크 픽",          log: "Process Bulk Pick" },
+        { text: "벌크 플레이스",    log: "Process Bulk Place" },
+        { text: "소팅 F 픽",        log: "Process Sorting Front Pick" },
+        { text: "소팅 F 플레이스",  log: "Process Sorting Front Place" },
+        { text: "소팅 R 픽",        log: "Process Sorting Rear Pick" },
+        { text: "소팅 R 플레이스",  log: "Process Sorting Rear Place" },
+        { text: "조립 픽",          log: "Process Assembly Pick" },
+        { text: "조립 플레이스",    log: "Process Assembly Place" },
+        { text: "컨베어 이동",      log: "Conveyor Move" }
+    ]
+
+    property var referencePointModel: [
+        { text: "P1 확인", point: "P1" },
+        { text: "P2 확인", point: "P2" },
+        { text: "P3 확인", point: "P3" },
+        { text: "P4 확인", point: "P4" }
+    ]
+
     property var gantryAxisModel: [
         { axis: "X축", pos: "0.000", unit: "mm" },
         { axis: "Z축", pos: "0.000", unit: "mm" },
@@ -85,9 +113,22 @@ Item {
 
     component PlainButton: Button {
         id: buttonRoot
+
         Layout.fillWidth: true
+        Layout.minimumWidth: 0
+        Layout.preferredWidth: 1
         Layout.preferredHeight: 34
+
         font.pixelSize: 14
+
+        contentItem: Text {
+            text: buttonRoot.text
+            color: "#374151"
+            font.pixelSize: buttonRoot.font.pixelSize
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            elide: Text.ElideRight
+        }
 
         background: Rectangle {
             radius: 4
@@ -114,6 +155,36 @@ Item {
             radius: 4
             color: dangerRoot.down ? "#fecaca" : "#fee2e2"
             border.color: "#fca5a5"
+        }
+    }
+
+
+    component ProcessActionButton: Button {
+        id: processButton
+
+        property bool danger: false
+
+        Layout.fillWidth: true
+        Layout.minimumWidth: 0
+        Layout.preferredWidth: 1
+        Layout.preferredHeight: 34
+
+        contentItem: Text {
+            text: processButton.text
+            color: processButton.danger ? "#dc2626" : "#374151"
+            font.pixelSize: 14
+            font.bold: processButton.danger
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            elide: Text.ElideRight
+        }
+
+        background: Rectangle {
+            radius: 4
+            color: processButton.down
+                   ? (processButton.danger ? "#fecaca" : "#cbd5e1")
+                   : (processButton.danger ? "#fee2e2" : "#e5e7eb")
+            border.color: processButton.danger ? "#fca5a5" : "#d1d5db"
         }
     }
 
@@ -364,11 +435,15 @@ Item {
                 estopText: "0"
                 errorText: "0"
                 connectButtonText: "통신 해제"
-                servoButtonText: "서보 OFF"
+//                servoButtonText: "서보 OFF"
                 alarmResetButtonText: "알람 리셋"
 
+                showConnectButton: true
+                showServoButton: false
+                showAlarmResetButton: true
+
                 onConnectClicked: console.log("[QML] Robot" + robotColumn.robotId + " communication toggle")
-                onServoClicked: console.log("[QML] Robot" + robotColumn.robotId + " servo toggle")
+//                onServoClicked: console.log("[QML] Robot" + robotColumn.robotId + " servo toggle")
                 onAlarmResetClicked: console.log("[QML] Robot" + robotColumn.robotId + " alarm reset")
             }
 
@@ -394,6 +469,33 @@ Item {
                     PlainButton {
                         text: "대기 위치 이동"
                         onClicked: console.log("[QML] Robot" + robotColumn.robotId + " Standby Pose")
+                    }
+                }
+            }
+
+            SectionLabel { text: "기준점 확인" }
+
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 108
+                radius: 6
+                color: "#f8fafc"
+                border.color: "#e2e8f0"
+
+                GridLayout {
+                    anchors.fill: parent
+                    anchors.margins: 8
+                    columns: 2
+                    rowSpacing: 6
+                    columnSpacing: 6
+
+                    Repeater {
+                        model: root.referencePointModel
+
+                        PlainButton {
+                            text: modelData.text
+                            onClicked: console.log("[QML] Robot" + robotColumn.robotId + " Reference Point Check:", modelData.point)
+                        }
                     }
                 }
             }
@@ -540,18 +642,29 @@ Item {
                             rowSpacing: 6
                             columnSpacing: 6
 
-                            PlainButton { text: "전체 에러 해제"; onClicked: console.log("[QML] Clear all errors") }
-                            PlainButton { text: "전체 서보 ON"; onClicked: console.log("[QML] Servo all on") }
-                            PlainButton { text: "초기 위치 이동"; onClicked: console.log("[QML] Move initial position") }
-                            PlainButton { text: "안전 홈 이동"; onClicked: console.log("[QML] Move safe home") }
+                            PlainButton {
+                                text: "전체 에러 해제"
+                                Layout.columnSpan: 2
+                                onClicked: console.log("[QML] Clear all errors")
+                            }
+
+                            PlainButton {
+                                text: "전체 초기화 위치 이동"
+                                onClicked: console.log("[QML] Move all initial position")
+                            }
+
+                            PlainButton {
+                                text: "전체 대기 위치 이동"
+                                onClicked: console.log("[QML] Move all standby position")
+                            }
                         }
                     }
 
-                    SectionLabel { text: "정상확인 동작" }
+                    SectionLabel { text: "로봇 동작 확인" }
 
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 108
+                        Layout.preferredHeight: 62
                         radius: 6
                         color: "#f8fafc"
                         border.color: "#e2e8f0"
@@ -565,16 +678,18 @@ Item {
 
                             PlainButton { text: "로봇 1 확인"; onClicked: console.log("[QML] Check Robot1") }
                             PlainButton { text: "로봇 2 확인"; onClicked: console.log("[QML] Check Robot2") }
-                            PlainButton { text: "양팔 순차 확인"; onClicked: console.log("[QML] Check both robots sequentially") }
-                            PlainButton { text: "동작 정지"; onClicked: console.log("[QML] Stop check motion") }
                         }
                     }
 
-                    SectionLabel { text: "4개 티칭점 순차 이동" }
+                    SectionLabel { text: "공정 단위 동작" }
 
                     Rectangle {
+                        property int buttonCount: root.processUnitActionModel.length
+                        property int columnCount: 2
+                        property int rowCount: Math.ceil(buttonCount / columnCount)
+
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 108
+                        Layout.preferredHeight: 62 + Math.max(0, rowCount - 1) * 46
                         radius: 6
                         color: "#f8fafc"
                         border.color: "#e2e8f0"
@@ -586,14 +701,19 @@ Item {
                             rowSpacing: 6
                             columnSpacing: 6
 
-                            PlainButton { text: "P1 대기"; onClicked: console.log("[QML] Move P1") }
-                            PlainButton { text: "P2 픽"; onClicked: console.log("[QML] Move P2") }
-                            PlainButton { text: "P3 접근"; onClicked: console.log("[QML] Move P3") }
-                            PlainButton { text: "P4 드롭"; onClicked: console.log("[QML] Move P4") }
+                            Repeater {
+                                model: root.processUnitActionModel
+
+                                ProcessActionButton {
+                                    text: modelData.text
+                                    danger: modelData.danger === true
+                                    onClicked: console.log("[QML]", modelData.log)
+                                }
+                            }
                         }
                     }
 
-                    SectionLabel { text: "단위 동작 / I/O 확인" }
+                    SectionLabel { text: "툴 교체" }
 
                     Rectangle {
                         Layout.fillWidth: true
@@ -609,14 +729,14 @@ Item {
                             rowSpacing: 6
                             columnSpacing: 6
 
-                            PlainButton { text: "그리퍼 열기"; onClicked: console.log("[QML] Gripper open") }
-                            PlainButton { text: "그리퍼 닫기"; onClicked: console.log("[QML] Gripper close") }
-                            PlainButton { text: "진공 흡착"; onClicked: console.log("[QML] Vacuum attach") }
-                            PlainButton { text: "진공 해제"; onClicked: console.log("[QML] Vacuum release") }
-                            PlainButton { text: "게이트 열기"; onClicked: console.log("[QML] Gate open") }
-                            PlainButton { text: "게이트 닫기"; onClicked: console.log("[QML] Gate close") }
-                            PlainButton { text: "리셋"; onClicked: console.log("[QML] Unit reset") }
-                            DangerButton { text: "비상정지"; onClicked: console.log("[QML] Emergency stop") }
+                            Repeater {
+                                model: root.toolChangeModel
+
+                                PlainButton {
+                                    text: modelData.text
+                                    onClicked: console.log("[QML]", modelData.log)
+                                }
+                            }
                         }
                     }
 
@@ -656,6 +776,10 @@ Item {
                         connectButtonText: "통신 해제"
                         servoButtonText: "서보 OFF"
                         alarmResetButtonText: "알람 리셋"
+
+                        showConnectButton: true
+                        showServoButton: true
+                        showAlarmResetButton: true
 
                         onConnectClicked: console.log("[QML] Gantry communication toggle")
                         onServoClicked: console.log("[QML] Gantry servo toggle")
@@ -733,6 +857,7 @@ Item {
         // ============================================================
         // Bottom Command Log
         // ============================================================
+        /*
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 150
@@ -772,6 +897,6 @@ Item {
                     text: "[17:24:10] [INFO] RobotPanel.qml loaded\n[17:24:11] [INFO] Waiting for ViewModel connection...\n[17:24:20] [INFO] Robot 1 Connected\n[17:24:20] [INFO] Robot 2 Connected\n[17:24:20] [INFO] Gantry Connected"
                 }
             }
-        }
+        }*/
     }
 }

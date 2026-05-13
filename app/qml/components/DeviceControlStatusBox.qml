@@ -6,6 +6,12 @@ Rectangle {
     id: root
 
     // ----------------------------
+    // Visibility control for buttons
+    // ----------------------------
+    property bool showConnectButton: true
+    property bool showServoButton: true
+    property bool showAlarmResetButton: true
+    // ----------------------------
     // Status text
     // ----------------------------
     property string connectionText: "연결됨"
@@ -119,6 +125,7 @@ Rectangle {
 
                 font.pixelSize: 12
 
+                visible: root.showConnectButton
                 onClicked: root.connectClicked()
             }
 
@@ -130,6 +137,7 @@ Rectangle {
 
                 font.pixelSize: 12
 
+                visible: root.showServoButton
                 onClicked: root.servoClicked()
             }
 
@@ -141,6 +149,7 @@ Rectangle {
 
                 font.pixelSize: 12
 
+                visible: root.showAlarmResetButton
                 onClicked: root.alarmResetClicked()
             }
         }
