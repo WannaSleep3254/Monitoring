@@ -12,6 +12,7 @@
 #include <QCoreApplication>
 
 #include "runtime/MultiChannelRobotGateway.h"
+#include "iot/viewmodel/IotViewModel.h"
 
 int main(int argc, char *argv[])
 {
@@ -24,12 +25,15 @@ int main(int argc, char *argv[])
     // ============================================================
     auto* robotGateway = new MultiChannelRobotGateway(&engine);
 
+    auto* iotViewModel = new IotViewModel(&engine);
+    iotViewModel->setRobotGateway(robotGateway);
+
+    engine.rootContext()->setContextProperty("robotGateway", robotGateway);
+    engine.rootContext()->setContextProperty("iotViewModel", iotViewModel);
+
     if (!robotGateway->start()) {
         qWarning() << "[Gateway] Failed to start MultiChannelRobotGateway";
     }
-
-    // 아직 QML에서 직접 사용하지 않더라도, 이후 ViewModel 연결 전 테스트용으로 등록 가능
-    engine.rootContext()->setContextProperty("robotGateway", robotGateway);
 
     const QUrl url(QStringLiteral("qrc:/qml/Main.qml"));
 
