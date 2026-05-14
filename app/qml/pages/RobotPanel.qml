@@ -1,11 +1,12 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+
 import "qrc:/qml/components"
 
-Item {
+Rectangle {
     id: root
-    anchors.fill: parent
+    color: "#f0f2f5"
 
     // Robot jog display/control mode
     // "joint" or "base"
@@ -107,8 +108,9 @@ Item {
     // ============================================================
     component SectionLabel: Text {
         color: "#2563eb"
-        font.pixelSize: 13
+        font.pixelSize: 12
         font.bold: true
+        font.family: "Asta Sans"
     }
 
     component PlainButton: Button {
@@ -117,14 +119,15 @@ Item {
         Layout.fillWidth: true
         Layout.minimumWidth: 0
         Layout.preferredWidth: 1
-        Layout.preferredHeight: 34
+        Layout.preferredHeight: 28
 
-        font.pixelSize: 14
+        font.pixelSize: 13
 
         contentItem: Text {
             text: buttonRoot.text
             color: "#374151"
             font.pixelSize: buttonRoot.font.pixelSize
+            font.family: "Asta Sans"
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
             elide: Text.ElideRight
@@ -137,28 +140,6 @@ Item {
         }
     }
 
-    component DangerButton: Button {
-        id: dangerRoot
-        Layout.fillWidth: true
-        Layout.preferredHeight: 34
-
-        contentItem: Text {
-            text: dangerRoot.text
-            color: "#dc2626"
-            font.pixelSize: 14
-            font.bold: true
-            horizontalAlignment: Text.AlignHCenter
-            verticalAlignment: Text.AlignVCenter
-        }
-
-        background: Rectangle {
-            radius: 4
-            color: dangerRoot.down ? "#fecaca" : "#fee2e2"
-            border.color: "#fca5a5"
-        }
-    }
-
-
     component ProcessActionButton: Button {
         id: processButton
 
@@ -167,13 +148,14 @@ Item {
         Layout.fillWidth: true
         Layout.minimumWidth: 0
         Layout.preferredWidth: 1
-        Layout.preferredHeight: 34
+        Layout.preferredHeight: 28
 
         contentItem: Text {
             text: processButton.text
             color: processButton.danger ? "#dc2626" : "#374151"
-            font.pixelSize: 14
+            font.pixelSize: 13
             font.bold: processButton.danger
+            font.family: "Asta Sans"
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
             elide: Text.ElideRight
@@ -193,21 +175,22 @@ Item {
         property bool selected: false
 
         Layout.fillWidth: true
-        Layout.preferredHeight: 34
+        Layout.preferredHeight: 28
 
         contentItem: Text {
             text: modeSelectButton.text
             color: modeSelectButton.selected ? "white" : "#334155"
-            font.pixelSize: 14
+            font.pixelSize: 13
             font.bold: modeSelectButton.selected
+            font.family: "Asta Sans"
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
         }
 
         background: Rectangle {
             radius: 3
-            color: modeSelectButton.selected ? "#2f2f2f" : "#e5e7eb"
-            border.color: modeSelectButton.selected ? "#2f2f2f" : "#d1d5db"
+            color: modeSelectButton.selected ? "#1976d2" : "#e5e7eb"
+            border.color: modeSelectButton.selected ? "#1565c0" : "#d1d5db"
         }
     }
 
@@ -216,13 +199,14 @@ Item {
         property bool selected: false
 
         Layout.fillWidth: true
-        Layout.preferredHeight: 48
+        Layout.preferredHeight: 40
 
         contentItem: Text {
             text: modeRoot.text
             color: modeRoot.selected ? "white" : "#111827"
-            font.pixelSize: 16
+            font.pixelSize: 14
             font.bold: true
+            font.family: "Asta Sans"
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
         }
@@ -242,7 +226,7 @@ Item {
         property var jogModel: []
 
         Layout.fillWidth: true
-        Layout.preferredHeight: 64 + 34 + 6 + (jogModel.length * 34) + ((jogModel.length - 1) * 6) //300
+        Layout.preferredHeight: 44 + 28 + 4 + (jogModel.length * 28) + ((jogModel.length - 1) * 4)
 
         radius: 6
         color: "#f8fafc"
@@ -251,11 +235,11 @@ Item {
         ColumnLayout {
             anchors.fill: parent
             anchors.margins: 8
-            spacing: 6
+            spacing: 4
 
             RowLayout {
                 Layout.fillWidth: true
-                spacing: 6
+                spacing: 4
 
                 ModeSelectButton {
                     text: "조인트"
@@ -298,8 +282,9 @@ Item {
                     Text {
                         text: modelData.name
                         Layout.preferredWidth: 28
-                        font.pixelSize: 14
+                        font.pixelSize: 13
                         font.bold: true
+                        font.family: "Asta Sans"
                     }
 
                     PlainButton {
@@ -314,15 +299,26 @@ Item {
                     TextField {
                         text: modelData.value
                         readOnly: true
+                        color: "#374151"
                         horizontalAlignment: Text.AlignRight
+                        font.family: "Asta Sans"
+                        font.pixelSize: 13
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 34
+                        Layout.preferredHeight: 28
+                        background: Rectangle {
+                            radius: 4
+                            color: "#f8fafc"
+                            border.color: "#d1d5db"
+                            border.width: 1
+                        }
                     }
 
                     Text {
                         text: modelData.unit
                         Layout.preferredWidth: 36
                         color: "#334155"
+                        font.pixelSize: 13
+                        font.family: "Asta Sans"
                     }
 
                     PlainButton {
@@ -346,7 +342,7 @@ Item {
         property string unitText: "mm"
 
         Layout.fillWidth: true
-        Layout.preferredHeight: 106
+        Layout.preferredHeight: 88
 
         radius: 6
         color: "#f8fafc"
@@ -354,45 +350,51 @@ Item {
 
         ColumnLayout {
             anchors.fill: parent
-            anchors.margins: 8
-            spacing: 5
+            anchors.margins: 6
+            spacing: 4
 
             Text {
                 text: axisBox.axisName
                 Layout.fillWidth: true
-                Layout.preferredHeight: 18
+                Layout.preferredHeight: 16
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
                 color: "#111827"
-                font.pixelSize: 14
+                font.pixelSize: 13
                 font.bold: true
+                font.family: "Asta Sans"
             }
 
             TextField {
                 text: axisBox.axisValue + " " + axisBox.unitText
                 readOnly: true
+                color: "#374151"
                 Layout.fillWidth: true
-                Layout.preferredHeight: 30
+                Layout.preferredHeight: 26
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
-                font.pixelSize: 14
+                font.pixelSize: 13
+                font.family: "Asta Sans"
+                background: Rectangle {
+                    radius: 4
+                    color: "#f8fafc"
+                    border.color: "#d1d5db"
+                    border.width: 1
+                }
             }
 
             RowLayout {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 28
                 spacing: 6
 
                 PlainButton {
                     text: "−"
-                    Layout.preferredHeight: 28
                     onPressed: console.log("[QML] Gantry jog negative:", axisBox.axisName)
                     onReleased: console.log("[QML] Gantry jog stop:", axisBox.axisName)
                 }
 
                 PlainButton {
                     text: "+"
-                    Layout.preferredHeight: 28
                     onPressed: console.log("[QML] Gantry jog positive:", axisBox.axisName)
                     onReleased: console.log("[QML] Gantry jog stop:", axisBox.axisName)
                 }
@@ -410,23 +412,27 @@ Item {
         property var ioModel: []
 
         Layout.fillWidth: true
-        Layout.fillHeight: true
         Layout.preferredWidth: 1.0
+        implicitHeight: _robotColLayout.implicitHeight + 20
 
         radius: 8
         color: "white"
         border.color: "#d7dde6"
 
         ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 12
-            spacing: 8
+            id: _robotColLayout
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.margins: 10
+            spacing: 6
 
             Text {
                 text: robotColumn.titleText
                 color: "#2563eb"
-                font.pixelSize: 18
+                font.pixelSize: 16
                 font.bold: true
+                font.family: "Asta Sans"
             }
 
             DeviceControlStatusBox {
@@ -435,7 +441,6 @@ Item {
                 estopText: "0"
                 errorText: "0"
                 connectButtonText: "통신 해제"
-//                servoButtonText: "서보 OFF"
                 alarmResetButtonText: "알람 리셋"
 
                 showConnectButton: true
@@ -443,7 +448,6 @@ Item {
                 showAlarmResetButton: true
 
                 onConnectClicked: console.log("[QML] Robot" + robotColumn.robotId + " communication toggle")
-//                onServoClicked: console.log("[QML] Robot" + robotColumn.robotId + " servo toggle")
                 onAlarmResetClicked: console.log("[QML] Robot" + robotColumn.robotId + " alarm reset")
             }
 
@@ -451,15 +455,15 @@ Item {
 
             Rectangle {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 62
+                Layout.preferredHeight: 50
                 radius: 6
                 color: "#f8fafc"
                 border.color: "#e2e8f0"
 
                 RowLayout {
                     anchors.fill: parent
-                    anchors.margins: 8
-                    spacing: 8
+                    anchors.margins: 6
+                    spacing: 6
 
                     PlainButton {
                         text: "초기화 위치 이동"
@@ -477,16 +481,16 @@ Item {
 
             Rectangle {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 108
+                Layout.preferredHeight: 80
                 radius: 6
                 color: "#f8fafc"
                 border.color: "#e2e8f0"
 
                 GridLayout {
                     anchors.fill: parent
-                    anchors.margins: 8
+                    anchors.margins: 6
                     columns: 2
-                    rowSpacing: 6
+                    rowSpacing: 4
                     columnSpacing: 6
 
                     Repeater {
@@ -512,16 +516,16 @@ Item {
 
             Rectangle {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 144
+                Layout.preferredHeight: 112
                 radius: 6
                 color: "#f8fafc"
                 border.color: "#e2e8f0"
 
                 GridLayout {
                     anchors.fill: parent
-                    anchors.margins: 8
+                    anchors.margins: 6
                     columns: 2
-                    rowSpacing: 6
+                    rowSpacing: 4
                     columnSpacing: 6
 
                     Repeater {
@@ -534,77 +538,108 @@ Item {
                     }
                 }
             }
-
-            Item { Layout.fillHeight: true }
         }
     }
 
-    ColumnLayout {
+    RowLayout {
+        id: _contentRow
         anchors.fill: parent
+        anchors.margins: 12
         spacing: 12
 
-        // ============================================================
-        // Upper Area : 4 Columns
-        // 로봇 1 | 로봇 2 | 정상확인/초기화 | 갠트리/피커
-        // ============================================================
-        RowLayout {
+        // --------------------------------------------------------
+        // Column 1: 로봇 1
+        // --------------------------------------------------------
+        ScrollView {
+            id: _scroll1
             Layout.fillWidth: true
             Layout.fillHeight: true
-            spacing: 12
+            clip: true
+            contentHeight: _col1.implicitHeight
+            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
             RobotColumn {
+                id: _col1
+                width: _scroll1.availableWidth
                 robotId: 1
                 titleText: "로봇 1 (FR10)"
                 jogMode: root.robot1JogMode
                 jogModel: root.robot1JogMode === "joint" ? root.robot1JointModel : root.robot1BaseModel
                 ioModel: root.robot1IoModel
             }
+        }
+
+        // --------------------------------------------------------
+        // Column 2: 로봇 2
+        // --------------------------------------------------------
+        ScrollView {
+            id: _scroll2
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            clip: true
+            contentHeight: _col2.implicitHeight
+            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
             RobotColumn {
+                id: _col2
+                width: _scroll2.availableWidth
                 robotId: 2
                 titleText: "로봇 2 (FR5)"
                 jogMode: root.robot2JogMode
                 jogModel: root.robot2JogMode === "joint" ? root.robot2JointModel : root.robot2BaseModel
                 ioModel: root.robot2IoModel
             }
+        }
 
-            // --------------------------------------------------------
-            // Column 3: 전체 제어 / 정상확인
-            // --------------------------------------------------------
+        // --------------------------------------------------------
+        // Column 3: 전체 제어 / 정상확인
+        // --------------------------------------------------------
+        ScrollView {
+            id: _scroll3
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            clip: true
+            contentHeight: _col3Content.implicitHeight
+            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+
             Rectangle {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                Layout.preferredWidth: 1.25
+                id: _col3Content
+                width: _scroll3.availableWidth
+                implicitHeight: _col3Layout.implicitHeight + 20
 
                 radius: 8
                 color: "white"
                 border.color: "#d7dde6"
 
                 ColumnLayout {
-                    anchors.fill: parent
-                    anchors.margins: 12
-                    spacing: 8
+                    id: _col3Layout
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: 10
+                    spacing: 6
 
                     Text {
                         text: "전체 제어 / 정상확인"
                         color: "#2563eb"
-                        font.pixelSize: 18
+                        font.pixelSize: 16
                         font.bold: true
+                        font.family: "Asta Sans"
                     }
 
                     SectionLabel { text: "로봇 제어 모드" }
 
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 70
+                        Layout.preferredHeight: 56
                         radius: 6
                         color: "#f8fafc"
                         border.color: "#e2e8f0"
 
                         RowLayout {
                             anchors.fill: parent
-                            anchors.margins: 8
-                            spacing: 8
+                            anchors.margins: 6
+                            spacing: 6
 
                             ModeButton {
                                 text: "수동 모드"
@@ -630,16 +665,16 @@ Item {
 
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 108
+                        Layout.preferredHeight: 80
                         radius: 6
                         color: "#f8fafc"
                         border.color: "#e2e8f0"
 
                         GridLayout {
                             anchors.fill: parent
-                            anchors.margins: 8
+                            anchors.margins: 6
                             columns: 2
-                            rowSpacing: 6
+                            rowSpacing: 4
                             columnSpacing: 6
 
                             PlainButton {
@@ -664,16 +699,16 @@ Item {
 
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 62
+                        Layout.preferredHeight: 46
                         radius: 6
                         color: "#f8fafc"
                         border.color: "#e2e8f0"
 
                         GridLayout {
                             anchors.fill: parent
-                            anchors.margins: 8
+                            anchors.margins: 6
                             columns: 2
-                            rowSpacing: 6
+                            rowSpacing: 4
                             columnSpacing: 6
 
                             PlainButton { text: "로봇 1 확인"; onClicked: console.log("[QML] Check Robot1") }
@@ -689,7 +724,7 @@ Item {
                         property int rowCount: Math.ceil(buttonCount / columnCount)
 
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 62 + Math.max(0, rowCount - 1) * 46
+                        Layout.preferredHeight: 46 + Math.max(0, rowCount - 1) * 34
                         radius: 6
                         color: "#f8fafc"
                         border.color: "#e2e8f0"
@@ -717,16 +752,16 @@ Item {
 
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 144
+                        Layout.preferredHeight: 112
                         radius: 6
                         color: "#f8fafc"
                         border.color: "#e2e8f0"
 
                         GridLayout {
                             anchors.fill: parent
-                            anchors.margins: 8
+                            anchors.margins: 6
                             columns: 2
-                            rowSpacing: 6
+                            rowSpacing: 4
                             columnSpacing: 6
 
                             Repeater {
@@ -739,33 +774,44 @@ Item {
                             }
                         }
                     }
-
-                    Item { Layout.fillHeight: true }
                 }
             }
+        }
 
-            // --------------------------------------------------------
-            // Column 4: 갠트리/피커
-            // --------------------------------------------------------
+        // --------------------------------------------------------
+        // Column 4: 갠트리/피커
+        // --------------------------------------------------------
+        ScrollView {
+            id: _scroll4
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            clip: true
+            contentHeight: _col4Content.implicitHeight
+            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+
             Rectangle {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                Layout.preferredWidth: 0.95
+                id: _col4Content
+                width: _scroll4.availableWidth
+                implicitHeight: _col4Layout.implicitHeight + 20
 
                 radius: 8
                 color: "white"
                 border.color: "#d7dde6"
 
                 ColumnLayout {
-                    anchors.fill: parent
-                    anchors.margins: 12
-                    spacing: 8
+                    id: _col4Layout
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: 10
+                    spacing: 6
 
                     Text {
                         text: "갠트리/피커 (X/Z/R)"
                         color: "#2563eb"
-                        font.pixelSize: 18
+                        font.pixelSize: 16
                         font.bold: true
+                        font.family: "Asta Sans"
                     }
 
                     DeviceControlStatusBox {
@@ -790,16 +836,16 @@ Item {
 
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 108
+                        Layout.preferredHeight: 80
                         radius: 6
                         color: "#f8fafc"
                         border.color: "#e2e8f0"
 
                         GridLayout {
                             anchors.fill: parent
-                            anchors.margins: 8
+                            anchors.margins: 6
                             columns: 2
-                            rowSpacing: 6
+                            rowSpacing: 4
                             columnSpacing: 6
 
                             PlainButton { text: "X축 원점"; onClicked: console.log("[QML] Home X") }
@@ -825,16 +871,16 @@ Item {
 
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 64
+                        Layout.preferredHeight: 50
                         radius: 6
                         color: "#f8fafc"
                         border.color: "#e2e8f0"
 
                         GridLayout {
                             anchors.fill: parent
-                            anchors.margins: 8
+                            anchors.margins: 6
                             columns: 2
-                            rowSpacing: 6
+                            rowSpacing: 4
                             columnSpacing: 6
 
                             PlainButton {
@@ -848,55 +894,8 @@ Item {
                             }
                         }
                     }
-
-                    Item { Layout.fillHeight: true }
                 }
             }
         }
-
-        // ============================================================
-        // Bottom Command Log
-        // ============================================================
-        /*
-        Rectangle {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 150
-            radius: 8
-            color: "white"
-            border.color: "#d7dde6"
-
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.margins: 12
-                spacing: 6
-
-                RowLayout {
-                    Layout.fillWidth: true
-
-                    Text {
-                        text: "명령 로그"
-                        color: "#2563eb"
-                        font.pixelSize: 18
-                        font.bold: true
-                    }
-
-                    Item { Layout.fillWidth: true }
-
-                    PlainButton {
-                        text: "로그 지우기"
-                        Layout.preferredWidth: 110
-                        Layout.fillWidth: false
-                        onClicked: console.log("[QML] Clear log")
-                    }
-                }
-
-                TextArea {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    readOnly: true
-                    text: "[17:24:10] [INFO] RobotPanel.qml loaded\n[17:24:11] [INFO] Waiting for ViewModel connection...\n[17:24:20] [INFO] Robot 1 Connected\n[17:24:20] [INFO] Robot 2 Connected\n[17:24:20] [INFO] Gantry Connected"
-                }
-            }
-        }*/
     }
 }
