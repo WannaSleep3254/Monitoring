@@ -75,10 +75,10 @@ bool IotViewModel::saveThreshold(int robotIndex, const QVariantMap& thresholdDat
 
 void IotViewModel::onSnapshotUpdated(int robotId, QVariantMap snapshot)
 {
+    updateRobotModelFromSnapshot(robotId, snapshot);
+
     qDebug() << "[IoTViewModel] snapshot received robot =" << robotId
              << "seq =" << snapshot.value("sequenceNumber").toULongLong();
-
-    updateRobotModelFromSnapshot(robotId, snapshot);
 }
 
 QVariantMap IotViewModel::defaultThreshold() const

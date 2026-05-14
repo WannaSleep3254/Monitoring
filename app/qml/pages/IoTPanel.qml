@@ -56,7 +56,8 @@ Item {
     // 시간 레이블은 고정으로 6개, 10초 간격으로 -50s ~ Now
     property var timeLabels: ["-50s", "-40s", "-30s", "-20s", "-10s", "Now"]
 
-    property var robotModels: [
+    property bool hasIotViewModel: typeof iotViewModel !== "undefined" && iotViewModel !== null
+    property var sampleRobotModels: [
         {
             name: "Robot 1 (FR10)",
             running: true,
@@ -123,12 +124,16 @@ Item {
         }
     ]
 
+    property var robotModels: root.hasIotViewModel
+                              ? iotViewModel.robotModels
+                              : root.sampleRobotModels
+
     // ============================================================
     // [로봇별 임계값 상태]
     // Dialog에서 저장한 값이 여기에 반영되고,
     // 각 AxisLineChart는 이 값을 binding으로 참조한다.
     // ============================================================
-    property var robotThresholds: [
+    property var sampleRobotThresholds: [
         {
             temperature: {
                 normalMax: 55,
@@ -154,6 +159,10 @@ Item {
             }
         }
     ]
+
+    property var robotThresholds: root.hasIotViewModel
+                                  ? iotViewModel.robotThresholds
+                                  : root.sampleRobotThresholds
 
     function defaultThreshold() {
         return {
@@ -738,10 +747,15 @@ Item {
         thresholds: root.robotThresholds
 
         onSaveRequested: function(robotIndex, thresholdData) {
-            root.applyThreshold(robotIndex, thresholdData)
+            if (root.hasIotViewModel) {
+                if (!iotViewModel.saveThreshold(robotIndex, thresholdData)) {
+                    console.warn("[QML] Failed to save threshold:", robotIndex)
+                }
+                return
+            }
 
-            // 이후 실제 로직 붙일 때
-            // TODO: iotViewModel.saveThreshold(robotIndex, thresholdData)
+            // ViewModel이 없을 때만 QML 내부 샘플 데이터에 반영
+            root.applyThreshold(robotIndex, thresholdData)
         }
     }
 
