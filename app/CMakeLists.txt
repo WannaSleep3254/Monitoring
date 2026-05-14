@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 
 # Qt 찾기 (Widgets 필수)
-find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets Quick Qml QuickControls2 Charts)
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets Quick Qml QuickControls2 Charts)
+find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets Quick Qml QuickControls2 Charts Sql Network)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets Quick Qml QuickControls2 Charts Sql Network)
 
 # Qt 자동 처리 (ui/moc/rcc)
 set(CMAKE_AUTOUIC ON)
@@ -12,14 +12,22 @@ set(CMAKE_AUTORCC ON)
 # 소스 목록
 set(APP_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/gui/mainwindow.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/gui/mainwindow.cpp
+ #   ${CMAKE_CURRENT_SOURCE_DIR}/gui/mainwindow.h
+ #   ${CMAKE_CURRENT_SOURCE_DIR}/gui/mainwindow.cpp
+ )
+
+set(RUNTIME_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/IRobotGateway.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/RobotRuntimeTypes.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/MultiChannelRobotGateway.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/MultiChannelRobotGateway.cpp
 )
 
+list(APPEND APP_SOURCES ${RUNTIME_SOURCES})
 # UI 파일(선택)
-if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/gui/mainwindow.ui")
-    list(APPEND APP_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/gui/mainwindow.ui")
-endif()
+#if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/gui/mainwindow.ui")
+#    list(APPEND APP_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/gui/mainwindow.ui")
+#endif()
 
 # 리소스 qrc(선택)
 if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources/app.qrc")
@@ -44,6 +52,8 @@ endif()
 target_include_directories(MonitoringApp PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/gui
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime
     #${FAIRINO_INCLUDE_DIR} # 일시적으로 core에서 필요한 경로도 추가 (core이외에 app에서도 직접 include할 경우 대비
 )
 
@@ -54,6 +64,8 @@ target_link_libraries(MonitoringApp PRIVATE
     Qt${QT_VERSION_MAJOR}::Qml
     Qt${QT_VERSION_MAJOR}::QuickControls2
     Qt${QT_VERSION_MAJOR}::Charts
+    Qt${QT_VERSION_MAJOR}::Sql
+    Qt${QT_VERSION_MAJOR}::Network
     monitoring_core
 )
 
