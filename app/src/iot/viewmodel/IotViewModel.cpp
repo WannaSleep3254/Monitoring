@@ -109,7 +109,7 @@ QVariantMap IotViewModel::normalizeThreshold(const QVariantMap& thresholdData) c
     QVariantMap torque = thresholdData.value("torque").toMap();
 
     if (torque.isEmpty()) {
-        torque = thresholdData.value("torque").toMap();
+        torque = fallback.value("torque").toMap();
     }
 
     if (temp.isEmpty()) {
