@@ -8,6 +8,9 @@
         <file alias="qml/pages/RobotPanel.qml">../qml/pages/RobotPanel.qml</file>
         <file alias="qml/pages/IoTPanel.qml">../qml/pages/IoTPanel.qml</file>
         <file alias="qml/pages/DevPanel.qml">../qml/pages/DevPanel.qml</file>
+        
+        <file alias="qml/pages/HistoryQueryDialog.qml">../qml/pages/HistoryQueryDialog.qml</file>
+        <file alias="qml/pages/ThresholdSettingDialog.qml">../qml/pages/ThresholdSettingDialog.qml</file>
         <!-- 컴포넌트 -->
         <file alias="qml/components/DeviceStatusBox.qml">../qml/components/DeviceStatusBox.qml</file>
         <file alias="qml/components/DeviceControlStatusBox.qml">../qml/components/DeviceControlStatusBox.qml</file>

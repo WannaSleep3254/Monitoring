@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 
 # Qt 찾기 (Widgets 필수)
-find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets Quick Qml QuickControls2)
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets Quick Qml QuickControls2)
+find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets Quick Qml QuickControls2 Charts)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets Quick Qml QuickControls2 Charts)
 
 # Qt 자동 처리 (ui/moc/rcc)
 set(CMAKE_AUTOUIC ON)
@@ -53,6 +53,7 @@ target_link_libraries(MonitoringApp PRIVATE
     Qt${QT_VERSION_MAJOR}::Quick
     Qt${QT_VERSION_MAJOR}::Qml
     Qt${QT_VERSION_MAJOR}::QuickControls2
+    Qt${QT_VERSION_MAJOR}::Charts
     monitoring_core
 )
 
