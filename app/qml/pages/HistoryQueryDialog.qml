@@ -17,13 +17,13 @@ Popup {
 
     width: Math.min(dialogRoot.hostWidth * 0.90, 1280)
     height: Math.min(dialogRoot.hostHeight * 0.82, 660)
-    x: Math.round((dialogRoot.width - width) / 2)
-    y: Math.round((dialogRoot.height - height) / 2)
+    x: Math.round((dialogRoot.hostWidth  - width)  / 2)
+    y: Math.round((dialogRoot.hostHeight - height) / 2)
 
     background: Rectangle {
         radius: 10
-        color: "white"
-        border.color: "#d7dde6"
+        color: "#ffffff"
+        border.color: "#e0e4ea"
     }
 
     onOpened: {
@@ -42,7 +42,8 @@ Popup {
 
                 Text {
                     text: "이력 조회 / 내보내기"
-                    color: "#0f172a"
+                    color: "#212121"
+                    font.family:    "Asta Sans"
                     font.pixelSize: 20
                     font.bold: true
                 }
@@ -71,7 +72,8 @@ Popup {
 
                     Text {
                         text: "로봇 선택"
-                        color: "#334155"
+                        color: "#374151"
+                        font.family:    "Asta Sans"
                         font.pixelSize: 13
                         font.bold: true
                     }
@@ -81,9 +83,27 @@ Popup {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 34
                         model: ["전체", "Robot 1", "Robot 2"]
+                        font.family:    "Asta Sans"
                         font.pixelSize: 12
 
                         onCurrentTextChanged: dialogRoot.selectedHistoryIndex = 0
+
+                        contentItem: Text {
+                            leftPadding:        8
+                            text:               historyRobotCombo.displayText
+                            font.family:        "Asta Sans"
+                            font.pixelSize:     12
+                            color:              "#212121"
+                            verticalAlignment:  Text.AlignVCenter
+                            elide:              Text.ElideRight
+                        }
+
+                        background: Rectangle {
+                            radius:       5
+                            color:        "#fafafa"
+                            border.color: historyRobotCombo.activeFocus ? "#1976d2" : "#d1d5db"
+                            border.width: 1
+                        }
                     }
                 }
 
@@ -93,7 +113,8 @@ Popup {
 
                     Text {
                         text: "기간"
-                        color: "#334155"
+                        color: "#374151"
+                        font.family:    "Asta Sans"
                         font.pixelSize: 13
                         font.bold: true
                     }
@@ -103,9 +124,27 @@ Popup {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 34
                         model: ["오늘", "최근 7일", "최근 30일", "사용자 지정"]
+                        font.family:    "Asta Sans"
                         font.pixelSize: 12
 
                         onCurrentTextChanged: dialogRoot.selectedHistoryIndex = 0
+
+                        contentItem: Text {
+                            leftPadding:        8
+                            text:               historyPeriodCombo.displayText
+                            font.family:        "Asta Sans"
+                            font.pixelSize:     12
+                            color:              "#212121"
+                            verticalAlignment:  Text.AlignVCenter
+                            elide:              Text.ElideRight
+                        }
+
+                        background: Rectangle {
+                            radius:       5
+                            color:        "#fafafa"
+                            border.color: historyPeriodCombo.activeFocus ? "#1976d2" : "#d1d5db"
+                            border.width: 1
+                        }
                     }
                 }
 
@@ -115,7 +154,8 @@ Popup {
 
                     Text {
                         text: "이력 구분"
-                        color: "#334155"
+                        color: "#374151"
+                        font.family:    "Asta Sans"
                         font.pixelSize: 13
                         font.bold: true
                     }
@@ -123,7 +163,7 @@ Popup {
                     RowLayout {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 34
-                        spacing: 0
+                        spacing: 4
 
                         HistorySegmentButton {
                             text: "전체"
@@ -160,7 +200,8 @@ Popup {
 
                     Text {
                         text: "검색"
-                        color: "#334155"
+                        color: "#374151"
+                        font.family:    "Asta Sans"
                         font.pixelSize: 13
                         font.bold: true
                     }
@@ -170,15 +211,17 @@ Popup {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 34
                         placeholderText: "설명 / 조치내용 검색"
-                        font.pixelSize: 12
-                        selectByMouse: true
+                        color:           "#212121"
+                        font.family:     "Asta Sans"
+                        font.pixelSize:  12
+                        selectByMouse:   true
 
                         onTextChanged: dialogRoot.selectedHistoryIndex = 0
 
                         background: Rectangle {
                             radius: 5
-                            color: "#f8fafc"
-                            border.color: historySearchField.activeFocus ? "#2563eb" : "#cbd5e1"
+                            color: "#fafafa"
+                            border.color: historySearchField.activeFocus ? "#1976d2" : "#d1d5db"
                         }
                     }
                 }
@@ -244,68 +287,81 @@ Popup {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     radius: 6
-                    color: "white"
-                    border.color: "#d7dde6"
+                    color: "#ffffff"
+                    border.color: "#e0e4ea"
                     clip: true
 
                     ColumnLayout {
                         anchors.fill: parent
                         spacing: 0
 
-                        HistoryTableRow {
+                        // 헤더 + 데이터: 단일 Flickable(가로+세로)
+                        Flickable {
+                            id: tableFlick
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 34
-                            Layout.minimumHeight: 34
-                            Layout.maximumHeight: 34
-                            Layout.fillHeight: false
-                            isHeader: true
-                            timeText: "시간"
-                            robotText: "로봇"
-                            kindText: "구분"
-                            axisText: "축"
-                            tempText: "온도"
-                            torqueText: "토크"
-                            statusText: "상태"
-                            descText: "설명"
-                            actionStatusText: "조치상태"
-                        }
+                            Layout.fillHeight: true
+                            contentWidth:  Math.max(width, 600)
+                            contentHeight: tableRows.implicitHeight
+                            flickableDirection: Flickable.HorizontalAndVerticalFlick
+                            boundsBehavior: Flickable.DragAndOvershootBounds
+                            clip: true
 
-                        Repeater {
-                            model: dialogRoot.filteredHistoryRows(historySearchField.text,
-                                                            historyRobotCombo.currentText,
-                                                            dialogRoot.historyFilterType)
+                            ScrollBar.horizontal: ScrollBar { policy: ScrollBar.AsNeeded }
+                            ScrollBar.vertical:   ScrollBar { policy: ScrollBar.AsNeeded }
 
-                            HistoryTableRow {
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: 34
-                                Layout.minimumHeight: 34
-                                Layout.maximumHeight: 34
-                                Layout.fillHeight: false
+                            Column {
+                                id: tableRows
+                                width: tableFlick.contentWidth
+                                spacing: 0
 
-                                isHeader: false
-                                selected: index === dialogRoot.selectedHistoryIndex
+                                HistoryTableRow {
+                                    width: parent.width
+                                    height: 34
+                                    isHeader: true
+                                    timeText: "시간"
+                                    robotText: "로봇"
+                                    kindText: "구분"
+                                    axisText: "축"
+                                    tempText: "온도"
+                                    torqueText: "토크"
+                                    statusText: "상태"
+                                    descText: "설명"
+                                    actionStatusText: "조치상태"
+                                }
 
-                                timeText: modelData.time
-                                robotText: modelData.robot
-                                kindText: modelData.kind
-                                axisText: modelData.axis
-                                tempText: modelData.temp
-                                torqueText: modelData.torque
-                                statusText: modelData.status
-                                descText: modelData.desc
-                                actionStatusText: modelData.actionStatus
+                                Repeater {
+                                    model: dialogRoot.filteredHistoryRows(historySearchField.text,
+                                                                    historyRobotCombo.currentText,
+                                                                    dialogRoot.historyFilterType)
 
-                                onRowClicked: dialogRoot.selectedHistoryIndex = index
+                                    HistoryTableRow {
+                                        width: tableRows.width
+                                        height: 34
+                                        isHeader: false
+                                        selected: index === dialogRoot.selectedHistoryIndex
+
+                                        timeText: modelData.time
+                                        robotText: modelData.robot
+                                        kindText: modelData.kind
+                                        axisText: modelData.axis
+                                        tempText: modelData.temp
+                                        torqueText: modelData.torque
+                                        statusText: modelData.status
+                                        descText: modelData.desc
+                                        actionStatusText: modelData.actionStatus
+
+                                        onRowClicked: dialogRoot.selectedHistoryIndex = index
+                                    }
+                                }
                             }
                         }
 
-                        Item { Layout.fillHeight: true }
-
+                        // 푸터: 건수
                         Rectangle {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 36
                             Layout.fillHeight: false
-                            color: "#f8fafc"
+                            color: "#fafafa"
                             border.color: "#e2e8f0"
 
                             RowLayout {
@@ -319,7 +375,8 @@ Popup {
                                                                                historyRobotCombo.currentText,
                                                                                dialogRoot.historyFilterType)
                                     text: "총 " + rows.length + "건"
-                                    color: "#475569"
+                                    color: "#374151"
+                                    font.family:    "Asta Sans"
                                     font.pixelSize: 12
                                 }
 
@@ -330,7 +387,8 @@ Popup {
                                     text: rows.length > 0
                                           ? " |  " + (dialogRoot.clampHistoryIndex(rows) + 1) + " / " + rows.length
                                           : " |  0 / 0"
-                                    color: "#64748b"
+                                    color: "#9e9e9e"
+                                    font.family:    "Asta Sans"
                                     font.pixelSize: 12
                                 }
 
@@ -349,21 +407,38 @@ Popup {
                     property int safeIndex: dialogRoot.clampHistoryIndex(rows)
                     property var selectedItem: safeIndex >= 0 ? rows[safeIndex] : null
 
-                    Layout.preferredWidth: 360
+                    Layout.preferredWidth: 280
                     Layout.fillHeight: true
                     radius: 6
-                    color: "white"
-                    border.color: "#d7dde6"
+                    color: "#ffffff"
+                    border.color: "#e0e4ea"
+                    clip: true
 
-                    ColumnLayout {
+                    Flickable {
+                        id: detailFlick
                         anchors.fill: parent
-                        anchors.margins: 12
-                        spacing: 8
+                        contentWidth:  width
+                        contentHeight: detailCol.implicitHeight
+                        flickableDirection: Flickable.VerticalFlick
+                        boundsBehavior: Flickable.DragAndOvershootBounds
+                        clip: false
+
+                        ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+
+                        ColumnLayout {
+                            id: detailCol
+                            width:   detailFlick.width - 24
+                            anchors.top:   parent.top
+                            anchors.left:  parent.left
+                            anchors.leftMargin:  12
+                            anchors.topMargin:   12
+                            spacing: 8
 
                         Text {
                             Layout.fillWidth: true
                             text: "선택 이력 상세"
-                            color: "#0f172a"
+                            color: "#212121"
+                            font.family:    "Asta Sans"
                             font.pixelSize: 16
                             font.bold: true
                         }
@@ -413,18 +488,13 @@ Popup {
                             valueText: historyDetailPanel.selectedItem ? historyDetailPanel.selectedItem.operatorName : "-"
                         }
 
-                        // ------------------------------------------------------------
-                        // 조치 내용 영역
-                        // 하단 안내 카드와 겹치지 않도록 고정 높이 사용
-                        // ------------------------------------------------------------
                         Rectangle {
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 74
-                            Layout.minimumHeight: 74
-                            Layout.maximumHeight: 74
+                            Layout.preferredHeight: 60
+                            Layout.minimumHeight: 0
                             Layout.fillHeight: false
                             radius: 6
-                            color: "#f8fafc"
+                            color: "#fafafa"
                             border.color: "#e2e8f0"
                             clip: true
 
@@ -437,9 +507,9 @@ Popup {
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 16
                                     Layout.fillHeight: false
-
                                     text: "조치 내용"
-                                    color: "#64748b"
+                                    color: "#9e9e9e"
+                                    font.family:    "Asta Sans"
                                     font.pixelSize: 12
                                     font.bold: true
                                     verticalAlignment: Text.AlignVCenter
@@ -449,7 +519,8 @@ Popup {
                                     Layout.fillWidth: true
                                     Layout.fillHeight: true
                                     text: historyDetailPanel.selectedItem ? historyDetailPanel.selectedItem.actionContent : "-"
-                                    color: "#334155"
+                                    color: "#374151"
+                                    font.family:    "Asta Sans"
                                     font.pixelSize: 12
                                     wrapMode: Text.WordWrap
                                     elide: Text.ElideRight
@@ -458,15 +529,10 @@ Popup {
                             }
                         }
 
-                        // ------------------------------------------------------------
-                        // 하단 기록 방식 안내 카드
-                        // 카드 영역은 고정 높이로 유지하여 조치 내용 영역을 침범하지 않게 함
-                        // ------------------------------------------------------------
                         RowLayout {
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 44
-                            Layout.minimumHeight: 44
-                            Layout.maximumHeight: 44
+                            Layout.preferredHeight: 54
+                            Layout.minimumHeight: 0
                             Layout.fillHeight: false
                             spacing: 8
 
@@ -484,7 +550,8 @@ Popup {
                                 accentColor: "#16a34a"
                             }
                         }
-                    }
+                        } // end ColumnLayout
+                    } // end Flickable
                 }
             }
         }
@@ -652,11 +719,14 @@ Popup {
         Layout.maximumHeight: 28
         Layout.fillHeight: false
 
+        font.family:    "Asta Sans"
+
         font.pixelSize: 12
 
         contentItem: Text {
             text: toolButton.text
-            color: "#334155"
+            color: "#374151"
+            font.family:    "Asta Sans"
             font.pixelSize: 12
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
@@ -687,11 +757,14 @@ Popup {
         Layout.preferredHeight: 34
         Layout.fillHeight: false
 
+        font.family:    "Asta Sans"
+
         font.pixelSize: 12
 
         contentItem: Text {
             text: exportButton.text
-            color: "white"
+            color: "#ffffff"
+            font.family:    "Asta Sans"
             font.pixelSize: 12
             font.bold: true
             horizontalAlignment: Text.AlignHCenter
@@ -721,13 +794,14 @@ Popup {
         Layout.fillHeight: false
 
         contentItem: Text {
-            text: segRoot.text
-            color: segRoot.selected ? "white" : "#334155"
-            font.pixelSize: 12
-            font.bold: segRoot.selected
+            text:                segRoot.text
+            color:               segRoot.selected ? "white" : "#374151"
+            font.family:         "Asta Sans"
+            font.pixelSize:      12
+            font.bold:           segRoot.selected
             horizontalAlignment: Text.AlignHCenter
-            verticalAlignment: Text.AlignVCenter
-            elide: Text.ElideRight
+            verticalAlignment:   Text.AlignVCenter
+            elide:               Text.ElideRight
         }
 
         background: Rectangle {
@@ -755,8 +829,8 @@ Popup {
         Layout.fillHeight: false
 
         radius: 5
-        color: "#f8fafc"
-        border.color: "#d7dde6"
+        color: "#fafafa"
+        border.color: "#e0e4ea"
 
         RowLayout {
             anchors.fill: parent
@@ -772,7 +846,8 @@ Popup {
 
             Text {
                 text: summaryRoot.labelText + " " + summaryRoot.valueText
-                color: "#334155"
+                color: "#374151"
+                font.family:    "Asta Sans"
                 font.pixelSize: 12
                 font.bold: true
                 elide: Text.ElideRight
@@ -909,6 +984,7 @@ Popup {
 
             text: cellRoot.textValue
             color: cellRoot.isHeader ? "#334155" : "#475569"
+            font.family:    "Asta Sans"
             font.pixelSize: 11
             font.bold: cellRoot.isHeader
             verticalAlignment: Text.AlignVCenter
@@ -935,7 +1011,8 @@ Popup {
             anchors.fill: parent
             anchors.leftMargin: 8
             text: kindRoot.kindText
-            color: "#334155"
+            color: "#374151"
+            font.family:    "Asta Sans"
             font.pixelSize: 11
             font.bold: true
             verticalAlignment: Text.AlignVCenter
@@ -954,6 +1031,7 @@ Popup {
                 anchors.centerIn: parent
                 text: kindRoot.kindText
                 color: kindRoot.kindText === "알람" ? "#dc2626" : "#2563eb"
+                font.family:    "Asta Sans"
                 font.pixelSize: 11
                 font.bold: true
             }
@@ -978,7 +1056,8 @@ Popup {
             anchors.fill: parent
             anchors.leftMargin: 8
             text: statusRoot.statusText
-            color: "#334155"
+            color: "#374151"
+            font.family:    "Asta Sans"
             font.pixelSize: 11
             font.bold: true
             verticalAlignment: Text.AlignVCenter
@@ -1000,6 +1079,7 @@ Popup {
                 color: statusRoot.statusText === "경고" ? "#dc2626"
                      : statusRoot.statusText === "주의" ? "#f97316"
                      : "#15803d"
+                font.family:    "Asta Sans"
                 font.pixelSize: 11
                 font.bold: true
             }
@@ -1024,7 +1104,8 @@ Popup {
             anchors.fill: parent
             anchors.leftMargin: 8
             text: actionRoot.actionText
-            color: "#334155"
+            color: "#374151"
+            font.family:    "Asta Sans"
             font.pixelSize: 11
             font.bold: true
             verticalAlignment: Text.AlignVCenter
@@ -1046,6 +1127,7 @@ Popup {
                 color: actionRoot.actionText === "완료" ? "#16a34a"
                      : actionRoot.actionText === "확인중" ? "#2563eb"
                      : "#d97706"
+                font.family:    "Asta Sans"
                 font.pixelSize: 11
                 font.bold: true
             }
@@ -1061,27 +1143,29 @@ Popup {
 
         property string labelText: ""
         property string valueText: ""
-        property color valueColor: "#334155"
+        property color  valueColor: "#374151"
 
         Layout.fillWidth: true
         Layout.preferredHeight: 24
 
         Text {
             Layout.preferredWidth: 82
-            text: detailRoot.labelText
-            color: "#64748b"
+            text:           detailRoot.labelText
+            font.family:    "Asta Sans"
             font.pixelSize: 12
-            font.bold: true
-            elide: Text.ElideRight
+            font.bold:      true
+            color:          "#9e9e9e"
+            elide:          Text.ElideRight
         }
 
         Text {
             Layout.fillWidth: true
-            text: detailRoot.valueText
-            color: detailRoot.valueColor
+            text:           detailRoot.valueText
+            font.family:    "Asta Sans"
             font.pixelSize: 12
-            font.bold: detailRoot.valueColor !== "#334155"
-            elide: Text.ElideRight
+            font.bold:      detailRoot.valueColor !== "#374151"
+            color:          detailRoot.valueColor
+            elide:          Text.ElideRight
         }
     }
 
@@ -1105,20 +1189,19 @@ Popup {
         property color accentColor: "#2563eb"
 
         Layout.fillWidth: true
-        Layout.fillHeight: false
-        Layout.preferredHeight: 44
-        Layout.minimumHeight: 44
-        Layout.maximumHeight: 44
+        Layout.fillHeight: true
+        Layout.preferredHeight: 54
+        Layout.minimumHeight: 0
 
         radius: 6
-        color: "#f8fafc"
-        border.color: "#d7dde6"
+        color: "#fafafa"
+        border.color: "#e0e4ea"
         clip: true
 
         RowLayout {
             anchors.fill: parent
-            anchors.margins: 5
-            spacing: 5
+            anchors.margins: 6
+            spacing: 6
 
             Rectangle {
                 Layout.preferredWidth: 6
@@ -1139,6 +1222,7 @@ Popup {
                     Layout.fillHeight: false
                     text: modeRoot.titleText
                     color: modeRoot.accentColor
+                    font.family:    "Asta Sans"
                     font.pixelSize: 12
                     font.bold: true
                     horizontalAlignment: Text.AlignLeft
@@ -1151,7 +1235,8 @@ Popup {
                     Layout.preferredHeight: 15
                     Layout.fillHeight: false
                     text: modeRoot.bodyText
-                    color: "#475569"
+                    color: "#374151"
+                    font.family:    "Asta Sans"
                     font.pixelSize: 10
                     horizontalAlignment: Text.AlignLeft
                     verticalAlignment: Text.AlignVCenter
@@ -1164,3 +1249,5 @@ Popup {
     }
 
 }
+
+
