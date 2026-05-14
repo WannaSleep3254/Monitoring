@@ -19,18 +19,19 @@ int main(int argc, char *argv[])
     QApplication app(argc, argv);
 
     QQmlApplicationEngine engine;
-
     // ============================================================
     // Runtime / Gateway
     // ============================================================
     auto* robotGateway = new MultiChannelRobotGateway(&engine);
-
     auto* iotViewModel = new IotViewModel(&engine);
+
     iotViewModel->setRobotGateway(robotGateway);
+    if (!iotViewModel->initialize()) {
+        qWarning() << "[IoTViewModel] initialize failed:"
+                   << iotViewModel->lastError();
+    }
 
-//    engine.rootContext()->setContextProperty("robotGateway", robotGateway);
     engine.rootContext()->setContextProperty("iotViewModel", iotViewModel);
-
     if (!robotGateway->start()) {
         qWarning() << "[Gateway] Failed to start MultiChannelRobotGateway";
     }

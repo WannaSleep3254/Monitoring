@@ -2,6 +2,10 @@
 
 #include "runtime/IRobotGateway.h"
 
+#include "iot/storage/IotDatabase.h"
+#include "iot/storage/IotSchema.h"
+#include "iot/storage/IotThresholdRepository.h"
+
 #include <QDebug>
 
 IotViewModel::IotViewModel(QObject* parent)
@@ -13,6 +17,35 @@ IotViewModel::IotViewModel(QObject* parent)
         defaultThreshold(),
         defaultThreshold()
     };
+}
+
+bool IotViewModel::initialize()
+{
+    m_database = std::make_unique<IotDatabase>();
+
+    if (!m_database->open()) {
+        m_lastError = m_database->lastError();
+        emit lastErrorChanged();
+        return false;
+    }
+
+    IotSchema schema(m_database->database());
+
+    if (!schema.createTables()) {
+        m_lastError = schema.lastError();
+        emit lastErrorChanged();
+        return false;
+    }
+
+    IotThresholdRepository repo(m_database->database());
+
+    m_robotThresholds = repo.loadRobotThresholds(2, defaultThreshold());
+
+    emit robotThresholdsChanged();
+
+    qDebug() << "[IoTViewModel] initialized with SQLite";
+
+    return true;
 }
 
 void IotViewModel::setRobotGateway(IRobotGateway* gateway)
@@ -64,7 +97,37 @@ bool IotViewModel::saveThreshold(int robotIndex, const QVariantMap& thresholdDat
         m_robotThresholds.push_back(defaultThreshold());
     }
 
-    m_robotThresholds[targetIndex] = normalizeThreshold(thresholdData);
+    const QVariantMap normalized = normalizeThreshold(thresholdData);
+
+    // 1. 메모리 갱신
+    m_robotThresholds[targetIndex] = normalized;
+
+    // 2. SQLite 저장
+    if (m_database && m_database->isOpen()) {
+        IotThresholdRepository repo(m_database->database());
+
+        const bool temperatureOk =
+            repo.saveThreshold(robotIndex,
+                               "temperature",
+                               normalized.value("temperature").toMap(),
+                               "°C");
+
+        const bool torqueOk =
+            repo.saveThreshold(robotIndex,
+                               "torque",
+                               normalized.value("torque").toMap(),
+                               "raw");
+
+        if (!temperatureOk || !torqueOk) {
+            m_lastError = repo.lastError();
+            emit lastErrorChanged();
+
+            qWarning() << "[IoTViewModel] threshold SQLite save failed:"
+                       << m_lastError;
+
+            return false;
+        }
+    }
 
     emit robotThresholdsChanged();
 

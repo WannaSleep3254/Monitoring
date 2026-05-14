@@ -4,7 +4,9 @@
 #include <QVariantList>
 #include <QVariantMap>
 #include <QString>
+#include <memory>
 
+class IotDatabase;
 class IRobotGateway;
 
 class IotViewModel : public QObject
@@ -17,6 +19,8 @@ class IotViewModel : public QObject
 
 public:
     explicit IotViewModel(QObject* parent = nullptr);
+
+    Q_INVOKABLE bool initialize();
 
     void setRobotGateway(IRobotGateway* gateway);
 
@@ -46,4 +50,6 @@ private:
     QVariantList m_robotModels;
     QVariantList m_robotThresholds;
     QString m_lastError;
+
+    std::unique_ptr<IotDatabase> m_database;
 };
