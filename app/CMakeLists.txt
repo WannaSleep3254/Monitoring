@@ -17,10 +17,14 @@ set(APP_SOURCES
  )
 
 set(RUNTIME_SOURCES
+    # 로봇 게이트웨이 관련
     ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/IRobotGateway.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/RobotRuntimeTypes.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/MultiChannelRobotGateway.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/MultiChannelRobotGateway.cpp
+    # iot 관련
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/iot/viewmodel/IotViewModel.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/iot/viewmodel/IotViewModel.cpp
 )
 
 list(APPEND APP_SOURCES ${RUNTIME_SOURCES})
