@@ -130,7 +130,7 @@ Rectangle {
         var fallback = root.defaultThreshold()
         if (!thresholdData) return fallback
         var temp    = thresholdData.temperature || fallback.temperature
-        var torque = thresholdData.torque || thresholdData.torque || fallback.torque
+        var torque = thresholdData.torque || fallback.torque
         return {
             temperature: { normalMax: Number(temp.normalMax),    warningMax: Number(temp.warningMax),    alarmMax: Number(temp.alarmMax)    },
             torque:     { normalMax: Number(torque.normalMax), warningMax: Number(torque.warningMax), alarmMax: Number(torque.alarmMax) }
@@ -334,7 +334,7 @@ Rectangle {
                                 Layout.fillWidth: true
                                 cardLabel:    "Max 부하"
                                 cardValue:    root.maxLatestInfo(robotCard.robotData.torqueSeries).value.toFixed(1)
-                                cardUnit:     "A"
+                                cardUnit:     "raw"
                                 cardSub:      root.maxLatestInfo(robotCard.robotData.torqueSeries).axis
                                 accentColor:  root.maxLatestInfo(robotCard.robotData.torqueSeries).value
                                               >= root.thresholdFor(robotCard.robotIndex).torque.warningMax
@@ -376,7 +376,7 @@ Rectangle {
                             Layout.minimumHeight:   root.chartMinHeight
                             Layout.preferredHeight: root.chartPreferredHeight
                             chartTitle:   "축별 부하 추세"
-                            unit:         "A"
+                            unit:         "raw"
                             minValue:     0
                             maxValue:     20
                             normalValue:  root.thresholdFor(robotCard.robotIndex).torque.normalMax

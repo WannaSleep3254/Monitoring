@@ -116,10 +116,6 @@ QVariantMap IotViewModel::normalizeThreshold(const QVariantMap& thresholdData) c
         temp = fallback.value("temperature").toMap();
     }
 
-    if (torque.isEmpty()) {
-        torque = fallback.value("torque").toMap();
-    }
-
     QVariantMap normalizedTemp;
     normalizedTemp["normalMax"] = temp.value("normalMax", 55.0).toDouble();
     normalizedTemp["warningMax"] = temp.value("warningMax", 60.0).toDouble();

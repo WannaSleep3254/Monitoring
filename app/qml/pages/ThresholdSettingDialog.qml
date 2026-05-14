@@ -45,7 +45,7 @@ Popup {
 
         return {
             temperature: source.temperature || fallback.temperature,
-            torque: source.torque || source.torque || fallback.torque
+            torque: source.torque || fallback.torque
         }
     }
 
@@ -195,11 +195,11 @@ Popup {
 
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    title: "전류 임계값 (A)"
+                    title: "부하 임계값 (raw)"
                     normalValue: thresholdCard.thresholdData.torque.normalMax
                     warningValue: thresholdCard.thresholdData.torque.warningMax
                     alarmValue: thresholdCard.thresholdData.torque.alarmMax
-                    unitText: "A"
+                    unitText: "raw"
                 }
             }
 
