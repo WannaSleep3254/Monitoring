@@ -22,12 +22,20 @@ set(RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/RobotRuntimeTypes.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/MultiChannelRobotGateway.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/MultiChannelRobotGateway.cpp
+)
+set(IOT_SOURCES
     # iot 관련
     ${CMAKE_CURRENT_SOURCE_DIR}/src/iot/viewmodel/IotViewModel.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/iot/viewmodel/IotViewModel.cpp
+    #
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/iot/storage/IotDatabase.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/iot/storage/IotDatabase.cpp
+    #
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/iot/storage/IotSchema.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/iot/storage/IotSchema.cpp
 )
 
-list(APPEND APP_SOURCES ${RUNTIME_SOURCES})
+list(APPEND APP_SOURCES ${RUNTIME_SOURCES} ${IOT_SOURCES})
 # UI 파일(선택)
 #if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/gui/mainwindow.ui")
 #    list(APPEND APP_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/gui/mainwindow.ui")
