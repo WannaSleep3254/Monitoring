@@ -28,7 +28,7 @@ int main(int argc, char *argv[])
     auto* iotViewModel = new IotViewModel(&engine);
     iotViewModel->setRobotGateway(robotGateway);
 
-    engine.rootContext()->setContextProperty("robotGateway", robotGateway);
+//    engine.rootContext()->setContextProperty("robotGateway", robotGateway);
     engine.rootContext()->setContextProperty("iotViewModel", iotViewModel);
 
     if (!robotGateway->start()) {

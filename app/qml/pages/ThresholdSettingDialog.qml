@@ -15,7 +15,7 @@ Popup {
     // thresholdData:
     // {
     //   temperature: { normalMax, warningMax, alarmMax },
-    //   current:     { normalMax, warningMax, alarmMax }
+    //   torque:     { normalMax, warningMax, alarmMax }
     // }
     signal saveRequested(int robotIndex, var thresholdData)
 
@@ -26,7 +26,7 @@ Popup {
                 warningMax: 60,
                 alarmMax: 70
             },
-            current: {
+            torque: {
                 normalMax: 12,
                 warningMax: 14,
                 alarmMax: 16
@@ -45,7 +45,7 @@ Popup {
 
         return {
             temperature: source.temperature || fallback.temperature,
-            current: source.current || source.torque || fallback.current
+            torque: source.torque || source.torque || fallback.torque
         }
     }
 
@@ -191,14 +191,14 @@ Popup {
                 }
 
                 ThresholdGroup {
-                    id: currentGroup
+                    id: torqueGroup
 
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     title: "전류 임계값 (A)"
-                    normalValue: thresholdCard.thresholdData.current.normalMax
-                    warningValue: thresholdCard.thresholdData.current.warningMax
-                    alarmValue: thresholdCard.thresholdData.current.alarmMax
+                    normalValue: thresholdCard.thresholdData.torque.normalMax
+                    warningValue: thresholdCard.thresholdData.torque.warningMax
+                    alarmValue: thresholdCard.thresholdData.torque.alarmMax
                     unitText: "A"
                 }
             }
@@ -212,7 +212,7 @@ Popup {
                 onClicked: {
                     var thresholdData = {
                         temperature: tempGroup.toThresholdData(),
-                        current: currentGroup.toThresholdData()
+                        torque: torqueGroup.toThresholdData()
                     }
 
                     console.log("[QML] threshold save requested, robot = " + thresholdCard.robotIndex)

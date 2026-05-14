@@ -76,9 +76,10 @@ bool IotViewModel::saveThreshold(int robotIndex, const QVariantMap& thresholdDat
 void IotViewModel::onSnapshotUpdated(int robotId, QVariantMap snapshot)
 {
     updateRobotModelFromSnapshot(robotId, snapshot);
-
+#if false
     qDebug() << "[IoTViewModel] snapshot received robot =" << robotId
              << "seq =" << snapshot.value("sequenceNumber").toULongLong();
+#endif
 }
 
 QVariantMap IotViewModel::defaultThreshold() const
@@ -88,14 +89,14 @@ QVariantMap IotViewModel::defaultThreshold() const
     temperature["warningMax"] = 60.0;
     temperature["alarmMax"] = 70.0;
 
-    QVariantMap current;
-    current["normalMax"] = 12.0;
-    current["warningMax"] = 14.0;
-    current["alarmMax"] = 16.0;
+    QVariantMap torque;
+    torque["normalMax"] = 12.0;
+    torque["warningMax"] = 14.0;
+    torque["alarmMax"] = 16.0;
 
     QVariantMap threshold;
     threshold["temperature"] = temperature;
-    threshold["current"] = current;
+    threshold["torque"] = torque;
 
     return threshold;
 }
@@ -105,18 +106,18 @@ QVariantMap IotViewModel::normalizeThreshold(const QVariantMap& thresholdData) c
     QVariantMap fallback = defaultThreshold();
 
     QVariantMap temp = thresholdData.value("temperature").toMap();
-    QVariantMap current = thresholdData.value("current").toMap();
+    QVariantMap torque = thresholdData.value("torque").toMap();
 
-    if (current.isEmpty()) {
-        current = thresholdData.value("torque").toMap();
+    if (torque.isEmpty()) {
+        torque = thresholdData.value("torque").toMap();
     }
 
     if (temp.isEmpty()) {
         temp = fallback.value("temperature").toMap();
     }
 
-    if (current.isEmpty()) {
-        current = fallback.value("current").toMap();
+    if (torque.isEmpty()) {
+        torque = fallback.value("torque").toMap();
     }
 
     QVariantMap normalizedTemp;
@@ -124,14 +125,14 @@ QVariantMap IotViewModel::normalizeThreshold(const QVariantMap& thresholdData) c
     normalizedTemp["warningMax"] = temp.value("warningMax", 60.0).toDouble();
     normalizedTemp["alarmMax"] = temp.value("alarmMax", 70.0).toDouble();
 
-    QVariantMap normalizedCurrent;
-    normalizedCurrent["normalMax"] = current.value("normalMax", 12.0).toDouble();
-    normalizedCurrent["warningMax"] = current.value("warningMax", 14.0).toDouble();
-    normalizedCurrent["alarmMax"] = current.value("alarmMax", 16.0).toDouble();
+    QVariantMap normalizedTorque;
+    normalizedTorque["normalMax"] = torque.value("normalMax", 12.0).toDouble();
+    normalizedTorque["warningMax"] = torque.value("warningMax", 14.0).toDouble();
+    normalizedTorque["alarmMax"] = torque.value("alarmMax", 16.0).toDouble();
 
     QVariantMap normalized;
     normalized["temperature"] = normalizedTemp;
-    normalized["current"] = normalizedCurrent;
+    normalized["torque"] = normalizedTorque;
 
     return normalized;
 }
@@ -144,7 +145,7 @@ void IotViewModel::initializeDefaultModels()
         robot["running"] = false;
 
         QVariantList tempSeries;
-        QVariantList currentSeries;
+        QVariantList torqueSeries;
 
         for (int i = 0; i < 6; ++i) {
             QVariantMap tempAxis;
@@ -152,14 +153,14 @@ void IotViewModel::initializeDefaultModels()
             tempAxis["values"] = QVariantList{0, 0, 0, 0, 0, 0};
             tempSeries.push_back(tempAxis);
 
-            QVariantMap currentAxis;
-            currentAxis["axis"] = QString("J%1").arg(i + 1);
-            currentAxis["values"] = QVariantList{0, 0, 0, 0, 0, 0};
-            currentSeries.push_back(currentAxis);
+            QVariantMap torqueAxis;
+            torqueAxis["axis"] = QString("J%1").arg(i + 1);
+            torqueAxis["values"] = QVariantList{0, 0, 0, 0, 0, 0};
+            torqueSeries.push_back(torqueAxis);
         }
 
         robot["tempSeries"] = tempSeries;
-        robot["currentSeries"] = currentSeries;
+        robot["torqueSeries"] = torqueSeries;
         robot["alarms"] = QVariantList{};
 
         QVariantMap prediction;
@@ -197,7 +198,7 @@ void IotViewModel::updateRobotModelFromSnapshot(int robotId, const QVariantMap& 
     QVariantList torques = snapshot.value("torques").toList();
 
     QVariantList tempSeries = robot.value("tempSeries").toList();
-    QVariantList currentSeries = robot.value("currentSeries").toList();
+    QVariantList torqueSeries = robot.value("torqueSeries").toList();
 
     auto pushLatest = [](QVariantList series, const QVariantList& values) {
         for (int i = 0; i < series.size() && i < values.size(); ++i) {
@@ -222,11 +223,11 @@ void IotViewModel::updateRobotModelFromSnapshot(int robotId, const QVariantMap& 
     }
 
     if (!torques.isEmpty()) {
-        currentSeries = pushLatest(currentSeries, torques);
+        torqueSeries = pushLatest(torqueSeries, torques);
     }
 
     robot["tempSeries"] = tempSeries;
-    robot["currentSeries"] = currentSeries;
+    robot["torqueSeries"] = torqueSeries;
 
     m_robotModels[index] = robot;
 

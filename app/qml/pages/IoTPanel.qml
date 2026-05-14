@@ -52,7 +52,7 @@ Rectangle {
                 { axis: "J5", values: [40.5, 41.0, 41.8, 42.3, 42.8, 43.2] },
                 { axis: "J6", values: [38.9, 39.4, 39.8, 40.2, 40.5, 40.7] }
             ],
-            currentSeries: [
+            torqueSeries: [
                 { axis: "J1", values: [10.2, 10.8, 11.4, 11.7, 12.0, 12.3] },
                 { axis: "J2", values: [8.4,  8.7,  9.1,  9.4,  9.6,  9.8]  },
                 { axis: "J3", values: [13.1, 13.7, 14.4, 15.0, 15.3, 15.6] },
@@ -61,14 +61,14 @@ Rectangle {
                 { axis: "J6", values: [9.1,  9.5,  10.0, 10.4, 10.7, 10.9] }
             ],
             alarms: [
-                { time: "17:04:58", level: "WARN", message: "J3 전류 임계치 접근" },
+                { time: "17:04:58", level: "WARN", message: "J3 부하 임계치 접근" },
                 { time: "17:04:41", level: "INFO", message: "실시간 갱신 정상" }
             ],
             prediction: {
                 riskLevel: "주의",
                 score: 82,
-                causeText: "J3 전류 상승",
-                recommendedAction: "J3 축 전류 추세 점검 권장"
+                causeText: "J3 부하 상승",
+                recommendedAction: "J3 축 부하 추세 점검 권장"
             }
         },
         {
@@ -82,7 +82,7 @@ Rectangle {
                 { axis: "J5", values: [41.0, 41.7, 42.2, 42.8, 43.4, 43.9] },
                 { axis: "J6", values: [39.7, 40.2, 40.7, 41.0, 41.3, 41.5] }
             ],
-            currentSeries: [
+            torqueSeries: [
                 { axis: "J1", values: [11.8, 12.4, 13.0, 13.5, 13.8, 14.1] },
                 { axis: "J2", values: [9.0,  9.4,  9.7,  10.0, 10.3, 10.6] },
                 { axis: "J3", values: [12.0, 12.5, 13.0, 13.3, 13.6, 13.8] },
@@ -91,13 +91,13 @@ Rectangle {
                 { axis: "J6", values: [10.2, 10.6, 10.9, 11.2, 11.5, 11.7] }
             ],
             alarms: [
-                { time: "17:04:57", level: "WARN", message: "J4 전류 초과 감지" },
+                { time: "17:04:57", level: "WARN", message: "J4 부하 초과 감지" },
                 { time: "17:04:32", level: "INFO", message: "알람 표시 정상" }
             ],
             prediction: {
                 riskLevel: "경고",
                 score: 91,
-                causeText: "J4 전류 초과",
+                causeText: "J4 부하 초과",
                 recommendedAction: "J4 축 이상 징후 감지, 점검 요청"
             }
         }
@@ -110,9 +110,9 @@ Rectangle {
     // ── 임계값 상태 ───────────────────────────────────────────
     property var sampleRobotThresholds: [
         { temperature: { normalMax: 55, warningMax: 60, alarmMax: 70 },
-          current:     { normalMax: 12, warningMax: 14, alarmMax: 16 } },
+          torque:     { normalMax: 12, warningMax: 14, alarmMax: 16 } },
         { temperature: { normalMax: 55, warningMax: 60, alarmMax: 70 },
-          current:     { normalMax: 12, warningMax: 14, alarmMax: 16 } }
+          torque:     { normalMax: 12, warningMax: 14, alarmMax: 16 } }
     ]
 
     property var robotThresholds: root.hasIotViewModel
@@ -122,7 +122,7 @@ Rectangle {
     function defaultThreshold() {
         return {
             temperature: { normalMax: 55, warningMax: 60, alarmMax: 70 },
-            current:     { normalMax: 12, warningMax: 14, alarmMax: 16 }
+            torque:     { normalMax: 12, warningMax: 14, alarmMax: 16 }
         }
     }
 
@@ -130,10 +130,10 @@ Rectangle {
         var fallback = root.defaultThreshold()
         if (!thresholdData) return fallback
         var temp    = thresholdData.temperature || fallback.temperature
-        var current = thresholdData.current || thresholdData.torque || fallback.current
+        var torque = thresholdData.torque || thresholdData.torque || fallback.torque
         return {
             temperature: { normalMax: Number(temp.normalMax),    warningMax: Number(temp.warningMax),    alarmMax: Number(temp.alarmMax)    },
-            current:     { normalMax: Number(current.normalMax), warningMax: Number(current.warningMax), alarmMax: Number(current.alarmMax) }
+            torque:     { normalMax: Number(torque.normalMax), warningMax: Number(torque.warningMax), alarmMax: Number(torque.alarmMax) }
         }
     }
 
@@ -332,12 +332,12 @@ Rectangle {
 
                             MetricCard {
                                 Layout.fillWidth: true
-                                cardLabel:    "Max 전류"
-                                cardValue:    root.maxLatestInfo(robotCard.robotData.currentSeries).value.toFixed(1)
+                                cardLabel:    "Max 부하"
+                                cardValue:    root.maxLatestInfo(robotCard.robotData.torqueSeries).value.toFixed(1)
                                 cardUnit:     "A"
-                                cardSub:      root.maxLatestInfo(robotCard.robotData.currentSeries).axis
-                                accentColor:  root.maxLatestInfo(robotCard.robotData.currentSeries).value
-                                              >= root.thresholdFor(robotCard.robotIndex).current.warningMax
+                                cardSub:      root.maxLatestInfo(robotCard.robotData.torqueSeries).axis
+                                accentColor:  root.maxLatestInfo(robotCard.robotData.torqueSeries).value
+                                              >= root.thresholdFor(robotCard.robotIndex).torque.warningMax
                                               ? "#c62828" : "#2e7d32"
                             }
 
@@ -369,21 +369,21 @@ Rectangle {
                             lineColors:   root.axisColors
                         }
 
-                        // 전류 그래프
+                        // 부하 그래프
                         AxisLineChart {
                             Layout.fillWidth:       true
                             Layout.fillHeight:      true
                             Layout.minimumHeight:   root.chartMinHeight
                             Layout.preferredHeight: root.chartPreferredHeight
-                            chartTitle:   "축별 전류 추세"
+                            chartTitle:   "축별 부하 추세"
                             unit:         "A"
                             minValue:     0
                             maxValue:     20
-                            normalValue:  root.thresholdFor(robotCard.robotIndex).current.normalMax
-                            warningValue: root.thresholdFor(robotCard.robotIndex).current.warningMax
-                            alarmValue:   root.thresholdFor(robotCard.robotIndex).current.alarmMax
+                            normalValue:  root.thresholdFor(robotCard.robotIndex).torque.normalMax
+                            warningValue: root.thresholdFor(robotCard.robotIndex).torque.warningMax
+                            alarmValue:   root.thresholdFor(robotCard.robotIndex).torque.alarmMax
                             timeLabels:   root.timeLabels
-                            series:       robotCard.robotData.currentSeries
+                            series:       robotCard.robotData.torqueSeries
                             lineColors:   root.axisColors
                         }
 
