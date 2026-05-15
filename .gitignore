@@ -12,6 +12,8 @@ CMakeFiles/
 
 # Qt
 *.pro.user
+*.user
+*.user.*
 moc_*.cpp
 ui_*.h
 
