@@ -156,6 +156,58 @@ bool IotViewModel::saveThreshold(int robotIndex, const QVariantMap& thresholdDat
     return true;
 }
 
+QVariantList IotViewModel::historyRows() const
+{
+    return m_historyRows;
+}
+
+bool IotViewModel::queryHistory(const QVariantMap& filter)
+{
+    if (!m_database || !m_database->isOpen()) {
+        m_lastError = "Database is not open";
+        emit lastErrorChanged();
+        return false;
+    }
+
+    const QString kind = filter.value("kind").toString();
+
+    // 현재는 알람 이력만 구현됨
+    if (kind == "조치 이력" || kind == "action") {
+        m_historyRows.clear();
+        emit historyRowsChanged();
+        return true;
+    }
+
+    IotHistoryRepository repo(m_database->database());
+
+    QVariantMap queryFilter = filter;
+
+    // QML에서 넘어온 kind는 Repository SQL에는 직접 사용하지 않음
+    queryFilter.remove("kind");
+
+    const QVariantList alarms = repo.queryAlarms(queryFilter);
+
+    if (!repo.lastError().isEmpty()) {
+        m_lastError = repo.lastError();
+        emit lastErrorChanged();
+        return false;
+    }
+
+    QVariantList rows;
+    rows.reserve(alarms.size());
+
+    for (const QVariant& item : alarms) {
+        rows.push_back(historyRowFromAlarm(item.toMap()));
+    }
+
+    m_historyRows = rows;
+    emit historyRowsChanged();
+
+    qDebug() << "[IoTViewModel] history queried, rows =" << m_historyRows.size();
+
+    return true;
+}
+
 void IotViewModel::onSnapshotUpdated(int robotId, QVariantMap snapshot)
 {
     updateRobotModelFromSnapshot(robotId, snapshot);
@@ -577,9 +629,85 @@ void IotViewModel::appendAlarmToRobotModel(int robotId,
 
 QString IotViewModel::alarmKey(const QVariantMap& alarm) const
 {
+/*
     return QString("%1|%2|%3|%4")
     .arg(alarm.value("robotId").toInt())
         .arg(alarm.value("axis").toString())
         .arg(alarm.value("metric").toString())
         .arg(alarm.value("level").toString());
+*/
+    return QString("%1|%2|%3|%4")
+        .arg(alarm.value("robotId").toInt())
+        .arg(alarm.value("axis").toString(),
+             alarm.value("metric").toString(),
+             alarm.value("level").toString());
+}
+
+QVariantMap IotViewModel::historyRowFromAlarm(const QVariantMap& alarm) const
+{
+    const QString metric = alarm.value("metric").toString();
+    const QString level = alarm.value("level").toString();
+    const QString occurredAt = alarm.value("occurredAt").toString();
+
+    const double value = alarm.value("value").toDouble();
+
+    QVariantMap row;
+
+    row["id"] = alarm.value("id");
+    row["time"] = historyTimeText(occurredAt);
+    row["occurredAt"] = occurredAt;
+
+    row["robot"] = QString("Robot %1").arg(alarm.value("robotId").toInt());
+    row["robotId"] = alarm.value("robotId").toInt();
+
+    row["kind"] = "알람";
+    row["axis"] = alarm.value("axis").toString();
+
+    row["temp"] = metric == "temperature"
+                      ? QString::number(value, 'f', 1)
+                      : "-";
+
+    row["torque"] = metric == "torque"
+                        ? QString::number(value, 'f', 1)
+                        : "-";
+
+    row["status"] = historyStatusText(level);
+    row["level"] = level;
+
+    row["desc"] = alarm.value("message").toString();
+    row["actionStatus"] = "요청";
+    row["cause"] = alarm.value("message").toString();
+    row["operatorName"] = "시스템";
+    row["actionContent"] = level == "ALARM"
+                               ? "즉시 축 상태 확인 및 점검 필요"
+                               : "추세 확인 및 부하/온도 상태 점검";
+
+    row["recordMode"] = "GUI 자동 기록";
+    row["source"] = alarm.value("source").toString();
+
+    return row;
+}
+
+QString IotViewModel::historyTimeText(const QString& isoTime) const
+{
+    const QDateTime dt = QDateTime::fromString(isoTime, Qt::ISODate);
+
+    if (dt.isValid())
+        return dt.toString("HH:mm:ss");
+
+    if (isoTime.size() >= 19)
+        return isoTime.mid(11, 8);
+
+    return "-";
+}
+
+QString IotViewModel::historyStatusText(const QString& level) const
+{
+    if (level == "ALARM")
+        return "경고";
+
+    if (level == "WARNING" || level == "WARN")
+        return "주의";
+
+    return "정상";
 }

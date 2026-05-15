@@ -248,6 +248,8 @@ Rectangle {
         id: historyDialog
         hostWidth:  root.width
         hostHeight: root.height
+        viewModel: root.hasIotViewModel ? iotViewModel : null
+
         onExportCsvRequested: function(rows, robotFilter, periodFilter, typeFilter, searchText) {
             console.log("[QML] CSV export requested, rows = " + rows.length)
         }

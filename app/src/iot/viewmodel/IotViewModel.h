@@ -18,6 +18,7 @@ class IotViewModel : public QObject
 
     Q_PROPERTY(QVariantList robotModels READ robotModels NOTIFY robotModelsChanged)
     Q_PROPERTY(QVariantList robotThresholds READ robotThresholds NOTIFY robotThresholdsChanged)
+    Q_PROPERTY(QVariantList historyRows READ historyRows NOTIFY historyRowsChanged)
     Q_PROPERTY(QString lastError READ lastError NOTIFY lastErrorChanged)
 
 public:
@@ -33,9 +34,13 @@ public:
 
     Q_INVOKABLE bool saveThreshold(int robotIndex, const QVariantMap& thresholdData);
 
+    QVariantList historyRows() const;
+    Q_INVOKABLE bool queryHistory(const QVariantMap& filter);
+
 signals:
     void robotModelsChanged();
     void robotThresholdsChanged();
+    void historyRowsChanged();
     void lastErrorChanged();
 
 private slots:
@@ -82,6 +87,10 @@ private:
 
     QString alarmKey(const QVariantMap& alarm) const;
 
+    QVariantMap historyRowFromAlarm(const QVariantMap& alarm) const;
+    QString historyTimeText(const QString& isoTime) const;
+    QString historyStatusText(const QString& level) const;
+
 private:
     IRobotGateway* m_gateway = nullptr;
 
@@ -94,4 +103,6 @@ private:
     // 동일 알람 반복 저장 방지용
     QHash<QString, QDateTime> m_lastAlarmTimes;
     int m_alarmCooldownSec = 60;
+
+    QVariantList m_historyRows;
 };

@@ -8,6 +8,9 @@ Popup {
     property real hostWidth: parent ? parent.width : 1200
     property real hostHeight: parent ? parent.height : 700
 
+    property var viewModel: null
+    property bool hasViewModel: viewModel !== null && viewModel !== undefined
+
     signal exportCsvRequested(var rows, string robotFilter, string periodFilter, string typeFilter, string searchText)
 
 
@@ -28,6 +31,7 @@ Popup {
 
     onOpened: {
         dialogRoot.selectedHistoryIndex = 0
+        dialogRoot.requestHistoryQuery()
     }
 
     contentItem: Item {
@@ -86,7 +90,8 @@ Popup {
                         font.family:    "Asta Sans"
                         font.pixelSize: 12
 
-                        onCurrentTextChanged: dialogRoot.selectedHistoryIndex = 0
+                        //onCurrentTextChanged: dialogRoot.selectedHistoryIndex = 0
+                        onCurrentTextChanged: dialogRoot.requestHistoryQuery()
 
                         contentItem: Text {
                             leftPadding:        8
@@ -127,7 +132,8 @@ Popup {
                         font.family:    "Asta Sans"
                         font.pixelSize: 12
 
-                        onCurrentTextChanged: dialogRoot.selectedHistoryIndex = 0
+                        //onCurrentTextChanged: dialogRoot.selectedHistoryIndex = 0
+                        onCurrentTextChanged: dialogRoot.requestHistoryQuery()
 
                         contentItem: Text {
                             leftPadding:        8
@@ -170,7 +176,8 @@ Popup {
                             selected: dialogRoot.historyFilterType === "전체"
                             onClicked: {
                                 dialogRoot.historyFilterType = "전체"
-                                dialogRoot.selectedHistoryIndex = 0
+                                //dialogRoot.selectedHistoryIndex = 0
+                                dialogRoot.requestHistoryQuery()
                             }
                         }
 
@@ -179,7 +186,8 @@ Popup {
                             selected: dialogRoot.historyFilterType === "알람 이력"
                             onClicked: {
                                 dialogRoot.historyFilterType = "알람 이력"
-                                dialogRoot.selectedHistoryIndex = 0
+                                //dialogRoot.selectedHistoryIndex = 0
+                                dialogRoot.requestHistoryQuery()
                             }
                         }
 
@@ -188,7 +196,8 @@ Popup {
                             selected: dialogRoot.historyFilterType === "조치 이력"
                             onClicked: {
                                 dialogRoot.historyFilterType = "조치 이력"
-                                dialogRoot.selectedHistoryIndex = 0
+                                //dialogRoot.selectedHistoryIndex = 0
+                                dialogRoot.requestHistoryQuery()
                             }
                         }
                     }
@@ -217,6 +226,7 @@ Popup {
                         selectByMouse:   true
 
                         onTextChanged: dialogRoot.selectedHistoryIndex = 0
+                        onAccepted: dialogRoot.requestHistoryQuery()
 
                         background: Rectangle {
                             radius: 5
@@ -561,7 +571,7 @@ Popup {
     // kind:
     // - "알람" : 센서/위험도 기반으로 GUI가 자동 생성한 이력
     // - "조치" : 알람에 대한 작업자 확인/완료/보류 이력
-    property var historyRows: [
+    property var sampleHistoryRows: [
         {
             time: "10:43:21",
             robot: "Robot 1",
@@ -638,10 +648,70 @@ Popup {
             recordMode: "작업자 수동 입력"
         }
     ]
+    property var historyRows: dialogRoot.hasViewModel
+                              ? dialogRoot.viewModel.historyRows
+                              : dialogRoot.sampleHistoryRows
 
     property string historyFilterType: "전체"
     property int selectedHistoryIndex: 0
     // =============================
+    function pad2(v) {
+        return v < 10 ? "0" + v : "" + v
+    }
+
+    function toLocalIso(dt) {
+        return dt.getFullYear() + "-"
+                + pad2(dt.getMonth() + 1) + "-"
+                + pad2(dt.getDate()) + "T"
+                + pad2(dt.getHours()) + ":"
+                + pad2(dt.getMinutes()) + ":"
+                + pad2(dt.getSeconds())
+    }
+
+    function historyFilterMap() {
+        var filter = {}
+
+        if (historyRobotCombo.currentText === "Robot 1")
+            filter.robotId = 1
+        else if (historyRobotCombo.currentText === "Robot 2")
+            filter.robotId = 2
+        else
+            filter.robotId = 0
+
+        filter.kind = dialogRoot.historyFilterType
+        filter.searchText = historySearchField.text
+        filter.limit = 500
+
+        var now = new Date()
+        var from = new Date(now)
+
+        if (historyPeriodCombo.currentText === "오늘") {
+            from.setHours(0, 0, 0, 0)
+            filter.from = toLocalIso(from)
+            filter.to = toLocalIso(now)
+        } else if (historyPeriodCombo.currentText === "최근 7일") {
+            from.setDate(now.getDate() - 7)
+            filter.from = toLocalIso(from)
+            filter.to = toLocalIso(now)
+        } else if (historyPeriodCombo.currentText === "최근 30일") {
+            from.setDate(now.getDate() - 30)
+            filter.from = toLocalIso(from)
+            filter.to = toLocalIso(now)
+        }
+
+        return filter
+    }
+
+    function requestHistoryQuery() {
+        dialogRoot.selectedHistoryIndex = 0
+
+        if (!dialogRoot.hasViewModel || !dialogRoot.viewModel.queryHistory)
+            return
+
+        if (!dialogRoot.viewModel.queryHistory(dialogRoot.historyFilterMap())) {
+            console.warn("[QML] queryHistory failed")
+        }
+    }
 
     function filteredHistoryRows(keyword, robotFilter, typeFilter) {
         var rows = []
