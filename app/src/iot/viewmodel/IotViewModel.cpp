@@ -7,6 +7,7 @@
 #include "iot/storage/IotThresholdRepository.h"
 #include "iot/storage/IotHistoryRepository.h"
 
+#include <QDateTime>
 #include <QDebug>
 
 IotViewModel::IotViewModel(QObject* parent)
@@ -158,6 +159,7 @@ bool IotViewModel::saveThreshold(int robotIndex, const QVariantMap& thresholdDat
 void IotViewModel::onSnapshotUpdated(int robotId, QVariantMap snapshot)
 {
     updateRobotModelFromSnapshot(robotId, snapshot);
+    evaluateAlarms(robotId, snapshot);
 #if false
     qDebug() << "[IoTViewModel] snapshot received robot =" << robotId
              << "seq =" << snapshot.value("sequenceNumber").toULongLong();
@@ -310,4 +312,274 @@ void IotViewModel::updateRobotModelFromSnapshot(int robotId, const QVariantMap& 
     m_robotModels[index] = robot;
 
     emit robotModelsChanged();
+}
+
+void IotViewModel::evaluateAlarms(int robotId, const QVariantMap& snapshot)
+{
+    const QVariantMap threshold = thresholdForRobot(robotId);
+
+    const QVariantList temperatures = snapshot.value("driverTemperatures").toList();
+    const QVariantList torques = snapshot.value("torques").toList();
+
+    const QVariantMap temperatureThreshold =
+        threshold.value("temperature").toMap();
+
+    const QVariantMap torqueThreshold =
+        threshold.value("torque").toMap();
+
+    evaluateMetricAlarms(robotId,
+                         "temperature",
+                         temperatures,
+                         temperatureThreshold);
+
+    evaluateMetricAlarms(robotId,
+                         "torque",
+                         torques,
+                         torqueThreshold);
+}
+
+void IotViewModel::evaluateMetricAlarms(int robotId,
+                                        const QString& metric,
+                                        const QVariantList& values,
+                                        const QVariantMap& threshold)
+{
+    if (values.isEmpty())
+        return;
+
+    if (threshold.isEmpty())
+        return;
+
+    const double normalMax =
+        threshold.value("normalMax", 0.0).toDouble();
+
+    const double warningMax =
+        threshold.value("warningMax", 0.0).toDouble();
+
+    const double alarmMax =
+        threshold.value("alarmMax", 0.0).toDouble();
+
+    Q_UNUSED(normalMax)
+
+    const QDateTime now = QDateTime::currentDateTime();
+
+    for (int i = 0; i < values.size(); ++i) {
+        const double value = values[i].toDouble();
+
+        const QString level = alarmLevel(value, warningMax, alarmMax);
+
+        if (level == "NORMAL")
+            continue;
+
+        const QVariantMap alarm =
+            makeAlarmMap(robotId,
+                         i,
+                         metric,
+                         value,
+                         threshold,
+                         level);
+
+        if (shouldSuppressAlarm(alarm, now))
+            continue;
+
+        if (m_database && m_database->isOpen()) {
+            IotHistoryRepository repo(m_database->database());
+
+            if (!repo.insertAlarm(alarm)) {
+                m_lastError = repo.lastError();
+                emit lastErrorChanged();
+
+                qWarning() << "[IoTViewModel] alarm insert failed:"
+                           << m_lastError;
+
+                continue;
+            }
+        }
+
+        rememberAlarm(alarm, now);
+        appendAlarmToRobotModel(robotId, alarm);
+    }
+}
+
+QString IotViewModel::alarmLevel(double value,
+                                 double warningMax,
+                                 double alarmMax) const
+{
+    if (value >= alarmMax)
+        return "ALARM";
+
+    if (value >= warningMax)
+        return "WARNING";
+
+    return "NORMAL";
+}
+
+QVariantMap IotViewModel::thresholdForRobot(int robotId) const
+{
+    const int index = robotId - 1;
+
+    if (index < 0 || index >= m_robotThresholds.size())
+        return defaultThreshold();
+
+    QVariantMap threshold = m_robotThresholds[index].toMap();
+
+    if (threshold.isEmpty())
+        return defaultThreshold();
+
+    return normalizeThreshold(threshold);
+}
+
+QVariantMap IotViewModel::makeAlarmMap(int robotId,
+                                       int axisIndex,
+                                       const QString& metric,
+                                       double value,
+                                       const QVariantMap& threshold,
+                                       const QString& level) const
+{
+    const QString axis = QString("J%1").arg(axisIndex + 1);
+
+    const double normalMax =
+        threshold.value("normalMax", 0.0).toDouble();
+
+    const double warningMax =
+        threshold.value("warningMax", 0.0).toDouble();
+
+    const double alarmMax =
+        threshold.value("alarmMax", 0.0).toDouble();
+
+    const QDateTime now = QDateTime::currentDateTime();
+    const QString occurredAt = now.toString(Qt::ISODate);
+    const QString displayTime = now.toString("HH:mm:ss");
+
+    QString metricText;
+    QString unitText;
+
+    if (metric == "temperature") {
+        metricText = "온도";
+        unitText = "°C";
+    } else if (metric == "torque") {
+        metricText = "부하";
+        unitText = "raw";
+    } else {
+        metricText = metric;
+        unitText = "";
+    }
+
+    QString levelText;
+
+    if (level == "ALARM") {
+        levelText = "경고";
+    } else if (level == "WARNING") {
+        levelText = "주의";
+    } else {
+        levelText = "정상";
+    }
+
+    const QString message =
+        QString("%1 %2 %3 %4 발생: %5%6")
+            .arg(axis)
+            .arg(metricText)
+            .arg(levelText)
+            .arg(level)
+            .arg(value, 0, 'f', 1)
+            .arg(unitText.isEmpty() ? "" : " " + unitText);
+
+    QVariantMap alarm;
+//    alarm["occurredAt"] = QDateTime::currentDateTime().toString(Qt::ISODate);
+    alarm["occurredAt"] = occurredAt;
+    alarm["time"] = displayTime;
+    alarm["robotId"] = robotId;
+    alarm["robotName"] = QString("Robot %1").arg(robotId);
+    alarm["axis"] = axis;
+    alarm["metric"] = metric;
+    alarm["metricText"] = metricText;
+    alarm["value"] = value;
+    alarm["normalMax"] = normalMax;
+    alarm["warningMax"] = warningMax;
+    alarm["alarmMax"] = alarmMax;
+    alarm["level"] = level;
+    alarm["levelText"] = levelText;
+    alarm["message"] = message;
+    alarm["source"] = "auto";
+    alarm["unit"] = unitText;
+
+    return alarm;
+}
+
+bool IotViewModel::shouldSuppressAlarm(const QVariantMap& alarm,
+                                       const QDateTime& now) const
+{
+    const QString key = alarmKey(alarm);
+
+    if (!m_lastAlarmTimes.contains(key))
+        return false;
+
+    const QDateTime lastTime = m_lastAlarmTimes.value(key);
+
+    if (!lastTime.isValid())
+        return false;
+
+    const qint64 elapsedSec = lastTime.secsTo(now);
+
+    return elapsedSec >= 0 && elapsedSec < m_alarmCooldownSec;
+}
+
+void IotViewModel::rememberAlarm(const QVariantMap& alarm,
+                                 const QDateTime& now)
+{
+    const QString key = alarmKey(alarm);
+    m_lastAlarmTimes[key] = now;
+}
+
+void IotViewModel::appendAlarmToRobotModel(int robotId,
+                                           const QVariantMap& alarm)
+{
+    const int index = robotId - 1;
+
+    if (index < 0 || index >= m_robotModels.size())
+        return;
+
+    QVariantMap robot = m_robotModels[index].toMap();
+
+    QVariantList alarms = robot.value("alarms").toList();
+
+    alarms.insert(0, alarm);
+
+    while (alarms.size() > 20) {
+        alarms.removeLast();
+    }
+
+    robot["alarms"] = alarms;
+
+    QVariantMap prediction = robot.value("prediction").toMap();
+
+    const QString level = alarm.value("level").toString();
+
+    if (level == "ALARM") {
+        prediction["modelStatus"] = "알람";
+        prediction["riskLevel"] = "경고";
+        prediction["score"] = 100;
+        prediction["causeText"] = alarm.value("message").toString();
+        prediction["recommendedAction"] = "즉시 축 상태 확인 및 점검 필요";
+    } else if (level == "WARNING") {
+        prediction["modelStatus"] = "주의";
+        prediction["riskLevel"] = "주의";
+        prediction["score"] = 60;
+        prediction["causeText"] = alarm.value("message").toString();
+        prediction["recommendedAction"] = "추세 확인 및 부하/온도 상태 점검";
+    }
+
+    robot["prediction"] = prediction;
+
+    m_robotModels[index] = robot;
+
+    emit robotModelsChanged();
+}
+
+QString IotViewModel::alarmKey(const QVariantMap& alarm) const
+{
+    return QString("%1|%2|%3|%4")
+    .arg(alarm.value("robotId").toInt())
+        .arg(alarm.value("axis").toString())
+        .arg(alarm.value("metric").toString())
+        .arg(alarm.value("level").toString());
 }

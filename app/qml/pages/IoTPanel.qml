@@ -114,18 +114,18 @@ Rectangle {
         { temperature: { normalMax: 55, warningMax: 60, alarmMax: 70 },
           torque:     { normalMax: 12, warningMax: 14, alarmMax: 16 } }
     ]
-
+    // 실제 모델 바인딩 (iotViewModel이 있을 때만)
     property var robotThresholds: root.hasIotViewModel
                                   ? iotViewModel.robotThresholds
                                   : root.sampleRobotThresholds
-
+    // 임계값 기본값 반환
     function defaultThreshold() {
         return {
             temperature: { normalMax: 55, warningMax: 60, alarmMax: 70 },
             torque:     { normalMax: 12, warningMax: 14, alarmMax: 16 }
         }
     }
-
+    // 임계값 데이터 정규화: 누락된 값은 기본값으로 채우고, 숫자 타입으로 변환
     function normalizeThreshold(thresholdData) {
         var fallback = root.defaultThreshold()
         if (!thresholdData) return fallback
@@ -136,13 +136,13 @@ Rectangle {
             torque:     { normalMax: Number(torque.normalMax), warningMax: Number(torque.warningMax), alarmMax: Number(torque.alarmMax) }
         }
     }
-
+    // robotIndex는 1-based, 내부 저장은 0-based 배열로 관리
     function thresholdFor(robotIndex) {
         if (!root.robotThresholds || robotIndex < 0 || robotIndex >= root.robotThresholds.length)
             return root.defaultThreshold()
         return root.normalizeThreshold(root.robotThresholds[robotIndex])
     }
-
+    // 임계값 적용: robotIndex는 1-based, 내부 저장은 0-based 배열로 관리
     function applyThreshold(robotIndex, thresholdData) {
         if (!thresholdData) return
         var targetIndex = robotIndex - 1
@@ -152,12 +152,12 @@ Rectangle {
         copied[targetIndex] = root.normalizeThreshold(thresholdData)
         root.robotThresholds = copied
     }
-
+    // 시리즈 아이템에서 최신값 반환, 값이 없으면 0 반환
     function latestValue(seriesItem) {
         if (!seriesItem || !seriesItem.values || seriesItem.values.length === 0) return 0
         return seriesItem.values[seriesItem.values.length - 1]
     }
-
+    // 시리즈 배열에서 최신값이 가장 큰 축 정보 반환 (예: { axis: "J4", value: 46.3 })
     function maxLatestInfo(series) {
         var maxValue = -999999
         var maxAxis  = "-"
@@ -167,7 +167,65 @@ Rectangle {
         }
         return { axis: maxAxis, value: maxValue }
     }
+    // 알람 시간 표시: time > occurredAt > occurred_at > "-"
+    function alarmDisplayTime(alarm) {
+        if (!alarm)
+            return "-"
 
+        if (alarm.time !== undefined && alarm.time !== "")
+            return alarm.time
+
+        if (alarm.occurredAt !== undefined && alarm.occurredAt.length >= 19)
+            return alarm.occurredAt.substr(11, 8)
+
+        if (alarm.occurred_at !== undefined && alarm.occurred_at.length >= 19)
+            return alarm.occurred_at.substr(11, 8)
+
+        return "-"
+    }
+    // 알람 레벨 표시: level > severity > "-"
+    function alarmLevelLabel(level) {
+        if (level === "ALARM")
+            return "ALARM"
+
+        if (level === "WARNING" || level === "WARN")
+            return "WARN"
+
+        if (level === "INFO")
+            return "INFO"
+
+        return level !== undefined && level !== "" ? level : "-"
+    }
+    // 알람 레벨별 색상: ALARM - 빨강, WARN - 노랑, INFO/기타 - 회색
+    function alarmBackground(level) {
+        if (level === "ALARM")
+            return "#ffebee"
+
+        if (level === "WARNING" || level === "WARN")
+            return "#fff8e1"
+
+        return "#f5f5f5"
+    }
+    // 알람 레벨별 테두리 색상: ALARM - 진한 빨강, WARN - 진한 노랑, INFO/기타 - 회색
+    function alarmBorder(level) {
+        if (level === "ALARM")
+            return "#ef9a9a"
+
+        if (level === "WARNING" || level === "WARN")
+            return "#ffe082"
+
+        return "#e0e4ea"
+    }
+    // 알람 레벨별 배지 색상: ALARM - 빨강, WARN - 노랑, INFO/기타 - 회색
+    function alarmBadgeColor(level) {
+        if (level === "ALARM")
+            return "#c62828"
+
+        if (level === "WARNING" || level === "WARN")
+            return "#f9a825"
+
+        return "#9e9e9e"
+    }
     // ── 다이얼로그 ────────────────────────────────────────────
     ThresholdSettingDialog {
         id: thresholdDialog
@@ -433,8 +491,8 @@ Rectangle {
                                             Layout.maximumHeight:   32
                                             Layout.fillHeight:      false
                                             radius:       4
-                                            color:        modelData.level === "WARN" ? "#fff8e1" : "#f5f5f5"
-                                            border.color: modelData.level === "WARN" ? "#ffe082" : "#e0e4ea"
+                                            color:        root.alarmBackground(modelData.level)
+                                            border.color: root.alarmBorder(modelData.level)
                                             border.width: 1
 
                                             RowLayout {
@@ -446,11 +504,11 @@ Rectangle {
                                                     width:  36
                                                     height: 18
                                                     radius:  9
-                                                    color:  modelData.level === "WARN" ? "#f9a825" : "#9e9e9e"
+                                                    color: root.alarmBadgeColor(modelData.level)
 
                                                     Text {
                                                         anchors.centerIn: parent
-                                                        text:           modelData.level
+                                                        text:           root.alarmLevelLabel(modelData.level)
                                                         color:          "white"
                                                         font.family:    "Asta Sans"
                                                         font.pixelSize: 9
@@ -459,7 +517,7 @@ Rectangle {
                                                 }
 
                                                 Text {
-                                                    text:                  modelData.time
+                                                    text:                  root.alarmDisplayTime(modelData)
                                                     color:                 "#757575"
                                                     font.family:           "Asta Sans"
                                                     font.pixelSize:        11

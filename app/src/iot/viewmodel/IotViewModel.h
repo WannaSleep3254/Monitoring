@@ -4,6 +4,9 @@
 #include <QVariantList>
 #include <QVariantMap>
 #include <QString>
+#include <QHash>
+#include <QDateTime>
+
 #include <memory>
 
 class IotDatabase;
@@ -44,6 +47,41 @@ private:
     void initializeDefaultModels();
     void updateRobotModelFromSnapshot(int robotId, const QVariantMap& snapshot);
 
+    // ============================================================
+    // Alarm evaluation
+    // ============================================================
+    // temperature/torque  임계값 비교
+    void evaluateAlarms(int robotId, const QVariantMap& snapshot);
+    // 온도와 부하/토크를 공통 처리
+    void evaluateMetricAlarms(int robotId,
+                              const QString& metric,
+                              const QVariantList& values,
+                              const QVariantMap& threshold);
+
+    QString alarmLevel(double value,
+                       double warningMax,
+                       double alarmMax) const;
+
+    QVariantMap thresholdForRobot(int robotId) const;
+
+    QVariantMap makeAlarmMap(int robotId,
+                             int axisIndex,
+                             const QString& metric,
+                             double value,
+                             const QVariantMap& threshold,
+                             const QString& level) const;
+
+    bool shouldSuppressAlarm(const QVariantMap& alarm,
+                             const QDateTime& now) const;
+
+    void rememberAlarm(const QVariantMap& alarm,
+                       const QDateTime& now);
+
+    void appendAlarmToRobotModel(int robotId,
+                                 const QVariantMap& alarm);
+
+    QString alarmKey(const QVariantMap& alarm) const;
+
 private:
     IRobotGateway* m_gateway = nullptr;
 
@@ -52,4 +90,8 @@ private:
     QString m_lastError;
 
     std::unique_ptr<IotDatabase> m_database;
+
+    // 동일 알람 반복 저장 방지용
+    QHash<QString, QDateTime> m_lastAlarmTimes;
+    int m_alarmCooldownSec = 60;
 };
