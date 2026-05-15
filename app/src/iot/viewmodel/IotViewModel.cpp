@@ -69,6 +69,20 @@ bool IotViewModel::initialize()
     historyRepo.insertAlarm(testAlarm);
 #endif
 
+#if false   // SQLite에 테스트 조치 데이터 삽입 (디버깅용)
+    IotHistoryRepository historyRepo(m_database->database());
+
+    QVariantMap testAction;
+    testAction["alarmId"] = 2;
+    testAction["robotId"] = 1;
+    testAction["status"] = "확인중";
+    testAction["actionContent"] = "J3 축 부하 상태 확인 시작";
+    testAction["operatorName"] = "작업자 A";
+    testAction["memo"] = "테스트 조치 이력";
+
+    historyRepo.insertAction(testAction);
+#endif
+
     return true;
 }
 
