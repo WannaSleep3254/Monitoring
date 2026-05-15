@@ -629,13 +629,6 @@ void IotViewModel::appendAlarmToRobotModel(int robotId,
 
 QString IotViewModel::alarmKey(const QVariantMap& alarm) const
 {
-/*
-    return QString("%1|%2|%3|%4")
-    .arg(alarm.value("robotId").toInt())
-        .arg(alarm.value("axis").toString())
-        .arg(alarm.value("metric").toString())
-        .arg(alarm.value("level").toString());
-*/
     return QString("%1|%2|%3|%4")
         .arg(alarm.value("robotId").toInt())
         .arg(alarm.value("axis").toString(),
