@@ -36,6 +36,9 @@ set(IOT_SOURCES
     #IotThresholdRepository
     ${CMAKE_CURRENT_SOURCE_DIR}/src/iot/storage/IotThresholdRepository.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/iot/storage/IotThresholdRepository.cpp
+    #IotHistoryRepository
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/iot/storage/IotHistoryRepository.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/iot/storage/IotHistoryRepository.cpp
 )
 
 list(APPEND APP_SOURCES ${RUNTIME_SOURCES} ${IOT_SOURCES})
