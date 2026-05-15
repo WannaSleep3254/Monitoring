@@ -19,6 +19,7 @@ class IotViewModel : public QObject
     Q_PROPERTY(QVariantList robotModels READ robotModels NOTIFY robotModelsChanged)
     Q_PROPERTY(QVariantList robotThresholds READ robotThresholds NOTIFY robotThresholdsChanged)
     Q_PROPERTY(QVariantList historyRows READ historyRows NOTIFY historyRowsChanged)
+    Q_PROPERTY(QString lastExportPath READ lastExportPath NOTIFY lastExportPathChanged)
     Q_PROPERTY(QString lastError READ lastError NOTIFY lastErrorChanged)
 
 public:
@@ -37,10 +38,14 @@ public:
     QVariantList historyRows() const;
     Q_INVOKABLE bool queryHistory(const QVariantMap& filter);
 
+    QString lastExportPath() const;
+    Q_INVOKABLE bool exportHistoryCsv(const QVariantList& rows);
+
 signals:
     void robotModelsChanged();
     void robotThresholdsChanged();
     void historyRowsChanged();
+    void lastExportPathChanged();
     void lastErrorChanged();
 
 private slots:
@@ -91,6 +96,9 @@ private:
     QString historyTimeText(const QString& isoTime) const;
     QString historyStatusText(const QString& level) const;
 
+    QString csvEscape(const QString& value) const;
+    QString defaultCsvExportPath() const;
+
 private:
     IRobotGateway* m_gateway = nullptr;
 
@@ -105,4 +113,6 @@ private:
     int m_alarmCooldownSec = 60;
 
     QVariantList m_historyRows;
+
+    QString m_lastExportPath;
 };

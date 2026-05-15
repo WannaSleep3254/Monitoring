@@ -252,6 +252,14 @@ Rectangle {
 
         onExportCsvRequested: function(rows, robotFilter, periodFilter, typeFilter, searchText) {
             console.log("[QML] CSV export requested, rows = " + rows.length)
+
+            if (root.hasIotViewModel) {
+                if (!iotViewModel.exportHistoryCsv(rows)) {
+                    console.warn("[QML] CSV export failed:", iotViewModel.lastError)
+                } else {
+                    console.log("[QML] CSV exported:", iotViewModel.lastExportPath)
+                }
+            }
         }
     }
 

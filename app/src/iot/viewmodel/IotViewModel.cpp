@@ -8,6 +8,10 @@
 #include "iot/storage/IotHistoryRepository.h"
 
 #include <QDateTime>
+#include <QFile>
+#include <QDir>
+#include <QTextStream>
+#include <QStandardPaths>
 #include <QDebug>
 
 IotViewModel::IotViewModel(QObject* parent)
@@ -206,6 +210,134 @@ bool IotViewModel::queryHistory(const QVariantMap& filter)
     qDebug() << "[IoTViewModel] history queried, rows =" << m_historyRows.size();
 
     return true;
+}
+
+QString IotViewModel::lastExportPath() const
+{
+    return m_lastExportPath;
+}
+
+bool IotViewModel::exportHistoryCsv(const QVariantList& rows)
+{
+    if (rows.isEmpty()) {
+        m_lastError = "No history rows to export";
+        emit lastErrorChanged();
+        qWarning() << "[IoTViewModel] CSV export failed:" << m_lastError;
+        return false;
+    }
+
+    const QString filePath = defaultCsvExportPath();
+
+    QFile file(filePath);
+
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        m_lastError = file.errorString();
+        emit lastErrorChanged();
+
+        qWarning() << "[IoTViewModel] CSV file open failed:"
+                   << filePath
+                   << m_lastError;
+
+        return false;
+    }
+
+    QTextStream out(&file);
+
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+    out.setCodec("UTF-8");
+#else
+    out.setEncoding(QStringConverter::Utf8);
+#endif
+
+    // Excel 한글 깨짐 방지용 UTF-8 BOM
+    out << QChar(0xFEFF);
+
+    const QStringList headers = {
+        "시간",
+        "로봇",
+        "구분",
+        "축",
+        "온도",
+        "부하",
+        "상태",
+        "설명",
+        "조치상태",
+        "원인",
+        "조치자",
+        "조치내용",
+        "기록방식"
+    };
+
+    out << headers.join(",") << "\n";
+
+    for (const QVariant& item : rows) {
+        const QVariantMap row = item.toMap();
+
+        QStringList cols;
+        cols << csvEscape(row.value("time").toString());
+        cols << csvEscape(row.value("robot").toString());
+        cols << csvEscape(row.value("kind").toString());
+        cols << csvEscape(row.value("axis").toString());
+        cols << csvEscape(row.value("temp").toString());
+        cols << csvEscape(row.value("torque").toString());
+        cols << csvEscape(row.value("status").toString());
+        cols << csvEscape(row.value("desc").toString());
+        cols << csvEscape(row.value("actionStatus").toString());
+        cols << csvEscape(row.value("cause").toString());
+        cols << csvEscape(row.value("operatorName").toString());
+        cols << csvEscape(row.value("actionContent").toString());
+        cols << csvEscape(row.value("recordMode").toString());
+
+        out << cols.join(",") << "\n";
+    }
+
+    file.close();
+
+    m_lastExportPath = filePath;
+    emit lastExportPathChanged();
+
+    qDebug() << "[IoTViewModel] history CSV exported:"
+             << filePath
+             << "rows =" << rows.size();
+
+    return true;
+}
+
+QString IotViewModel::csvEscape(const QString& value) const
+{
+    QString escaped = value;
+    escaped.replace("\"", "\"\"");
+
+    if (escaped.contains(",") ||
+        escaped.contains("\"") ||
+        escaped.contains("\n") ||
+        escaped.contains("\r")) {
+        escaped = "\"" + escaped + "\"";
+    }
+
+    return escaped;
+}
+
+QString IotViewModel::defaultCsvExportPath() const
+{
+    QString baseDir =
+        QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+
+    if (baseDir.isEmpty()) {
+        baseDir = QDir::homePath() + "/MonitoringApp";
+    }
+
+    QDir dir(baseDir);
+
+    if (!dir.exists("exports")) {
+        dir.mkpath("exports");
+    }
+
+    const QString fileName =
+        QString("iot_history_%1.csv")
+            .arg(QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss"));
+
+    return dir.filePath("exports/" + fileName);
 }
 
 void IotViewModel::onSnapshotUpdated(int robotId, QVariantMap snapshot)
