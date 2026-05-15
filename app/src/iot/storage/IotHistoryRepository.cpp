@@ -1,6 +1,7 @@
 #include "IotHistoryRepository.h"
 
 IotHistoryRepository::IotHistoryRepository(const QSqlDatabase& database)
+    : m_db(database)
 {
 
 }
