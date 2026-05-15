@@ -5,6 +5,7 @@
 #include "iot/storage/IotDatabase.h"
 #include "iot/storage/IotSchema.h"
 #include "iot/storage/IotThresholdRepository.h"
+#include "iot/storage/IotHistoryRepository.h"
 
 #include <QDebug>
 
@@ -44,6 +45,24 @@ bool IotViewModel::initialize()
     emit robotThresholdsChanged();
 
     qDebug() << "[IoTViewModel] initialized with SQLite";
+
+#if false   // SQLite에 테스트 알람 데이터 삽입 (디버깅용)
+    IotHistoryRepository historyRepo(m_database->database());
+
+    QVariantMap testAlarm;
+    testAlarm["robotId"] = 1;
+    testAlarm["axis"] = "J6";
+    testAlarm["metric"] = "temperature";
+    testAlarm["value"] = 73.0;
+    testAlarm["normalMax"] = 55.0;
+    testAlarm["warningMax"] = 60.0;
+    testAlarm["alarmMax"] = 70.0;
+    testAlarm["level"] = "ALARM";
+    testAlarm["message"] = "J6 온도 알람 테스트";
+    testAlarm["source"] = "test";
+
+    historyRepo.insertAlarm(testAlarm);
+#endif
 
     return true;
 }
