@@ -9,10 +9,12 @@ public:
     explicit IotSchema(const QSqlDatabase& database);
 
     bool createTables();
-    bool createThresholdTables();
-    bool createHistoryTables();
 
     QString lastError() const;
+
+private:
+    bool createThresholdTables();
+    bool createHistoryTables();
 
 private:
     QSqlDatabase m_db;
