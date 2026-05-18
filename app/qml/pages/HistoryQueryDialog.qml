@@ -363,7 +363,12 @@ Popup {
                                         descText: modelData.desc
                                         actionStatusText: modelData.actionStatus
 
-                                        onRowClicked: dialogRoot.selectedHistoryIndex = index
+                                        //onRowClicked: dialogRoot.selectedHistoryIndex = index
+                                        onRowClicked: {
+                                            dialogRoot.selectedHistoryIndex = index
+                                            dialogRoot.actionEditMode = false
+                                            dialogRoot.actionTargetItem = null
+                                        }
                                     }
                                 }
                             }
@@ -502,15 +507,61 @@ Popup {
                                            : historyDetailPanel.selectedItem && historyDetailPanel.selectedItem.actionStatus === "확인중" ? "#2563eb"
                                            : "#f97316"
                             }
-
+/*
                             HistoryDetailItem {
                                 labelText: "조치자"
                                 valueText: historyDetailPanel.selectedItem ? historyDetailPanel.selectedItem.operatorName : "-"
                             }
+*/
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: dialogRoot.actionEditMode ? 34 : 24
 
+                                Text {
+                                    Layout.preferredWidth: 82
+                                    text: "조치자"
+                                    font.family: "Asta Sans"
+                                    font.pixelSize: 12
+                                    font.bold: true
+                                    color: "#9e9e9e"
+                                    elide: Text.ElideRight
+                                }
+
+                                Text {
+                                    visible: !dialogRoot.actionEditMode
+                                    Layout.fillWidth: true
+                                    text: historyDetailPanel.selectedItem
+                                          ? historyDetailPanel.selectedItem.operatorName
+                                          : "-"
+                                    font.family: "Asta Sans"
+                                    font.pixelSize: 12
+                                    color: "#374151"
+                                    elide: Text.ElideRight
+                                }
+
+                                TextField {
+                                    visible: dialogRoot.actionEditMode
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 30
+                                    text: dialogRoot.actionOperatorText
+                                    placeholderText: "조치자 입력"
+                                    selectByMouse: true
+                                    font.family: "Asta Sans"
+                                    font.pixelSize: 12
+
+                                    onTextChanged: dialogRoot.actionOperatorText = text
+
+                                    background: Rectangle {
+                                        radius: 5
+                                        color: "#ffffff"
+                                        border.color: parent.activeFocus ? "#2563eb" : "#d1d5db"
+                                    }
+                                }
+                            }
                             Rectangle {
                                 Layout.fillWidth: true
-                                Layout.preferredHeight: 60
+                                //Layout.preferredHeight: 60
+                                Layout.preferredHeight: dialogRoot.actionEditMode ? 92 : 60
                                 Layout.minimumHeight: 0
                                 Layout.fillHeight: false
                                 radius: 6
@@ -534,7 +585,7 @@ Popup {
                                         font.bold: true
                                         verticalAlignment: Text.AlignVCenter
                                     }
-
+/*
                                     Text {
                                         Layout.fillWidth: true
                                         Layout.fillHeight: true
@@ -546,6 +597,41 @@ Popup {
                                         elide: Text.ElideRight
                                         maximumLineCount: 2
                                     }
+*/
+                                    Text {
+                                        visible: !dialogRoot.actionEditMode
+                                        Layout.fillWidth: true
+                                        Layout.fillHeight: true
+                                        text: historyDetailPanel.selectedItem
+                                              ? historyDetailPanel.selectedItem.actionContent
+                                              : "-"
+                                        color: "#374151"
+                                        font.family: "Asta Sans"
+                                        font.pixelSize: 12
+                                        wrapMode: Text.WordWrap
+                                        elide: Text.ElideRight
+                                        maximumLineCount: 2
+                                    }
+
+                                    TextArea {
+                                        visible: dialogRoot.actionEditMode
+                                        Layout.fillWidth: true
+                                        Layout.fillHeight: true
+                                        text: dialogRoot.actionContentText
+                                        placeholderText: "조치 내용을 입력하세요"
+                                        selectByMouse: true
+                                        wrapMode: TextArea.Wrap
+                                        font.family: "Asta Sans"
+                                        font.pixelSize: 12
+
+                                        onTextChanged: dialogRoot.actionContentText = text
+
+                                        background: Rectangle {
+                                            radius: 5
+                                            color: "#ffffff"
+                                            border.color: parent.activeFocus ? "#2563eb" : "#d1d5db"
+                                        }
+                                    }
                                 }
                             }
 
@@ -555,6 +641,8 @@ Popup {
                                 Layout.minimumHeight: 54
                                 Layout.fillHeight: false
                                 spacing: 8
+
+                                visible: !dialogRoot.actionEditMode
 
                                 HistoryActionCardButton {
                                     titleText: "확인"
@@ -582,7 +670,54 @@ Popup {
                                         if (!dialogRoot.canRegisterAction(historyDetailPanel.selectedItem))
                                             return
 
-                                        dialogRoot.alarmActionRequested(historyDetailPanel.selectedItem)
+                                        dialogRoot.actionTargetItem = historyDetailPanel.selectedItem
+                                        dialogRoot.actionOperatorText = "작업자"
+                                        dialogRoot.actionContentText = ""
+                                        dialogRoot.actionMemoText = historyDetailPanel.selectedItem
+                                                                    ? historyDetailPanel.selectedItem.cause
+                                                                    : ""
+                                        dialogRoot.actionEditMode = true
+                                    }
+                                }
+                            }
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 54
+                                Layout.minimumHeight: 54
+                                Layout.fillHeight: false
+                                spacing: 8
+                                visible: dialogRoot.actionEditMode
+
+                                HistoryActionCardButton {
+                                    titleText: "저장"
+                                    bodyText: "조치 이력 저장"
+                                    accentColor: "#16a34a"
+
+                                    enabled: dialogRoot.actionContentText.trim().length > 0
+
+                                    onClicked: {
+                                        if (dialogRoot.actionContentText.trim().length <= 0)
+                                            return
+
+                                        console.log("[QML] action save requested:",
+                                                    dialogRoot.actionTargetItem ? dialogRoot.actionTargetItem.id : 0,
+                                                    dialogRoot.actionOperatorText,
+                                                    dialogRoot.actionContentText)
+
+                                        // 다음 단계에서 iotViewModel.saveAction(actionData) 연결
+                                    }
+                                }
+
+                                HistoryActionCardButton {
+                                    titleText: "취소"
+                                    bodyText: "입력 취소"
+                                    accentColor: "#64748b"
+
+                                    onClicked: {
+                                        dialogRoot.actionEditMode = false
+                                        dialogRoot.actionTargetItem = null
+                                        dialogRoot.actionContentText = ""
+                                        dialogRoot.actionMemoText = ""
                                     }
                                 }
                             }
@@ -680,6 +815,13 @@ Popup {
 
     property string historyFilterType: "전체"
     property int selectedHistoryIndex: 0
+
+    property bool actionEditMode: false
+    property var actionTargetItem: null
+
+    property string actionOperatorText: "작업자"
+    property string actionContentText: ""
+    property string actionMemoText: ""
     // =============================
     function pad2(v) {
         return v < 10 ? "0" + v : "" + v
