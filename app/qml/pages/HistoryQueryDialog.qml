@@ -1522,6 +1522,7 @@ Popup {
             radius: 4
             color: statusRoot.statusText === "경고" ? "#fee2e2"
                  : statusRoot.statusText === "주의" ? "#ffedd5"
+                 : statusRoot.statusText === "조치" ? "#dbeafe"
                  : "#dcfce7"
 
             Text {
@@ -1529,8 +1530,9 @@ Popup {
                 text: statusRoot.statusText
                 color: statusRoot.statusText === "경고" ? "#dc2626"
                      : statusRoot.statusText === "주의" ? "#f97316"
+                     : statusRoot.statusText === "조치" ? "#2563eb"
                      : "#15803d"
-                font.family:    "Asta Sans"
+                font.family: "Asta Sans"
                 font.pixelSize: 11
                 font.bold: true
             }
@@ -1570,15 +1572,19 @@ Popup {
             radius: 4
             color: actionRoot.actionText === "완료" ? "#dcfce7"
                  : actionRoot.actionText === "확인중" ? "#dbeafe"
-                 : "#fef3c7"
+                 : actionRoot.actionText === "보류" ? "#fef3c7"
+                 : actionRoot.actionText === "요청" ? "#ffedd5"
+                 : "#f1f5f9"
 
             Text {
                 anchors.centerIn: parent
                 text: actionRoot.actionText
                 color: actionRoot.actionText === "완료" ? "#16a34a"
                      : actionRoot.actionText === "확인중" ? "#2563eb"
-                     : "#d97706"
-                font.family:    "Asta Sans"
+                     : actionRoot.actionText === "보류" ? "#d97706"
+                     : actionRoot.actionText === "요청" ? "#f97316"
+                     : "#64748b"
+                font.family: "Asta Sans"
                 font.pixelSize: 11
                 font.bold: true
             }
