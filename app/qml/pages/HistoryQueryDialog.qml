@@ -507,12 +507,7 @@ Popup {
                                            : historyDetailPanel.selectedItem && historyDetailPanel.selectedItem.actionStatus === "확인중" ? "#2563eb"
                                            : "#f97316"
                             }
-/*
-                            HistoryDetailItem {
-                                labelText: "조치자"
-                                valueText: historyDetailPanel.selectedItem ? historyDetailPanel.selectedItem.operatorName : "-"
-                            }
-*/
+
                             RowLayout {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: dialogRoot.actionEditMode ? 34 : 24
@@ -560,7 +555,6 @@ Popup {
                             }
                             Rectangle {
                                 Layout.fillWidth: true
-                                //Layout.preferredHeight: 60
                                 Layout.preferredHeight: dialogRoot.actionEditMode ? 92 : 60
                                 Layout.minimumHeight: 0
                                 Layout.fillHeight: false
@@ -585,19 +579,7 @@ Popup {
                                         font.bold: true
                                         verticalAlignment: Text.AlignVCenter
                                     }
-/*
-                                    Text {
-                                        Layout.fillWidth: true
-                                        Layout.fillHeight: true
-                                        text: historyDetailPanel.selectedItem ? historyDetailPanel.selectedItem.actionContent : "-"
-                                        color: "#374151"
-                                        font.family:    "Asta Sans"
-                                        font.pixelSize: 12
-                                        wrapMode: Text.WordWrap
-                                        elide: Text.ElideRight
-                                        maximumLineCount: 2
-                                    }
-*/
+
                                     Text {
                                         visible: !dialogRoot.actionEditMode
                                         Layout.fillWidth: true
@@ -754,6 +736,7 @@ Popup {
 
                                         dialogRoot.actionEditMode = false
                                         dialogRoot.actionTargetItem = null
+                                        dialogRoot.actionOperatorText = "작업자"
                                         dialogRoot.actionContentText = ""
                                         dialogRoot.actionMemoText = ""
 
