@@ -328,7 +328,7 @@ Popup {
                                     width: parent.width
                                     height: 34
                                     isHeader: true
-                                    timeText: "시간"
+                                    timeText: "일시"
                                     robotText: "로봇"
                                     kindText: "구분"
                                     axisText: "축"
@@ -350,7 +350,7 @@ Popup {
                                         isHeader: false
                                         selected: index === dialogRoot.selectedHistoryIndex
 
-                                        timeText: modelData.time
+                                        timeText: dialogRoot.displayDateTime(modelData)
                                         robotText: modelData.robot
                                         kindText: modelData.kind
                                         axisText: modelData.axis
@@ -456,6 +456,13 @@ Popup {
                         HistoryDetailItem {
                             labelText: "이력 종류"
                             valueText: historyDetailPanel.selectedItem ? historyDetailPanel.selectedItem.kind + " 이력" : "-"
+                        }
+
+                        HistoryDetailItem {
+                            labelText: "발생 일시"
+                            valueText: historyDetailPanel.selectedItem
+                                       ? dialogRoot.displayDateTime(historyDetailPanel.selectedItem)
+                                       : "-"
                         }
 
                         HistoryDetailItem {
@@ -713,6 +720,28 @@ Popup {
         }
     }
 
+    function displayDateTime(item) {
+        if (!item)
+            return "-"
+
+        var iso = ""
+
+        if (item.sortTime !== undefined && item.sortTime !== "")
+            iso = item.sortTime
+        else if (item.occurredAt !== undefined && item.occurredAt !== "")
+            iso = item.occurredAt
+        else if (item.actionAt !== undefined && item.actionAt !== "")
+            iso = item.actionAt
+
+        if (iso === undefined || iso === "")
+            return item.time !== undefined ? item.time : "-"
+
+        if (iso.length >= 19)
+            return iso.substr(0, 10) + " " + iso.substr(11, 8)
+
+        return iso
+    }
+
     function filteredHistoryRows(keyword, robotFilter, typeFilter) {
         var rows = []
         var key = (keyword || "").toLowerCase()
@@ -963,7 +992,7 @@ Popup {
             spacing: 0
 
             HistoryTableCell {
-                width: 88
+                width: 142  //88
                 height: rowRoot.height
                 textValue: rowRoot.timeText
                 isHeader: rowRoot.isHeader
@@ -1012,7 +1041,8 @@ Popup {
             }
 
             HistoryTableCell {
-                width: Math.max(120, rowRoot.width - 88 - 82 - 68 - 48 - 62 - 62 - 72 - 78)
+                //width: Math.max(120, rowRoot.width - 88 - 82 - 68 - 48 - 62 - 62 - 72 - 78)
+                width: Math.max(120, rowRoot.width - 142 - 82 - 68 - 48 - 62 - 62 - 72 - 78)
                 height: rowRoot.height
                 textValue: rowRoot.descText
                 isHeader: rowRoot.isHeader
