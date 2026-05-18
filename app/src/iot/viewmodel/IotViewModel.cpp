@@ -183,6 +183,7 @@ QVariantList IotViewModel::historyRows() const
 
 bool IotViewModel::queryHistory(const QVariantMap& filter)
 {
+#if false
     if (!m_database || !m_database->isOpen()) {
         m_lastError = "Database is not open";
         emit lastErrorChanged();
@@ -255,6 +256,155 @@ bool IotViewModel::queryHistory(const QVariantMap& filter)
              << "rows =" << m_historyRows.size();
 
     return true;
+#else
+    if (!m_database || !m_database->isOpen()) {
+        m_lastError = "Database is not open";
+        emit lastErrorChanged();
+        return false;
+    }
+
+    const QString kind = filter.value("kind").toString();
+
+    IotHistoryRepository repo(m_database->database());
+
+    QVariantMap queryFilter = filter;
+    queryFilter.remove("kind");
+
+    QVariantList rows;
+    QVariantList alarms;
+    QVariantList actionsForRows;
+    QVariantList actionsForState;
+
+    const bool queryAlarm =
+        kind.isEmpty() ||
+        kind == "전체" ||
+        kind == "알람 이력" ||
+        kind == "alarm";
+
+    const bool queryAction =
+        kind.isEmpty() ||
+        kind == "전체" ||
+        kind == "조치 이력" ||
+        kind == "action";
+
+    if (queryAlarm) {
+        alarms = repo.queryAlarms(queryFilter);
+
+        if (!repo.lastError().isEmpty()) {
+            m_lastError = repo.lastError();
+            emit lastErrorChanged();
+            return false;
+        }
+
+        // 알람 row의 최신 조치상태 반영용.
+        // 검색어 조건은 제거해서, 알람이 검색 결과에 포함된 경우에도
+        // 해당 알람의 최신 조치상태는 정상 반영되도록 한다.
+        QVariantMap actionStateFilter = queryFilter;
+        actionStateFilter.remove("searchText");
+        actionStateFilter["limit"] = 5000;
+
+        actionsForState = repo.queryActions(actionStateFilter);
+
+        if (!repo.lastError().isEmpty()) {
+            m_lastError = repo.lastError();
+            emit lastErrorChanged();
+            return false;
+        }
+    }
+
+    if (queryAction) {
+        actionsForRows = repo.queryActions(queryFilter);
+
+        if (!repo.lastError().isEmpty()) {
+            m_lastError = repo.lastError();
+            emit lastErrorChanged();
+            return false;
+        }
+    }
+
+    QHash<qint64, QVariantMap> latestActionByAlarmId;
+
+    for (const QVariant& item : actionsForState) {
+        const QVariantMap action = item.toMap();
+        const qint64 alarmId = action.value("alarmId").toLongLong();
+
+        if (alarmId <= 0)
+            continue;
+
+        // queryActions()는 action_at DESC, id DESC 기준이므로
+        // 먼저 들어온 항목을 최신 조치로 사용한다.
+        if (!latestActionByAlarmId.contains(alarmId)) {
+            latestActionByAlarmId.insert(alarmId, action);
+        }
+    }
+
+    if (queryAlarm) {
+        for (const QVariant& item : alarms) {
+            const QVariantMap alarm = item.toMap();
+            QVariantMap row = historyRowFromAlarm(alarm);
+
+            const qint64 alarmId = alarm.value("id").toLongLong();
+
+            if (latestActionByAlarmId.contains(alarmId)) {
+                const QVariantMap latestAction =
+                    latestActionByAlarmId.value(alarmId);
+
+                const QString status =
+                    latestAction.value("status").toString();
+
+                const QString operatorName =
+                    latestAction.value("operatorName").toString();
+
+                const QString actionContent =
+                    latestAction.value("actionContent").toString();
+
+                const QString memo =
+                    latestAction.value("memo").toString();
+
+                if (!status.isEmpty())
+                    row["actionStatus"] = status;
+
+                if (!operatorName.isEmpty())
+                    row["operatorName"] = operatorName;
+
+                if (!actionContent.isEmpty())
+                    row["actionContent"] = actionContent;
+
+                if (!memo.isEmpty())
+                    row["cause"] = memo;
+
+                row["latestActionId"] = latestAction.value("id");
+                row["latestActionAt"] = latestAction.value("actionAt");
+            }
+
+            rows.push_back(row);
+        }
+    }
+
+    if (queryAction) {
+        for (const QVariant& item : actionsForRows) {
+            rows.push_back(historyRowFromAction(item.toMap()));
+        }
+    }
+
+    std::sort(rows.begin(), rows.end(),
+              [](const QVariant& lhs, const QVariant& rhs) {
+                  const QVariantMap left = lhs.toMap();
+                  const QVariantMap right = rhs.toMap();
+
+                  return left.value("sortTime").toString()
+                         > right.value("sortTime").toString();
+              });
+
+    m_historyRows = rows;
+    emit historyRowsChanged();
+
+    qDebug() << "[IoTViewModel] history queried"
+             << "kind =" << kind
+             << "rows =" << m_historyRows.size();
+
+    return true;
+#endif
 }
 
 QString IotViewModel::lastExportPath() const
@@ -418,7 +568,7 @@ bool IotViewModel::confirmAlarmAction(const QVariantMap& alarmRow)
         }
     }
 
-    // 기존 조치 이력 조회
+    // 신규 확인 조치 이력 생성
     QVariantMap action;
     action["alarmId"] = alarmId;
     action["robotId"] = robotId;
