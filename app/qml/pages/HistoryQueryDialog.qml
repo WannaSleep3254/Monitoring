@@ -509,6 +509,44 @@ Popup {
                             }
 
                             RowLayout {
+                                visible: dialogRoot.actionEditMode
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 34
+                                spacing: 8
+
+                                Text {
+                                    Layout.preferredWidth: 82
+                                    text: "저장 상태"
+                                    font.family: "Asta Sans"
+                                    font.pixelSize: 12
+                                    font.bold: true
+                                    color: "#9e9e9e"
+                                    elide: Text.ElideRight
+                                }
+
+                                ComboBox {
+                                    id: actionStatusCombo
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 30
+                                    model: ["완료", "보류", "확인중"]
+                                    currentIndex: model.indexOf(dialogRoot.actionStatusText)
+
+                                    font.family: "Asta Sans"
+                                    font.pixelSize: 12
+
+                                    onCurrentTextChanged: {
+                                        dialogRoot.actionStatusText = currentText
+                                    }
+
+                                    background: Rectangle {
+                                        radius: 5
+                                        color: "#ffffff"
+                                        border.color: parent.activeFocus ? "#2563eb" : "#d1d5db"
+                                    }
+                                }
+                            }
+
+                            RowLayout {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: dialogRoot.actionEditMode ? 34 : 24
 
@@ -658,6 +696,7 @@ Popup {
                                         dialogRoot.actionMemoText = historyDetailPanel.selectedItem
                                                                     ? historyDetailPanel.selectedItem.cause
                                                                     : ""
+                                        dialogRoot.actionStatusText = "완료"
                                         dialogRoot.actionEditMode = true
                                     }
                                 }
@@ -716,7 +755,7 @@ Popup {
                                         var actionData = {
                                             "alarmId": alarmId,
                                             "robotId": robotId,
-                                            "status": "완료",
+                                            "status": dialogRoot.actionStatusText,
                                             "operatorName": dialogRoot.actionOperatorText,
                                             "actionContent": content,
                                             "memo": dialogRoot.actionMemoText
@@ -725,6 +764,7 @@ Popup {
                                         console.log("[QML] action save requested:",
                                                     "alarmId =", alarmId,
                                                     "robotId =", robotId,
+                                                    "status =", dialogRoot.actionStatusText,
                                                     "operator =", dialogRoot.actionOperatorText,
                                                     "content =", content)
 
@@ -739,6 +779,7 @@ Popup {
                                         dialogRoot.actionOperatorText = "작업자"
                                         dialogRoot.actionContentText = ""
                                         dialogRoot.actionMemoText = ""
+                                        dialogRoot.actionStatusText = "완료"
 
                                         dialogRoot.requestHistoryQuery()
                                     }
@@ -754,6 +795,7 @@ Popup {
                                         dialogRoot.actionTargetItem = null
                                         dialogRoot.actionContentText = ""
                                         dialogRoot.actionMemoText = ""
+                                        dialogRoot.actionStatusText = "완료"
                                     }
                                 }
                             }
@@ -858,6 +900,7 @@ Popup {
     property string actionOperatorText: "작업자"
     property string actionContentText: ""
     property string actionMemoText: ""
+    property string actionStatusText: "완료"
     // =============================
     function pad2(v) {
         return v < 10 ? "0" + v : "" + v
