@@ -561,11 +561,10 @@ Popup {
                                     bodyText: "알람 확인"
                                     accentColor: "#2563eb"
 
-                                    enabled: historyDetailPanel.selectedItem
-                                             && historyDetailPanel.selectedItem.kind === "알람"
+                                    enabled: dialogRoot.canConfirmAlarm(historyDetailPanel.selectedItem)
 
                                     onClicked: {
-                                        if (!historyDetailPanel.selectedItem)
+                                        if (!dialogRoot.canConfirmAlarm(historyDetailPanel.selectedItem))
                                             return
 
                                         dialogRoot.alarmConfirmRequested(historyDetailPanel.selectedItem)
@@ -577,11 +576,10 @@ Popup {
                                     bodyText: "조치내용 입력"
                                     accentColor: "#16a34a"
 
-                                    enabled: historyDetailPanel.selectedItem
-                                             && historyDetailPanel.selectedItem.kind === "알람"
+                                    enabled: dialogRoot.canRegisterAction(historyDetailPanel.selectedItem)
 
                                     onClicked: {
-                                        if (!historyDetailPanel.selectedItem)
+                                        if (!dialogRoot.canRegisterAction(historyDetailPanel.selectedItem))
                                             return
 
                                         dialogRoot.alarmActionRequested(historyDetailPanel.selectedItem)
@@ -761,6 +759,20 @@ Popup {
             return iso.substr(0, 10) + " " + iso.substr(11, 8)
 
         return iso
+    }
+
+    function isAlarmItem(item) {
+        return item && item.kind === "알람"
+    }
+
+    function canConfirmAlarm(item) {
+        return isAlarmItem(item)
+               && item.actionStatus === "요청"
+    }
+
+    function canRegisterAction(item) {
+        return isAlarmItem(item)
+               && item.actionStatus !== "완료"
     }
 
     function filteredHistoryRows(keyword, robotFilter, typeFilter) {

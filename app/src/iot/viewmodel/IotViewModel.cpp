@@ -392,6 +392,33 @@ bool IotViewModel::confirmAlarmAction(const QVariantMap& alarmRow)
 
     IotHistoryRepository repo(m_database->database());
 
+    // 동일 알람에 대해 이미 "확인중" 또는 "완료" 상태의 조치가 있는지 확인
+    const QVariantList existingActions = repo.loadActionsByAlarmId(alarmId);
+
+    if (!repo.lastError().isEmpty()) {
+        m_lastError = repo.lastError();
+        emit lastErrorChanged();
+        return false;
+    }
+
+    for (const QVariant& item : existingActions) {
+        const QVariantMap action = item.toMap();
+        const QString status = action.value("status").toString();
+
+        if (status == "확인중") {
+            qDebug() << "[IoTViewModel] alarm confirm skipped, already confirmed"
+                     << "alarmId =" << alarmId;
+            return true;
+        }
+
+        if (status == "완료") {
+            qDebug() << "[IoTViewModel] alarm confirm skipped, already completed"
+                     << "alarmId =" << alarmId;
+            return true;
+        }
+    }
+
+    // 기존 조치 이력 조회
     QVariantMap action;
     action["alarmId"] = alarmId;
     action["robotId"] = robotId;
