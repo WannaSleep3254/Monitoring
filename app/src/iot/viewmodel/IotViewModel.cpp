@@ -183,80 +183,6 @@ QVariantList IotViewModel::historyRows() const
 
 bool IotViewModel::queryHistory(const QVariantMap& filter)
 {
-#if false
-    if (!m_database || !m_database->isOpen()) {
-        m_lastError = "Database is not open";
-        emit lastErrorChanged();
-        return false;
-    }
-
-    const QString kind = filter.value("kind").toString();
-
-    IotHistoryRepository repo(m_database->database());
-
-    QVariantMap queryFilter = filter;
-    queryFilter.remove("kind");
-
-    QVariantList rows;
-
-    const bool queryAlarm =
-        kind.isEmpty() ||
-        kind == "전체" ||
-        kind == "알람 이력" ||
-        kind == "alarm";
-
-    const bool queryAction =
-        kind.isEmpty() ||
-        kind == "전체" ||
-        kind == "조치 이력" ||
-        kind == "action";
-
-    if (queryAlarm) {
-        const QVariantList alarms = repo.queryAlarms(queryFilter);
-
-        if (!repo.lastError().isEmpty()) {
-            m_lastError = repo.lastError();
-            emit lastErrorChanged();
-            return false;
-        }
-
-        for (const QVariant& item : alarms) {
-            rows.push_back(historyRowFromAlarm(item.toMap()));
-        }
-    }
-
-    if (queryAction) {
-        const QVariantList actions = repo.queryActions(queryFilter);
-
-        if (!repo.lastError().isEmpty()) {
-            m_lastError = repo.lastError();
-            emit lastErrorChanged();
-            return false;
-        }
-
-        for (const QVariant& item : actions) {
-            rows.push_back(historyRowFromAction(item.toMap()));
-        }
-    }
-
-    std::sort(rows.begin(), rows.end(),
-              [](const QVariant& lhs, const QVariant& rhs) {
-                  const QVariantMap left = lhs.toMap();
-                  const QVariantMap right = rhs.toMap();
-
-                  return left.value("sortTime").toString()
-                         > right.value("sortTime").toString();
-              });
-
-    m_historyRows = rows;
-    emit historyRowsChanged();
-
-    qDebug() << "[IoTViewModel] history queried"
-             << "kind =" << kind
-             << "rows =" << m_historyRows.size();
-
-    return true;
-#else
     if (!m_database || !m_database->isOpen()) {
         m_lastError = "Database is not open";
         emit lastErrorChanged();
@@ -404,7 +330,6 @@ bool IotViewModel::queryHistory(const QVariantMap& filter)
              << "rows =" << m_historyRows.size();
 
     return true;
-#endif
 }
 
 QString IotViewModel::lastExportPath() const
