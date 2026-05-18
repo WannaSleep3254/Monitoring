@@ -310,7 +310,6 @@ bool IotViewModel::queryHistory(const QVariantMap& filter)
 
     if (queryAction) {
         for (const QVariant& item : std::as_const(actionsForRows)) {
-            //rows.push_back((item.toMap()));
             rows.push_back(historyRowFromAction(item.toMap()));
         }
     }
