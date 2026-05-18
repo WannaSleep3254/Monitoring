@@ -770,9 +770,22 @@ Popup {
                && item.actionStatus === "요청"
     }
 
+    function isActionItem(item) {
+        return item && item.kind === "조치"
+    }
+
     function canRegisterAction(item) {
-        return isAlarmItem(item)
-               && item.actionStatus !== "완료"
+        if (!item)
+            return false
+
+        if (isAlarmItem(item))
+            return item.actionStatus !== "완료"
+
+        if (isActionItem(item))
+            return item.actionStatus === "확인중"
+                   || item.actionStatus === "보류"
+
+        return false
     }
 
     function filteredHistoryRows(keyword, robotFilter, typeFilter) {
