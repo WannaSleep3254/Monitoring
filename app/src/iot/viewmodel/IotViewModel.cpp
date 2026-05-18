@@ -309,7 +309,7 @@ bool IotViewModel::queryHistory(const QVariantMap& filter)
 
     if (queryAction) {
         for (const QVariant& item : actionsForRows) {
-            rows.push_back(historyRowFromAction(item.toMap()));
+            rows.push_back((item.toMap()));
         }
     }
 
@@ -1140,7 +1140,7 @@ QVariantMap IotViewModel::historyRowFromAction(const QVariantMap& action) const
     row["temp"] = "-";
     row["torque"] = "-";
 
-    row["status"] = "정상";
+    row["status"] = "조치"; //"정상";
     row["desc"] = action.value("actionContent").toString();
 
     row["actionStatus"] = action.value("status").toString();
