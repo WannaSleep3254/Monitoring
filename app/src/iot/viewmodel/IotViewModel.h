@@ -36,7 +36,8 @@ public:
     Q_INVOKABLE bool saveThreshold(int robotIndex, const QVariantMap& thresholdData);
 
     QVariantList historyRows() const;
-    Q_INVOKABLE bool queryHistory(const QVariantMap& filter);
+    void extracted(QVariantList &rows, QVariantList &actionsForRows);
+    Q_INVOKABLE bool queryHistory(const QVariantMap &filter);
 
     QString lastExportPath() const;
     Q_INVOKABLE bool exportHistoryCsv(const QVariantList& rows);

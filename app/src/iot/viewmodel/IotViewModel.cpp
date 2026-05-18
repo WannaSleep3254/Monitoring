@@ -15,6 +15,7 @@
 #include <QDebug>
 
 #include <algorithm>
+#include <utility>
 
 IotViewModel::IotViewModel(QObject* parent)
     : QObject(parent)
@@ -250,7 +251,7 @@ bool IotViewModel::queryHistory(const QVariantMap& filter)
 
     QHash<qint64, QVariantMap> latestActionByAlarmId;
 
-    for (const QVariant& item : actionsForState) {
+    for (const QVariant& item : std::as_const(actionsForState)) {
         const QVariantMap action = item.toMap();
         const qint64 alarmId = action.value("alarmId").toLongLong();
 
@@ -265,7 +266,7 @@ bool IotViewModel::queryHistory(const QVariantMap& filter)
     }
 
     if (queryAlarm) {
-        for (const QVariant& item : alarms) {
+        for (const QVariant& item : std::as_const(alarms)) {
             const QVariantMap alarm = item.toMap();
             QVariantMap row = historyRowFromAlarm(alarm);
 
@@ -308,8 +309,9 @@ bool IotViewModel::queryHistory(const QVariantMap& filter)
     }
 
     if (queryAction) {
-        for (const QVariant& item : actionsForRows) {
-            rows.push_back((item.toMap()));
+        for (const QVariant& item : std::as_const(actionsForRows)) {
+            //rows.push_back((item.toMap()));
+            rows.push_back(historyRowFromAction(item.toMap()));
         }
     }
 
@@ -962,10 +964,7 @@ QVariantMap IotViewModel::makeAlarmMap(int robotId,
 
     const QString message =
         QString("%1 %2 %3 %4 발생: %5%6")
-            .arg(axis)
-            .arg(metricText)
-            .arg(levelText)
-            .arg(level)
+            .arg(axis, metricText, levelText, level)
             .arg(value, 0, 'f', 1)
             .arg(unitText.isEmpty() ? "" : " " + unitText);
 
@@ -1140,7 +1139,7 @@ QVariantMap IotViewModel::historyRowFromAction(const QVariantMap& action) const
     row["temp"] = "-";
     row["torque"] = "-";
 
-    row["status"] = "조치"; //"정상";
+    row["status"] = "조치";
     row["desc"] = action.value("actionContent").toString();
 
     row["actionStatus"] = action.value("status").toString();
