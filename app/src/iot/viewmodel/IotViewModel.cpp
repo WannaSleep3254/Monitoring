@@ -522,6 +522,89 @@ bool IotViewModel::confirmAlarmAction(const QVariantMap& alarmRow)
     return true;
 }
 
+bool IotViewModel::saveAction(const QVariantMap& actionData)
+{
+    if (!m_database || !m_database->isOpen()) {
+        m_lastError = "Database is not open";
+        emit lastErrorChanged();
+        return false;
+    }
+
+    const qint64 alarmId = actionData.value("alarmId").toLongLong();
+    const int robotId = actionData.value("robotId").toInt();
+
+    QString status = actionData.value("status").toString().trimmed();
+    QString actionContent = actionData.value("actionContent").toString().trimmed();
+    QString operatorName = actionData.value("operatorName").toString().trimmed();
+    QString memo = actionData.value("memo").toString().trimmed();
+
+    if (alarmId <= 0) {
+        m_lastError = QString("Invalid alarm id: %1").arg(alarmId);
+        emit lastErrorChanged();
+
+        qWarning() << "[IoTViewModel] save action failed:"
+                   << m_lastError;
+
+        return false;
+    }
+
+    if (robotId <= 0) {
+        m_lastError = QString("Invalid robot id: %1").arg(robotId);
+        emit lastErrorChanged();
+
+        qWarning() << "[IoTViewModel] save action failed:"
+                   << m_lastError;
+
+        return false;
+    }
+
+    if (status.isEmpty()) {
+        status = "완료";
+    }
+
+    if (actionContent.isEmpty()) {
+        m_lastError = "Action content is empty";
+        emit lastErrorChanged();
+
+        qWarning() << "[IoTViewModel] save action failed:"
+                   << m_lastError;
+
+        return false;
+    }
+
+    if (operatorName.isEmpty()) {
+        operatorName = "작업자";
+    }
+
+    IotHistoryRepository repo(m_database->database());
+
+    QVariantMap action;
+    action["alarmId"] = alarmId;
+    action["robotId"] = robotId;
+    action["status"] = status;
+    action["actionContent"] = actionContent;
+    action["operatorName"] = operatorName;
+    action["memo"] = memo;
+
+    if (!repo.insertAction(action)) {
+        m_lastError = repo.lastError();
+        emit lastErrorChanged();
+
+        qWarning() << "[IoTViewModel] save action insert failed:"
+                   << m_lastError;
+
+        return false;
+    }
+
+    qDebug() << "[IoTViewModel] action saved"
+             << "alarmId =" << alarmId
+             << "robotId =" << robotId
+             << "status =" << status
+             << "operator =" << operatorName;
+
+    return true;
+}
+
 QString IotViewModel::csvEscape(const QString& value) const
 {
     QString escaped = value;

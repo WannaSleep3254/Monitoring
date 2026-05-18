@@ -696,15 +696,68 @@ Popup {
                                     enabled: dialogRoot.actionContentText.trim().length > 0
 
                                     onClicked: {
-                                        if (dialogRoot.actionContentText.trim().length <= 0)
+                                        var content = dialogRoot.actionContentText.trim()
+
+                                        if (content.length <= 0)
                                             return
 
-                                        console.log("[QML] action save requested:",
-                                                    dialogRoot.actionTargetItem ? dialogRoot.actionTargetItem.id : 0,
-                                                    dialogRoot.actionOperatorText,
-                                                    dialogRoot.actionContentText)
+                                        var target = dialogRoot.actionTargetItem
 
-                                        // 다음 단계에서 iotViewModel.saveAction(actionData) 연결
+                                        if (!target) {
+                                            console.warn("[QML] action save failed: target item is null")
+                                            return
+                                        }
+
+                                        var alarmId = 0
+                                        var robotId = 0
+
+                                        if (target.kind === "알람")
+                                            alarmId = Number(target.id)
+                                        else if (target.kind === "조치")
+                                            alarmId = Number(target.alarmId)
+
+                                        robotId = Number(target.robotId)
+
+                                        if (alarmId <= 0 || robotId <= 0) {
+                                            console.warn("[QML] action save failed: invalid target",
+                                                         "alarmId =", alarmId,
+                                                         "robotId =", robotId,
+                                                         "kind =", target.kind)
+                                            return
+                                        }
+
+                                        if (!dialogRoot.hasViewModel || !dialogRoot.viewModel.saveAction) {
+                                            console.warn("[QML] action save failed: viewModel.saveAction is not available")
+                                            return
+                                        }
+
+                                        var actionData = {
+                                            "alarmId": alarmId,
+                                            "robotId": robotId,
+                                            "status": "완료",
+                                            "operatorName": dialogRoot.actionOperatorText,
+                                            "actionContent": content,
+                                            "memo": dialogRoot.actionMemoText
+                                        }
+
+                                        console.log("[QML] action save requested:",
+                                                    "alarmId =", alarmId,
+                                                    "robotId =", robotId,
+                                                    "operator =", dialogRoot.actionOperatorText,
+                                                    "content =", content)
+
+                                        if (!dialogRoot.viewModel.saveAction(actionData)) {
+                                            console.warn("[QML] action save failed:",
+                                                         dialogRoot.viewModel.lastError)
+                                            return
+                                        }
+
+                                        dialogRoot.actionEditMode = false
+                                        dialogRoot.actionTargetItem = null
+                                        dialogRoot.actionContentText = ""
+                                        dialogRoot.actionMemoText = ""
+
+                                        dialogRoot.requestHistoryQuery()
                                     }
                                 }
 

@@ -42,6 +42,7 @@ public:
     Q_INVOKABLE bool exportHistoryCsv(const QVariantList& rows);
 
     Q_INVOKABLE bool confirmAlarmAction(const QVariantMap& alarmRow);
+    Q_INVOKABLE bool saveAction(const QVariantMap& actionData);
 
 signals:
     void robotModelsChanged();
