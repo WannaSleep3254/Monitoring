@@ -1133,18 +1133,31 @@ QVariantMap IotViewModel::historyRowFromAction(const QVariantMap& action) const
     row["robot"] = QString("Robot %1").arg(robotId);
     row["robotId"] = robotId;
 
+    const QString alarmAxis = action.value("alarmAxis").toString();
+    const QString alarmMetric = action.value("alarmMetric").toString();
+    const double alarmValue = action.value("alarmValue").toDouble();
+
     row["kind"] = "조치";
-    row["axis"] = "-";
-    row["temp"] = "-";
-    row["torque"] = "-";
+    row["axis"] = alarmAxis.isEmpty() ? "-" : alarmAxis;
+    row["temp"] = alarmMetric == "temperature"
+                        ? QString::number(alarmValue, 'f', 1)
+                        : "-";
+
+    row["torque"] = alarmMetric == "torque"
+                        ? QString::number(alarmValue, 'f', 1)
+                        : "-";
 
     row["status"] = "조치";
     row["desc"] = action.value("actionContent").toString();
 
     row["actionStatus"] = action.value("status").toString();
+
+    const QString memo = action.value("memo").toString();
+    const QString alarmMessage = action.value("alarmMessage").toString();
+
     row["cause"] = action.value("memo").toString().isEmpty()
-                       ? "-"
-                       : action.value("memo").toString();
+                        ? memo
+                        : (!alarmMessage.isEmpty() ? alarmMessage : "-");
 
     row["operatorName"] = action.value("operatorName").toString().isEmpty()
                               ? "-"

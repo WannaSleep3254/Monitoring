@@ -1,7 +1,9 @@
 #include "IotHistoryRepository.h"
-
+// QSql-header
 #include <QSqlQuery>
 #include <QSqlError>
+#include <QSqlRecord>
+// Qt-header
 #include <QDateTime>
 #include <QDebug>
 #include <QStringList>
@@ -117,6 +119,14 @@ namespace
         action["operatorName"] = query.value(6).toString();
         action["memo"] = query.value(7).toString();
         action["createdAt"] = query.value(8).toString();
+        // QML 표시 편의용: 알람 정보가 JOIN 되어서 넘어오는 경우, 알람 관련 필드도 포함
+        if (query.record().count() > 9) {
+            action["alarmAxis"] = query.value(9).toString();
+            action["alarmMetric"] = query.value(10).toString();
+            action["alarmValue"] = query.value(11).toDouble();
+            action["alarmLevel"] = query.value(12).toString();
+            action["alarmMessage"] = query.value(13).toString();
+        }
 
         action["robotName"] = QString("Robot %1").arg(action["robotId"].toInt());
 
@@ -524,40 +534,45 @@ QVariantList IotHistoryRepository::queryActions(const QVariantMap& filter)
     const int limit = boundedLimit(filter.value("limit", 500).toInt());
 
     if (robotId > 0)
-        conditions << "robot_id = :robot_id";
+        conditions << "a.robot_id = :robot_id";
 
     if (alarmId > 0)
-        conditions << "alarm_id = :alarm_id";
+        conditions << "a.alarm_id = :alarm_id";
 
     if (!status.isEmpty() && status != "ALL" && status != "전체")
-        conditions << "status = :status";
+        conditions << "a.status = :status";
 
     if (!from.isEmpty())
-        conditions << "action_at >= :from";
+        conditions << "a.action_at >= :from";
 
     if (!to.isEmpty())
-        conditions << "action_at <= :to";
+        conditions << "a.action_at <= :to";
 
     if (!searchText.isEmpty()) {
         conditions << "("
-                      "status LIKE :search_text OR "
-                      "action_content LIKE :search_text OR "
-                      "operator_name LIKE :search_text OR "
-                      "memo LIKE :search_text"
+                      "a.status LIKE :search_text OR "
+                      "a.action_content LIKE :search_text OR "
+                      "a.operator_name LIKE :search_text OR "
+                      "a.memo LIKE :search_text OR "
+                      "h.axis LIKE :search_text OR "
+                      "h.metric LIKE :search_text OR "
+                      "h.message LIKE :search_text"
                       ")";
     }
 
     QString sql =
         "SELECT "
-        "id, alarm_id, action_at, robot_id, status, action_content, "
-        "operator_name, memo, created_at "
-        "FROM iot_action_history ";
+        "a.id, a.alarm_id, a.action_at, a.robot_id, a.status, a.action_content, "
+        "a.operator_name, a.memo, a.created_at, "
+        "h.axis, h.metric, h.value, h.level, h.message "
+        "FROM iot_action_history a "
+        "LEFT JOIN iot_alarm_history h ON a.alarm_id = h.id ";
 
     if (!conditions.isEmpty()) {
         sql += "WHERE " + conditions.join(" AND ") + " ";
     }
 
-    sql += "ORDER BY action_at DESC, id DESC LIMIT :limit";
+    sql += "ORDER BY a.action_at DESC, a.id DESC LIMIT :limit";
 
     QSqlQuery query(m_db);
     query.prepare(sql);
