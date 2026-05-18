@@ -120,7 +120,7 @@ namespace
         action["memo"] = query.value(7).toString();
         action["createdAt"] = query.value(8).toString();
         // QML 표시 편의용: 알람 정보가 JOIN 되어서 넘어오는 경우, 알람 관련 필드도 포함
-        if (query.record().count() > 9) {
+        if (query.record().count() >= 14) {
             action["alarmAxis"] = query.value(9).toString();
             action["alarmMetric"] = query.value(10).toString();
             action["alarmValue"] = query.value(11).toDouble();

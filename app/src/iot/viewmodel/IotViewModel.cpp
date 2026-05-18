@@ -1155,7 +1155,7 @@ QVariantMap IotViewModel::historyRowFromAction(const QVariantMap& action) const
     const QString memo = action.value("memo").toString();
     const QString alarmMessage = action.value("alarmMessage").toString();
 
-    row["cause"] = action.value("memo").toString().isEmpty()
+    row["cause"] = !memo.isEmpty()
                         ? memo
                         : (!alarmMessage.isEmpty() ? alarmMessage : "-");
 
