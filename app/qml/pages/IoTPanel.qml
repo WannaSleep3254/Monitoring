@@ -261,6 +261,20 @@ Rectangle {
                 }
             }
         }
+
+        onAlarmConfirmRequested: function(alarmRow) {
+            console.log("[QML] alarm confirm requested:",
+                        alarmRow.id,
+                        alarmRow.robot,
+                        alarmRow.axis)
+        }
+
+        onAlarmActionRequested: function(alarmRow) {
+            console.log("[QML] alarm action requested:",
+                        alarmRow.id,
+                        alarmRow.robot,
+                        alarmRow.axis)
+        }
     }
 
     // ═══════════════════════════════════════════════════════════

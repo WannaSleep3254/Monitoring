@@ -13,6 +13,9 @@ Popup {
 
     signal exportCsvRequested(var rows, string robotFilter, string periodFilter, string typeFilter, string searchText)
 
+    signal alarmConfirmRequested(var alarmRow)
+    signal alarmActionRequested(var alarmRow)
+
 
     modal: true
     focus: true
@@ -444,129 +447,147 @@ Popup {
                             anchors.topMargin:   12
                             spacing: 8
 
-                        Text {
-                            Layout.fillWidth: true
-                            text: "선택 이력 상세"
-                            color: "#212121"
-                            font.family:    "Asta Sans"
-                            font.pixelSize: 16
-                            font.bold: true
-                        }
+                            Text {
+                                Layout.fillWidth: true
+                                text: "선택 이력 상세"
+                                color: "#212121"
+                                font.family:    "Asta Sans"
+                                font.pixelSize: 16
+                                font.bold: true
+                            }
 
-                        HistoryDetailItem {
-                            labelText: "이력 종류"
-                            valueText: historyDetailPanel.selectedItem ? historyDetailPanel.selectedItem.kind + " 이력" : "-"
-                        }
+                            HistoryDetailItem {
+                                labelText: "이력 종류"
+                                valueText: historyDetailPanel.selectedItem ? historyDetailPanel.selectedItem.kind + " 이력" : "-"
+                            }
 
-                        HistoryDetailItem {
-                            labelText: "발생 일시"
-                            valueText: historyDetailPanel.selectedItem
-                                       ? dialogRoot.displayDateTime(historyDetailPanel.selectedItem)
-                                       : "-"
-                        }
+                            HistoryDetailItem {
+                                labelText: "발생 일시"
+                                valueText: historyDetailPanel.selectedItem
+                                           ? dialogRoot.displayDateTime(historyDetailPanel.selectedItem)
+                                           : "-"
+                            }
 
-                        HistoryDetailItem {
-                            labelText: "로봇"
-                            valueText: historyDetailPanel.selectedItem ? historyDetailPanel.selectedItem.robot : "-"
-                        }
+                            HistoryDetailItem {
+                                labelText: "로봇"
+                                valueText: historyDetailPanel.selectedItem ? historyDetailPanel.selectedItem.robot : "-"
+                            }
 
-                        HistoryDetailItem {
-                            labelText: "대상 축"
-                            valueText: historyDetailPanel.selectedItem ? historyDetailPanel.selectedItem.axis : "-"
-                        }
+                            HistoryDetailItem {
+                                labelText: "대상 축"
+                                valueText: historyDetailPanel.selectedItem ? historyDetailPanel.selectedItem.axis : "-"
+                            }
 
-                        HistoryDetailItem {
-                            labelText: "위험도"
-                            valueText: historyDetailPanel.selectedItem
-                                       ? (historyDetailPanel.selectedItem.status === "주의" ? "주의 (82)"
-                                          : historyDetailPanel.selectedItem.status === "경고" ? "경고 (91)"
-                                          : "정상")
-                                       : "-"
-                            valueColor: historyDetailPanel.selectedItem && historyDetailPanel.selectedItem.status === "경고" ? "#dc2626"
-                                       : historyDetailPanel.selectedItem && historyDetailPanel.selectedItem.status === "주의" ? "#f97316"
-                                       : "#16a34a"
-                        }
+                            HistoryDetailItem {
+                                labelText: "위험도"
+                                valueText: historyDetailPanel.selectedItem
+                                           ? (historyDetailPanel.selectedItem.status === "주의" ? "주의 (82)"
+                                              : historyDetailPanel.selectedItem.status === "경고" ? "경고 (91)"
+                                              : "정상")
+                                           : "-"
+                                valueColor: historyDetailPanel.selectedItem && historyDetailPanel.selectedItem.status === "경고" ? "#dc2626"
+                                           : historyDetailPanel.selectedItem && historyDetailPanel.selectedItem.status === "주의" ? "#f97316"
+                                           : "#16a34a"
+                            }
 
-                        HistoryDetailItem {
-                            labelText: "원인"
-                            valueText: historyDetailPanel.selectedItem ? historyDetailPanel.selectedItem.cause : "-"
-                        }
+                            HistoryDetailItem {
+                                labelText: "원인"
+                                valueText: historyDetailPanel.selectedItem ? historyDetailPanel.selectedItem.cause : "-"
+                            }
 
-                        HistoryDetailItem {
-                            labelText: "조치 상태"
-                            valueText: historyDetailPanel.selectedItem ? historyDetailPanel.selectedItem.actionStatus : "-"
-                            valueColor: historyDetailPanel.selectedItem && historyDetailPanel.selectedItem.actionStatus === "완료" ? "#16a34a"
-                                       : historyDetailPanel.selectedItem && historyDetailPanel.selectedItem.actionStatus === "확인중" ? "#2563eb"
-                                       : "#f97316"
-                        }
+                            HistoryDetailItem {
+                                labelText: "조치 상태"
+                                valueText: historyDetailPanel.selectedItem ? historyDetailPanel.selectedItem.actionStatus : "-"
+                                valueColor: historyDetailPanel.selectedItem && historyDetailPanel.selectedItem.actionStatus === "완료" ? "#16a34a"
+                                           : historyDetailPanel.selectedItem && historyDetailPanel.selectedItem.actionStatus === "확인중" ? "#2563eb"
+                                           : "#f97316"
+                            }
 
-                        HistoryDetailItem {
-                            labelText: "조치자"
-                            valueText: historyDetailPanel.selectedItem ? historyDetailPanel.selectedItem.operatorName : "-"
-                        }
+                            HistoryDetailItem {
+                                labelText: "조치자"
+                                valueText: historyDetailPanel.selectedItem ? historyDetailPanel.selectedItem.operatorName : "-"
+                            }
 
-                        Rectangle {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 60
-                            Layout.minimumHeight: 0
-                            Layout.fillHeight: false
-                            radius: 6
-                            color: "#fafafa"
-                            border.color: "#e2e8f0"
-                            clip: true
+                            Rectangle {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 60
+                                Layout.minimumHeight: 0
+                                Layout.fillHeight: false
+                                radius: 6
+                                color: "#fafafa"
+                                border.color: "#e2e8f0"
+                                clip: true
 
-                            ColumnLayout {
-                                anchors.fill: parent
-                                anchors.margins: 8
-                                spacing: 6
+                                ColumnLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 8
+                                    spacing: 6
 
-                                Text {
-                                    Layout.fillWidth: true
-                                    Layout.preferredHeight: 16
-                                    Layout.fillHeight: false
-                                    text: "조치 내용"
-                                    color: "#9e9e9e"
-                                    font.family:    "Asta Sans"
-                                    font.pixelSize: 12
-                                    font.bold: true
-                                    verticalAlignment: Text.AlignVCenter
+                                    Text {
+                                        Layout.fillWidth: true
+                                        Layout.preferredHeight: 16
+                                        Layout.fillHeight: false
+                                        text: "조치 내용"
+                                        color: "#9e9e9e"
+                                        font.family:    "Asta Sans"
+                                        font.pixelSize: 12
+                                        font.bold: true
+                                        verticalAlignment: Text.AlignVCenter
+                                    }
+
+                                    Text {
+                                        Layout.fillWidth: true
+                                        Layout.fillHeight: true
+                                        text: historyDetailPanel.selectedItem ? historyDetailPanel.selectedItem.actionContent : "-"
+                                        color: "#374151"
+                                        font.family:    "Asta Sans"
+                                        font.pixelSize: 12
+                                        wrapMode: Text.WordWrap
+                                        elide: Text.ElideRight
+                                        maximumLineCount: 2
+                                    }
+                                }
+                            }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 54
+                                Layout.minimumHeight: 54
+                                Layout.fillHeight: false
+                                spacing: 8
+
+                                HistoryActionCardButton {
+                                    titleText: "확인"
+                                    bodyText: "알람 확인"
+                                    accentColor: "#2563eb"
+
+                                    enabled: historyDetailPanel.selectedItem
+                                             && historyDetailPanel.selectedItem.kind === "알람"
+
+                                    onClicked: {
+                                        if (!historyDetailPanel.selectedItem)
+                                            return
+
+                                        dialogRoot.alarmConfirmRequested(historyDetailPanel.selectedItem)
+                                    }
                                 }
 
-                                Text {
-                                    Layout.fillWidth: true
-                                    Layout.fillHeight: true
-                                    text: historyDetailPanel.selectedItem ? historyDetailPanel.selectedItem.actionContent : "-"
-                                    color: "#374151"
-                                    font.family:    "Asta Sans"
-                                    font.pixelSize: 12
-                                    wrapMode: Text.WordWrap
-                                    elide: Text.ElideRight
-                                    maximumLineCount: 2
+                                HistoryActionCardButton {
+                                    titleText: "조치 등록"
+                                    bodyText: "조치내용 입력"
+                                    accentColor: "#16a34a"
+
+                                    enabled: historyDetailPanel.selectedItem
+                                             && historyDetailPanel.selectedItem.kind === "알람"
+
+                                    onClicked: {
+                                        if (!historyDetailPanel.selectedItem)
+                                            return
+
+                                        dialogRoot.alarmActionRequested(historyDetailPanel.selectedItem)
+                                    }
                                 }
                             }
-                        }
-
-                        RowLayout {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 54
-                            Layout.minimumHeight: 0
-                            Layout.fillHeight: false
-                            spacing: 8
-
-                            HistoryModeCard {
-                                Layout.fillWidth: true
-                                titleText: "GUI 자동 기록"
-                                bodyText: "알람/조치요청 생성"
-                                accentColor: "#2563eb"
-                            }
-
-                            HistoryModeCard {
-                                Layout.fillWidth: true
-                                titleText: "작업자 수동 입력"
-                                bodyText: "확인/완료/비고 기록"
-                                accentColor: "#16a34a"
-                            }
-                        }
                         } // end ColumnLayout
                     } // end Flickable
                 }
@@ -876,6 +897,90 @@ Popup {
             color: exportButton.pressed ? Qt.darker(exportButton.buttonColor, 1.15)
                  : exportButton.hovered ? Qt.lighter(exportButton.buttonColor, 1.08)
                  : exportButton.buttonColor
+        }
+    }
+
+    // ============================================================
+    // [컴포넌트] HistoryActionCardButton
+    // 사용 위치: 이력 조회 다이얼로그의 확인 / 조치 버튼
+    // ============================================================
+
+    component HistoryActionCardButton: Button {
+        id: cardButton
+
+        property color accentColor: "#2563eb"
+        property string titleText: "확인"
+        property string bodyText: "알람 확인"
+
+        Layout.fillWidth: true
+        Layout.preferredHeight: 54
+        Layout.minimumHeight: 54
+        Layout.maximumHeight: 54
+        Layout.fillHeight: false
+
+        padding: 0
+        hoverEnabled: true
+        opacity: enabled ? 1.0 : 0.45
+
+        background: Rectangle {
+            radius: 6
+            color: !cardButton.enabled ? "#f1f5f9"
+                 : cardButton.pressed ? "#eef2f7"
+                 : cardButton.hovered ? "#f8fafc"
+                 : "#fafafa"
+            border.color: cardButton.hovered ? "#cbd5e1" : "#e0e4ea"
+            border.width: 1
+        }
+
+        contentItem: Item {
+            RowLayout {
+                anchors.fill: parent
+                anchors.margins: 6
+                spacing: 6
+
+                Rectangle {
+                    Layout.preferredWidth: 6
+                    Layout.fillHeight: true
+                    radius: 3
+                    color: cardButton.accentColor
+                    opacity: 0.9
+                }
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    spacing: 2
+
+                    Text {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 16
+                        Layout.fillHeight: false
+                        text: cardButton.titleText
+                        color: cardButton.accentColor
+                        font.family: "Asta Sans"
+                        font.pixelSize: 12
+                        font.bold: true
+                        horizontalAlignment: Text.AlignLeft
+                        verticalAlignment: Text.AlignVCenter
+                        elide: Text.ElideRight
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 15
+                        Layout.fillHeight: false
+                        text: cardButton.bodyText
+                        color: "#374151"
+                        font.family: "Asta Sans"
+                        font.pixelSize: 10
+                        horizontalAlignment: Text.AlignLeft
+                        verticalAlignment: Text.AlignVCenter
+                        wrapMode: Text.WordWrap
+                        maximumLineCount: 2
+                        elide: Text.ElideRight
+                    }
+                }
+            }
         }
     }
 
