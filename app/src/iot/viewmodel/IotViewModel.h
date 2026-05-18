@@ -41,6 +41,8 @@ public:
     QString lastExportPath() const;
     Q_INVOKABLE bool exportHistoryCsv(const QVariantList& rows);
 
+    Q_INVOKABLE bool confirmAlarmAction(const QVariantMap& alarmRow);
+
 signals:
     void robotModelsChanged();
     void robotThresholdsChanged();

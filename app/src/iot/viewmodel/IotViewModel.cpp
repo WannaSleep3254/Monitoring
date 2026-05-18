@@ -357,6 +357,69 @@ bool IotViewModel::exportHistoryCsv(const QVariantList& rows)
     return true;
 }
 
+bool IotViewModel::confirmAlarmAction(const QVariantMap& alarmRow)
+{
+    if (!m_database || !m_database->isOpen()) {
+        m_lastError = "Database is not open";
+        emit lastErrorChanged();
+        return false;
+    }
+
+    const qint64 alarmId = alarmRow.value("id").toLongLong();
+    const int robotId = alarmRow.value("robotId").toInt();
+    const QString axis = alarmRow.value("axis").toString();
+    const QString desc = alarmRow.value("desc").toString();
+
+    if (alarmId <= 0) {
+        m_lastError = QString("Invalid alarm id: %1").arg(alarmId);
+        emit lastErrorChanged();
+
+        qWarning() << "[IoTViewModel] confirm alarm failed:"
+                   << m_lastError;
+
+        return false;
+    }
+
+    if (robotId <= 0) {
+        m_lastError = QString("Invalid robot id: %1").arg(robotId);
+        emit lastErrorChanged();
+
+        qWarning() << "[IoTViewModel] confirm alarm failed:"
+                   << m_lastError;
+
+        return false;
+    }
+
+    IotHistoryRepository repo(m_database->database());
+
+    QVariantMap action;
+    action["alarmId"] = alarmId;
+    action["robotId"] = robotId;
+    action["status"] = "확인중";
+    action["actionContent"] = axis.isEmpty()
+                                  ? "알람 확인"
+                                  : QString("%1 알람 확인").arg(axis);
+    action["operatorName"] = "작업자";
+    action["memo"] = desc;
+
+    if (!repo.insertAction(action)) {
+        m_lastError = repo.lastError();
+        emit lastErrorChanged();
+
+        qWarning() << "[IoTViewModel] confirm alarm insert failed:"
+                   << m_lastError;
+
+        return false;
+    }
+
+    qDebug() << "[IoTViewModel] alarm confirmed"
+             << "alarmId =" << alarmId
+             << "robotId =" << robotId
+             << "axis =" << axis;
+
+    return true;
+}
+
 QString IotViewModel::csvEscape(const QString& value) const
 {
     QString escaped = value;

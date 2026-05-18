@@ -267,6 +267,19 @@ Rectangle {
                         alarmRow.id,
                         alarmRow.robot,
                         alarmRow.axis)
+
+            if (!root.hasIotViewModel) {
+                console.warn("[QML] IoTViewModel is not available")
+                return
+            }
+
+            if (!iotViewModel.confirmAlarmAction(alarmRow)) {
+                console.warn("[QML] alarm confirm failed:",
+                             iotViewModel.lastError)
+                return
+            }
+
+            historyDialog.requestHistoryQuery()
         }
 
         onAlarmActionRequested: function(alarmRow) {
