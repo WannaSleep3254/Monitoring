@@ -131,7 +131,7 @@ Popup {
                         id: historyPeriodCombo
                         Layout.fillWidth: true
                         Layout.preferredHeight: 34
-                        model: ["오늘", "최근 7일", "최근 30일", "사용자 지정"]
+                        model: ["오늘", "최근 7일", "최근 30일", "최근 90일", "사용자 지정"]
                         font.family:    "Asta Sans"
                         font.pixelSize: 12
 
@@ -942,6 +942,10 @@ Popup {
             filter.to = toLocalIso(now)
         } else if (historyPeriodCombo.currentText === "최근 30일") {
             from.setDate(now.getDate() - 30)
+            filter.from = toLocalIso(from)
+            filter.to = toLocalIso(now)
+        } else if (historyPeriodCombo.currentText === "최근 90일") {
+            from.setDate(now.getDate() - 90)
             filter.from = toLocalIso(from)
             filter.to = toLocalIso(now)
         }
