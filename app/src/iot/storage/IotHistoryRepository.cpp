@@ -123,7 +123,7 @@ namespace
         return action;
     }
 }
-/////
+
 IotHistoryRepository::IotHistoryRepository(const QSqlDatabase& database)
     : m_db(database)
 {
@@ -186,10 +186,8 @@ bool IotHistoryRepository::insertAlarm(const QVariantMap& alarm)
 
     if (message.isEmpty()) {
         message = QString("Robot %1 %2 %3 %4")
-            .arg(robotId)
-            .arg(axis)
-            .arg(metric)
-            .arg(level);
+            .arg(robotId)               // int to QString
+            .arg(axis, metric, level);  // QString to QString
     }
 
     QSqlQuery query(m_db);

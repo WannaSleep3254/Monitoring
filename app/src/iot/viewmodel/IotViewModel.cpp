@@ -14,6 +14,8 @@
 #include <QStandardPaths>
 #include <QDebug>
 
+#include <algorithm>
+
 IotViewModel::IotViewModel(QObject* parent)
     : QObject(parent)
 {
@@ -189,39 +191,68 @@ bool IotViewModel::queryHistory(const QVariantMap& filter)
 
     const QString kind = filter.value("kind").toString();
 
-    // 현재는 알람 이력만 구현됨
-    if (kind == "조치 이력" || kind == "action") {
-        m_historyRows.clear();
-        emit historyRowsChanged();
-        return true;
-    }
-
     IotHistoryRepository repo(m_database->database());
 
     QVariantMap queryFilter = filter;
-
-    // QML에서 넘어온 kind는 Repository SQL에는 직접 사용하지 않음
     queryFilter.remove("kind");
 
-    const QVariantList alarms = repo.queryAlarms(queryFilter);
-
-    if (!repo.lastError().isEmpty()) {
-        m_lastError = repo.lastError();
-        emit lastErrorChanged();
-        return false;
-    }
-
     QVariantList rows;
-    rows.reserve(alarms.size());
 
-    for (const QVariant& item : alarms) {
-        rows.push_back(historyRowFromAlarm(item.toMap()));
+    const bool queryAlarm =
+        kind.isEmpty() ||
+        kind == "전체" ||
+        kind == "알람 이력" ||
+        kind == "alarm";
+
+    const bool queryAction =
+        kind.isEmpty() ||
+        kind == "전체" ||
+        kind == "조치 이력" ||
+        kind == "action";
+
+    if (queryAlarm) {
+        const QVariantList alarms = repo.queryAlarms(queryFilter);
+
+        if (!repo.lastError().isEmpty()) {
+            m_lastError = repo.lastError();
+            emit lastErrorChanged();
+            return false;
+        }
+
+        for (const QVariant& item : alarms) {
+            rows.push_back(historyRowFromAlarm(item.toMap()));
+        }
     }
+
+    if (queryAction) {
+        const QVariantList actions = repo.queryActions(queryFilter);
+
+        if (!repo.lastError().isEmpty()) {
+            m_lastError = repo.lastError();
+            emit lastErrorChanged();
+            return false;
+        }
+
+        for (const QVariant& item : actions) {
+            rows.push_back(historyRowFromAction(item.toMap()));
+        }
+    }
+
+    std::sort(rows.begin(), rows.end(),
+              [](const QVariant& lhs, const QVariant& rhs) {
+                  const QVariantMap left = lhs.toMap();
+                  const QVariantMap right = rhs.toMap();
+
+                  return left.value("sortTime").toString()
+                         > right.value("sortTime").toString();
+              });
 
     m_historyRows = rows;
     emit historyRowsChanged();
 
-    qDebug() << "[IoTViewModel] history queried, rows =" << m_historyRows.size();
+    qDebug() << "[IoTViewModel] history queried"
+             << "kind =" << kind
+             << "rows =" << m_historyRows.size();
 
     return true;
 }
@@ -795,6 +826,7 @@ QVariantMap IotViewModel::historyRowFromAlarm(const QVariantMap& alarm) const
     row["id"] = alarm.value("id");
     row["time"] = historyTimeText(occurredAt);
     row["occurredAt"] = occurredAt;
+    row["sortTime"] = occurredAt;
 
     row["robot"] = QString("Robot %1").arg(alarm.value("robotId").toInt());
     row["robotId"] = alarm.value("robotId").toInt();
@@ -849,4 +881,45 @@ QString IotViewModel::historyStatusText(const QString& level) const
         return "주의";
 
     return "정상";
+}
+
+QVariantMap IotViewModel::historyRowFromAction(const QVariantMap& action) const
+{
+    const QString actionAt = action.value("actionAt").toString();
+
+    QVariantMap row;
+
+    row["id"] = action.value("id");
+    row["alarmId"] = action.value("alarmId");
+
+    row["time"] = historyTimeText(actionAt);
+    row["actionAt"] = actionAt;
+    row["sortTime"] = actionAt;
+
+    const int robotId = action.value("robotId").toInt();
+
+    row["robot"] = QString("Robot %1").arg(robotId);
+    row["robotId"] = robotId;
+
+    row["kind"] = "조치";
+    row["axis"] = "-";
+    row["temp"] = "-";
+    row["torque"] = "-";
+
+    row["status"] = "정상";
+    row["desc"] = action.value("actionContent").toString();
+
+    row["actionStatus"] = action.value("status").toString();
+    row["cause"] = action.value("memo").toString().isEmpty()
+                       ? "-"
+                       : action.value("memo").toString();
+
+    row["operatorName"] = action.value("operatorName").toString().isEmpty()
+                              ? "-"
+                              : action.value("operatorName").toString();
+
+    row["actionContent"] = action.value("actionContent").toString();
+    row["recordMode"] = "작업자 수동 입력";
+
+    return row;
 }

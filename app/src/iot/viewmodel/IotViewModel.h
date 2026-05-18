@@ -96,8 +96,11 @@ private:
     QString historyTimeText(const QString& isoTime) const;
     QString historyStatusText(const QString& level) const;
 
+    QVariantMap historyRowFromAction(const QVariantMap& action) const;
+
     QString csvEscape(const QString& value) const;
     QString defaultCsvExportPath() const;
+
 
 private:
     IRobotGateway* m_gateway = nullptr;
