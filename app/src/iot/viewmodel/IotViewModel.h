@@ -93,10 +93,11 @@ private:
     QString alarmKey(const QVariantMap& alarm) const;
 
     QVariantMap historyRowFromAlarm(const QVariantMap& alarm) const;
-    QString historyTimeText(const QString& isoTime) const;
-    QString historyStatusText(const QString& level) const;
-
     QVariantMap historyRowFromAction(const QVariantMap& action) const;
+
+    QString historyTimeText(const QString& isoTime) const;
+    QString historyDateTimeText(const QString& isoTime) const;
+    QString historyStatusText(const QString& level) const;
 
     QString csvEscape(const QString& value) const;
     QString defaultCsvExportPath() const;

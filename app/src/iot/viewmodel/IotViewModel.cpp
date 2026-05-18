@@ -298,6 +298,7 @@ bool IotViewModel::exportHistoryCsv(const QVariantList& rows)
     out << QChar(0xFEFF);
 
     const QStringList headers = {
+        "일시",
         "시간",
         "로봇",
         "구분",
@@ -318,7 +319,15 @@ bool IotViewModel::exportHistoryCsv(const QVariantList& rows)
     for (const QVariant& item : rows) {
         const QVariantMap row = item.toMap();
 
+        QString isoTime = row.value("sortTime").toString();
+        if (isoTime.isEmpty())
+            isoTime = row.value("occurredAt").toString();
+
+        if (isoTime.isEmpty())
+            isoTime = row.value("actionAt").toString();
+
         QStringList cols;
+        cols << csvEscape(historyDateTimeText(isoTime));
         cols << csvEscape(row.value("time").toString());
         cols << csvEscape(row.value("robot").toString());
         cols << csvEscape(row.value("kind").toString());
@@ -859,29 +868,6 @@ QVariantMap IotViewModel::historyRowFromAlarm(const QVariantMap& alarm) const
     return row;
 }
 
-QString IotViewModel::historyTimeText(const QString& isoTime) const
-{
-    const QDateTime dt = QDateTime::fromString(isoTime, Qt::ISODate);
-
-    if (dt.isValid())
-        return dt.toString("HH:mm:ss");
-
-    if (isoTime.size() >= 19)
-        return isoTime.mid(11, 8);
-
-    return "-";
-}
-
-QString IotViewModel::historyStatusText(const QString& level) const
-{
-    if (level == "ALARM")
-        return "경고";
-
-    if (level == "WARNING" || level == "WARN")
-        return "주의";
-
-    return "정상";
-}
 
 QVariantMap IotViewModel::historyRowFromAction(const QVariantMap& action) const
 {
@@ -923,3 +909,41 @@ QVariantMap IotViewModel::historyRowFromAction(const QVariantMap& action) const
 
     return row;
 }
+
+QString IotViewModel::historyTimeText(const QString& isoTime) const
+{
+    const QDateTime dt = QDateTime::fromString(isoTime, Qt::ISODate);
+
+    if (dt.isValid())
+        return dt.toString("HH:mm:ss");
+
+    if (isoTime.size() >= 19)
+        return isoTime.mid(11, 8);
+
+    return "-";
+}
+
+QString IotViewModel::historyDateTimeText(const QString& isoTime) const
+{
+    const QDateTime dt = QDateTime::fromString(isoTime, Qt::ISODate);
+
+    if (dt.isValid())
+        return dt.toString("yyyy-MM-dd HH:mm:ss");
+
+    if (isoTime.size() >= 19)
+        return isoTime.left(10) + " " + isoTime.mid(11, 8);
+
+    return "-";
+}
+
+QString IotViewModel::historyStatusText(const QString& level) const
+{
+    if (level == "ALARM")
+        return "경고";
+
+    if (level == "WARNING" || level == "WARN")
+        return "주의";
+
+    return "정상";
+}
+
