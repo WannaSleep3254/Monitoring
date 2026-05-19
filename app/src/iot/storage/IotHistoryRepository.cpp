@@ -707,6 +707,10 @@ bool IotHistoryRepository::deleteOldHistoryDays(int retentionDays)
             .addDays(-retentionDays)
             .toString(Qt::ISODate);
 
+    int linkedActionsDeleted = 0;
+    int standaloneActionsDeleted = 0;
+    int alarmsDeleted = 0;
+
     QSqlQuery query(m_db);
 
     // 오래된 알람에 연결된 조치 이력 먼저 삭제
@@ -726,6 +730,8 @@ bool IotHistoryRepository::deleteOldHistoryDays(int retentionDays)
         return false;
     }
 
+    linkedActionsDeleted = query.numRowsAffected();
+
     // 독립적으로 오래된 조치 이력 삭제
     query.prepare(
         "DELETE FROM iot_action_history "
@@ -739,6 +745,8 @@ bool IotHistoryRepository::deleteOldHistoryDays(int retentionDays)
                    << m_lastError;
         return false;
     }
+
+    standaloneActionsDeleted = query.numRowsAffected();
 
     // 오래된 알람 이력 삭제
     query.prepare(
@@ -754,11 +762,19 @@ bool IotHistoryRepository::deleteOldHistoryDays(int retentionDays)
         return false;
     }
 
+    alarmsDeleted = query.numRowsAffected();
+
     m_lastError.clear();
 
     qDebug() << "[IotHistoryRepository] old history deleted"
              << "retentionDays =" << retentionDays
-             << "cutoff =" << cutoff;
+             << "cutoff =" << cutoff
+             << "linkedActionsDeleted =" << linkedActionsDeleted
+             << "standaloneActionsDeleted =" << standaloneActionsDeleted
+             << "alarmsDeleted =" << alarmsDeleted
+             << "totalDeleted =" << (linkedActionsDeleted
+                                     + standaloneActionsDeleted
+                                     + alarmsDeleted);
 
     return true;
 }
