@@ -606,7 +606,7 @@ bool IotViewModel::saveAction(const QVariantMap& actionData)
     return true;
 }
 
-bool IotViewModel::deleteOldHistoryDays(int retentionMonths)
+bool IotViewModel::deleteOldHistoryDays(int retentionDays)
 {
     if (!m_database || !m_database->isOpen()) {
         m_lastError = "Database is not open";
@@ -614,9 +614,9 @@ bool IotViewModel::deleteOldHistoryDays(int retentionMonths)
         return false;
     }
 
-    if (retentionMonths <= 0) {
-        m_lastError = QString("Invalid retention months: %1")
-        .arg(retentionMonths);
+    if (retentionDays <= 0) {
+        m_lastError = QString("Invalid retention days: %1")
+        .arg(retentionDays);
         emit lastErrorChanged();
 
         qWarning() << "[IoTViewModel] delete old history failed:"
@@ -627,7 +627,7 @@ bool IotViewModel::deleteOldHistoryDays(int retentionMonths)
 
     IotHistoryRepository repo(m_database->database());
 
-    if (!repo.deleteOldHistory(retentionMonths)) {
+    if (!repo.deleteOldHistoryDays(retentionDays)) {
         m_lastError = repo.lastError();
         emit lastErrorChanged();
 
@@ -638,7 +638,7 @@ bool IotViewModel::deleteOldHistoryDays(int retentionMonths)
     }
 
     qDebug() << "[IoTViewModel] old history deleted"
-             << "retentionMonths =" << retentionMonths;
+             << "retentionDays =" << retentionDays;
 
     return true;
 }
