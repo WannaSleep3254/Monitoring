@@ -1198,15 +1198,17 @@ Popup {
     property var historyRows: dialogRoot.hasViewModel
                               ? dialogRoot.viewModel.historyRows
                               : dialogRoot.sampleHistoryRows
-
+    // 필터링 및 검색 조건
     property string historyFilterType: "전체"
     property int selectedHistoryIndex: 0
-
+    // 편집 모드 여부 및 대상 아이템
     property bool actionEditMode: false
     property var actionTargetItem: null
-
+    // 조치 등록/수정 시 입력값 보관용
     property string actionOperatorText: "작업자"
     property string lastActionOperatorText: "작업자"
+    property bool rememberActionOperatorEnabled: true
+    // 상태 및 내용 입력용
     property string actionContentText: ""
     property string actionMemoText: ""
     property string actionStatusText: "완료"
