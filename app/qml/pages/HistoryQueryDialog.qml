@@ -966,12 +966,82 @@ Popup {
                         if (!dialogRoot.viewModel.deleteOldHistoryDays(90)) {
                             console.warn("[QML] delete old history failed:",
                                          dialogRoot.viewModel.lastError)
+
+                            cleanupResultPopup.messageText =
+                                    "90일 이전 이력 삭제에 실패했습니다.\n" +
+                                    dialogRoot.viewModel.lastError
+                            cleanupConfirmPopup.close()
+                            cleanupResultPopup.open()
                             return
                         }
 
                         cleanupConfirmPopup.close()
                         dialogRoot.requestHistoryQuery()
+
+                        cleanupResultPopup.messageText =
+                                "90일 이전 알람/조치 이력 삭제 처리가 완료되었습니다."
+                        cleanupResultPopup.open()
                     }
+                }
+            }
+        }
+    }
+    // ===== 삭제 결과 알림 팝업 =====
+    Popup {
+        id: cleanupResultPopup
+
+        modal: true
+        focus: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+        width: 340
+        height: 150
+        x: Math.round((dialogRoot.width - width) / 2)
+        y: Math.round((dialogRoot.height - height) / 2)
+
+        property string messageText: ""
+
+        background: Rectangle {
+            radius: 8
+            color: "#ffffff"
+            border.color: "#e2e8f0"
+        }
+
+        contentItem: ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 18
+            spacing: 12
+
+            Text {
+                Layout.fillWidth: true
+                text: "삭제 완료"
+                color: "#111827"
+                font.family: "Asta Sans"
+                font.pixelSize: 16
+                font.bold: true
+            }
+
+            Text {
+                Layout.fillWidth: true
+                text: cleanupResultPopup.messageText
+                color: "#475569"
+                font.family: "Asta Sans"
+                font.pixelSize: 12
+                wrapMode: Text.WordWrap
+            }
+
+            Item { Layout.fillHeight: true }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 34
+
+                Item { Layout.fillWidth: true }
+
+                DialogToolButton {
+                    text: "확인"
+                    Layout.preferredWidth: 72
+                    onClicked: cleanupResultPopup.close()
                 }
             }
         }
