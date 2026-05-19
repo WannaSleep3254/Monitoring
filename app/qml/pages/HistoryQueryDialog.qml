@@ -673,6 +673,40 @@ Popup {
                                     }
                                 }
                             }
+
+                            RowLayout {
+                                visible: dialogRoot.actionEditMode
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 24
+                                spacing: 6
+
+                                Item {
+                                    Layout.preferredWidth: 82
+                                }
+
+                                CheckBox {
+                                    id: rememberOperatorCheckBox
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 24
+
+                                    checked: dialogRoot.rememberActionOperatorEnabled
+                                    text: "조치자 기억"
+
+                                    font.family: "Asta Sans"
+                                    font.pixelSize: 11
+
+                                    onToggled: {
+                                        dialogRoot.rememberActionOperatorEnabled = checked
+
+                                        if (checked) {
+                                            dialogRoot.actionOperatorText = dialogRoot.lastActionOperatorText
+                                        } else {
+                                            dialogRoot.actionOperatorText = "작업자"
+                                        }
+                                    }
+                                }
+                            }
+
                             Rectangle {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: dialogRoot.actionEditMode ? 92 : 60
@@ -773,7 +807,11 @@ Popup {
                                             return
 
                                         dialogRoot.actionTargetItem = historyDetailPanel.selectedItem
-                                        dialogRoot.actionOperatorText = "작업자"
+                                        dialogRoot.actionOperatorText =
+                                                dialogRoot.rememberActionOperatorEnabled
+                                                ? dialogRoot.lastActionOperatorText
+                                                : "작업자"
+
                                         dialogRoot.actionContentText = ""
                                         dialogRoot.actionMemoText = historyDetailPanel.selectedItem
                                                                     ? historyDetailPanel.selectedItem.cause
@@ -856,9 +894,19 @@ Popup {
                                             return
                                         }
 
+                                        var savedOperatorName = dialogRoot.actionOperatorText.trim()
+
+                                        if (dialogRoot.rememberActionOperatorEnabled &&
+                                            savedOperatorName.length > 0) {
+                                            dialogRoot.lastActionOperatorText = savedOperatorName
+                                        }
+
                                         dialogRoot.actionEditMode = false
                                         dialogRoot.actionTargetItem = null
-                                        dialogRoot.actionOperatorText = "작업자"
+                                        dialogRoot.actionOperatorText =
+                                                dialogRoot.rememberActionOperatorEnabled
+                                                ? dialogRoot.lastActionOperatorText
+                                                : "작업자"
                                         dialogRoot.actionContentText = ""
                                         dialogRoot.actionMemoText = ""
                                         dialogRoot.actionStatusText = "완료"
@@ -875,6 +923,10 @@ Popup {
                                     onClicked: {
                                         dialogRoot.actionEditMode = false
                                         dialogRoot.actionTargetItem = null
+                                        dialogRoot.actionOperatorText =
+                                                dialogRoot.rememberActionOperatorEnabled
+                                                ? dialogRoot.lastActionOperatorText
+                                                : "작업자"
                                         dialogRoot.actionContentText = ""
                                         dialogRoot.actionMemoText = ""
                                         dialogRoot.actionStatusText = "완료"
@@ -1154,6 +1206,7 @@ Popup {
     property var actionTargetItem: null
 
     property string actionOperatorText: "작업자"
+    property string lastActionOperatorText: "작업자"
     property string actionContentText: ""
     property string actionMemoText: ""
     property string actionStatusText: "완료"
