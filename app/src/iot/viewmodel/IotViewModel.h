@@ -43,7 +43,7 @@ public:
 
     Q_INVOKABLE bool confirmAlarmAction(const QVariantMap& alarmRow);
     Q_INVOKABLE bool saveAction(const QVariantMap& actionData);
-    Q_INVOKABLE bool deleteOldHistoryMonths(int retentionMonths);
+    Q_INVOKABLE bool deleteOldHistoryDays(int retentionMonths);
 
 signals:
     void robotModelsChanged();

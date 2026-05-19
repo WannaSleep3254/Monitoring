@@ -606,7 +606,7 @@ bool IotViewModel::saveAction(const QVariantMap& actionData)
     return true;
 }
 
-bool IotViewModel::deleteOldHistoryMonths(int retentionMonths)
+bool IotViewModel::deleteOldHistoryDays(int retentionMonths)
 {
     if (!m_database || !m_database->isOpen()) {
         m_lastError = "Database is not open";
