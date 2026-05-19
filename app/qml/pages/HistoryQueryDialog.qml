@@ -1002,7 +1002,11 @@ Popup {
     }
 
     function isValidDateText(text) {
-        return /^\d{4}-\d{2}-\d{2}$/.test(text)
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(text))
+            return false
+
+        var d = new Date(text + "T00:00:00")
+        return !isNaN(d.getTime())
     }
 
     function customStartIso(text) {
