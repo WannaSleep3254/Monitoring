@@ -104,27 +104,45 @@ QString IotDatabase::defaultDatabasePath() const
 
     return QDir(basePath).filePath("iot_monitoring.db");
 #else   // organization 적용 후 경로: .../Gachisoft/MonitoringApp/iot_monitoring.db ->  .../MonitoringApp/iot_monitoring.db
-    QString roamingPath =
+    constexpr const char* kDatabaseFileName = "iot_monitoring.db";
+    constexpr const char* kOrganizationName = "Gachisoft";
+    constexpr const char* kApplicationName  = "MonitoringApp";
+
+    QString appDataPath =
         QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
 
-    if (roamingPath.isEmpty()) {
-        roamingPath = QDir::currentPath();
+    if (appDataPath.isEmpty()) {
+        appDataPath = QDir::currentPath();
     }
 
-    QDir dir(roamingPath);
+    const QString currentDbPath =
+        QDir(appDataPath).filePath(kDatabaseFileName);
 
-    // organization 적용 후: .../Gachisoft/MonitoringApp
-    // 기존 경로로 되돌림: .../MonitoringApp
-    if (dir.dirName() == "MonitoringApp") {
-        dir.cdUp();
+    QDir legacyDir(appDataPath);
 
-        if (dir.dirName() == "Gachisoft") {
-            dir.cdUp();
+    // organization 적용 후 일반 경로:
+    //   .../Gachisoft/MonitoringApp
+    //
+    // 기존 DB 경로:
+    //   .../MonitoringApp
+    //
+    // 기존 DB가 있으면 기존 이력 유지를 위해 legacy path를 우선 사용한다.
+    if (legacyDir.dirName() == QLatin1String(kApplicationName)) {
+        legacyDir.cdUp();
+
+        if (legacyDir.dirName() == QLatin1String(kOrganizationName)) {
+            legacyDir.cdUp();
+
+            const QString legacyDbPath =
+                QDir(legacyDir.filePath(kApplicationName))
+                    .filePath(kDatabaseFileName);
+
+            if (QFileInfo::exists(legacyDbPath)) {
+                return legacyDbPath;
+            }
         }
-
-        return QDir(dir.filePath("MonitoringApp")).filePath("iot_monitoring.db");
     }
 
-    return QDir(roamingPath).filePath("iot_monitoring.db");
+    return currentDbPath;
 #endif
 }
