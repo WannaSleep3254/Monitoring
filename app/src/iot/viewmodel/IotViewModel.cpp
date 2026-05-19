@@ -606,6 +606,43 @@ bool IotViewModel::saveAction(const QVariantMap& actionData)
     return true;
 }
 
+bool IotViewModel::deleteOldHistoryMonths(int retentionMonths)
+{
+    if (!m_database || !m_database->isOpen()) {
+        m_lastError = "Database is not open";
+        emit lastErrorChanged();
+        return false;
+    }
+
+    if (retentionMonths <= 0) {
+        m_lastError = QString("Invalid retention months: %1")
+        .arg(retentionMonths);
+        emit lastErrorChanged();
+
+        qWarning() << "[IoTViewModel] delete old history failed:"
+                   << m_lastError;
+
+        return false;
+    }
+
+    IotHistoryRepository repo(m_database->database());
+
+    if (!repo.deleteOldHistory(retentionMonths)) {
+        m_lastError = repo.lastError();
+        emit lastErrorChanged();
+
+        qWarning() << "[IoTViewModel] delete old history failed:"
+                   << m_lastError;
+
+        return false;
+    }
+
+    qDebug() << "[IoTViewModel] old history deleted"
+             << "retentionMonths =" << retentionMonths;
+
+    return true;
+}
+
 QString IotViewModel::csvEscape(const QString& value) const
 {
     QString escaped = value;

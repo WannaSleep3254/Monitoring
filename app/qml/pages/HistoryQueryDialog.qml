@@ -344,6 +344,17 @@ Popup {
                         }
                 }
 
+                ExportButton {
+                    text: "90일 이전 삭제"
+                    buttonColor: "#64748b"
+                    Layout.fillWidth: false
+                    Layout.preferredWidth: 130
+
+                    onClicked: {
+                        cleanupConfirmPopup.open()
+                    }
+                }
+
                 Item { Layout.fillWidth: true }
 
                 HistorySummaryCard {
@@ -882,7 +893,89 @@ Popup {
             }
         }
     }
+    // ===== 90일 이전 이력 삭제 확인 팝업 =====
+    Popup {
+        id: cleanupConfirmPopup
 
+        modal: true
+        focus: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+        width: 380
+        height: 190
+        x: Math.round((dialogRoot.width - width) / 2)
+        y: Math.round((dialogRoot.height - height) / 2)
+
+        background: Rectangle {
+            radius: 8
+            color: "#ffffff"
+            border.color: "#e2e8f0"
+        }
+
+        contentItem: ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 18
+            spacing: 12
+
+            Text {
+                Layout.fillWidth: true
+                text: "90일 이전 이력 삭제"
+                color: "#111827"
+                font.family: "Asta Sans"
+                font.pixelSize: 16
+                font.bold: true
+            }
+
+            Text {
+                Layout.fillWidth: true
+                text: "90일 이전 알람/조치 이력을 삭제하시겠습니까?\n삭제된 이력은 복구할 수 없습니다."
+                color: "#475569"
+                font.family: "Asta Sans"
+                font.pixelSize: 12
+                wrapMode: Text.WordWrap
+            }
+
+            Item { Layout.fillHeight: true }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 34
+                spacing: 8
+
+                Item { Layout.fillWidth: true }
+
+                DialogToolButton {
+                    text: "취소"
+                    Layout.preferredWidth: 72
+                    onClicked: cleanupConfirmPopup.close()
+                }
+
+                ExportButton {
+                    text: "삭제"
+                    buttonColor: "#dc2626"
+                    Layout.fillWidth: false
+                    Layout.preferredWidth: 72
+
+                    onClicked: {
+                        if (!dialogRoot.hasViewModel ||
+                            !dialogRoot.viewModel.deleteOldHistoryDays) {
+                            console.warn("[QML] deleteOldHistoryDays is not available")
+                            return
+                        }
+
+                        if (!dialogRoot.viewModel.deleteOldHistoryDays(90)) {
+                            console.warn("[QML] delete old history failed:",
+                                         dialogRoot.viewModel.lastError)
+                            return
+                        }
+
+                        cleanupConfirmPopup.close()
+                        dialogRoot.requestHistoryQuery()
+                    }
+                }
+            }
+        }
+    }
     // ===== 이력 조회 샘플 데이터 =====
     // kind:
     // - "알람" : 센서/위험도 기반으로 GUI가 자동 생성한 이력

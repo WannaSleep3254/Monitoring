@@ -19,6 +19,7 @@ public:
     QVariantList queryActions(const QVariantMap& filter);
 
     bool deleteOldHistory(int retentionMonths);
+    bool deleteOldHistoryDays(int retentionDays);
 
     QString lastError() const;
 

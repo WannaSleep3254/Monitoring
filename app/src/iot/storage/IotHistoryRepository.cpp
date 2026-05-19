@@ -688,6 +688,81 @@ bool IotHistoryRepository::deleteOldHistory(int retentionMonths)
     return true;
 }
 
+bool IotHistoryRepository::deleteOldHistoryDays(int retentionDays)
+{
+    if (!m_db.isValid() || !m_db.isOpen()) {
+        m_lastError = "Database is not open";
+        qWarning() << "[IotHistoryRepository]" << m_lastError;
+        return false;
+    }
+
+    if (retentionDays <= 0) {
+        m_lastError = QString("Invalid retentionDays: %1").arg(retentionDays);
+        qWarning() << "[IotHistoryRepository]" << m_lastError;
+        return false;
+    }
+
+    const QString cutoff =
+        QDateTime::currentDateTime()
+            .addDays(-retentionDays)
+            .toString(Qt::ISODate);
+
+    QSqlQuery query(m_db);
+
+    // 오래된 알람에 연결된 조치 이력 먼저 삭제
+    query.prepare(
+        "DELETE FROM iot_action_history "
+        "WHERE alarm_id IN ("
+        "    SELECT id FROM iot_alarm_history "
+        "    WHERE occurred_at < :cutoff OR created_at < :cutoff"
+        ")"
+        );
+    query.bindValue(":cutoff", cutoff);
+
+    if (!query.exec()) {
+        m_lastError = query.lastError().text();
+        qWarning() << "[IotHistoryRepository] delete old linked actions failed:"
+                   << m_lastError;
+        return false;
+    }
+
+    // 독립적으로 오래된 조치 이력 삭제
+    query.prepare(
+        "DELETE FROM iot_action_history "
+        "WHERE action_at < :cutoff OR created_at < :cutoff"
+        );
+    query.bindValue(":cutoff", cutoff);
+
+    if (!query.exec()) {
+        m_lastError = query.lastError().text();
+        qWarning() << "[IotHistoryRepository] delete old actions failed:"
+                   << m_lastError;
+        return false;
+    }
+
+    // 오래된 알람 이력 삭제
+    query.prepare(
+        "DELETE FROM iot_alarm_history "
+        "WHERE occurred_at < :cutoff OR created_at < :cutoff"
+        );
+    query.bindValue(":cutoff", cutoff);
+
+    if (!query.exec()) {
+        m_lastError = query.lastError().text();
+        qWarning() << "[IotHistoryRepository] delete old alarms failed:"
+                   << m_lastError;
+        return false;
+    }
+
+    m_lastError.clear();
+
+    qDebug() << "[IotHistoryRepository] old history deleted"
+             << "retentionDays =" << retentionDays
+             << "cutoff =" << cutoff;
+
+    return true;
+}
+
 QString IotHistoryRepository::lastError() const
 {
     return m_lastError;
