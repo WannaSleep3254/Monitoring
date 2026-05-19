@@ -690,6 +690,8 @@ bool IotHistoryRepository::deleteOldHistory(int retentionMonths)
 
 bool IotHistoryRepository::deleteOldHistoryDays(int retentionDays)
 {
+    m_lastCleanupSummary.clear();
+
     if (!m_db.isValid() || !m_db.isOpen()) {
         m_lastError = "Database is not open";
         qWarning() << "[IotHistoryRepository]" << m_lastError;
@@ -766,17 +768,34 @@ bool IotHistoryRepository::deleteOldHistoryDays(int retentionDays)
 
     m_lastError.clear();
 
+    const int totalActionsDeleted =
+        linkedActionsDeleted + standaloneActionsDeleted;
+
+    const int totalDeleted =
+        totalActionsDeleted + alarmsDeleted;
+
+    m_lastCleanupSummary["retentionDays"] = retentionDays;
+    m_lastCleanupSummary["cutoff"] = cutoff;
+    m_lastCleanupSummary["linkedActionsDeleted"] = linkedActionsDeleted;
+    m_lastCleanupSummary["standaloneActionsDeleted"] = standaloneActionsDeleted;
+    m_lastCleanupSummary["actionsDeleted"] = totalActionsDeleted;
+    m_lastCleanupSummary["alarmsDeleted"] = alarmsDeleted;
+    m_lastCleanupSummary["totalDeleted"] = totalDeleted;
+
     qDebug() << "[IotHistoryRepository] old history deleted"
              << "retentionDays =" << retentionDays
              << "cutoff =" << cutoff
              << "linkedActionsDeleted =" << linkedActionsDeleted
              << "standaloneActionsDeleted =" << standaloneActionsDeleted
              << "alarmsDeleted =" << alarmsDeleted
-             << "totalDeleted =" << (linkedActionsDeleted
-                                     + standaloneActionsDeleted
-                                     + alarmsDeleted);
+             << "totalDeleted =" << totalDeleted;
 
     return true;
+}
+
+QVariantMap IotHistoryRepository::lastCleanupSummary() const
+{
+    return m_lastCleanupSummary;
 }
 
 QString IotHistoryRepository::lastError() const

@@ -21,9 +21,11 @@ public:
     bool deleteOldHistory(int retentionMonths);
     bool deleteOldHistoryDays(int retentionDays);
 
+    QVariantMap lastCleanupSummary() const;
     QString lastError() const;
 
 private:
     QSqlDatabase m_db;
     QString m_lastError;
+    QVariantMap m_lastCleanupSummary;
 };

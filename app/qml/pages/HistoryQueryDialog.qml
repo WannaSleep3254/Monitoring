@@ -974,9 +974,26 @@ Popup {
                         cleanupConfirmPopup.close()
                         dialogRoot.requestHistoryQuery()
 
+                        var summary = dialogRoot.viewModel.lastCleanupSummary
+
+                        var alarmsDeleted = summary && summary.alarmsDeleted !== undefined
+                                ? Number(summary.alarmsDeleted)
+                                : 0
+
+                        var actionsDeleted = summary && summary.actionsDeleted !== undefined
+                                ? Number(summary.actionsDeleted)
+                                : 0
+
+                        var totalDeleted = summary && summary.totalDeleted !== undefined
+                                ? Number(summary.totalDeleted)
+                                : 0
+
                         cleanupResultPopup.titleText = "삭제 완료"
                         cleanupResultPopup.messageText =
-                                "90일 이전 알람/조치 이력 삭제 처리가 완료되었습니다."
+                                "90일 이전 알람/조치 이력 삭제 처리가 완료되었습니다.\n" +
+                                "삭제된 알람: " + alarmsDeleted + "건\n" +
+                                "삭제된 조치: " + actionsDeleted + "건\n" +
+                                "총 삭제: " + totalDeleted + "건"
 
                         cleanupResultPopup.open()
                     }

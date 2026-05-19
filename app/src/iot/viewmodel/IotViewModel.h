@@ -21,6 +21,7 @@ class IotViewModel : public QObject
     Q_PROPERTY(QVariantList historyRows READ historyRows NOTIFY historyRowsChanged)
     Q_PROPERTY(QString lastExportPath READ lastExportPath NOTIFY lastExportPathChanged)
     Q_PROPERTY(QString lastError READ lastError NOTIFY lastErrorChanged)
+    Q_PROPERTY(QVariantMap lastCleanupSummary READ lastCleanupSummary NOTIFY lastCleanupSummaryChanged)
 
 public:
     explicit IotViewModel(QObject* parent = nullptr);
@@ -45,12 +46,16 @@ public:
     Q_INVOKABLE bool saveAction(const QVariantMap& actionData);
     Q_INVOKABLE bool deleteOldHistoryDays(int retentionDays);
 
+    QVariantMap lastCleanupSummary() const;
+
 signals:
     void robotModelsChanged();
     void robotThresholdsChanged();
     void historyRowsChanged();
     void lastExportPathChanged();
     void lastErrorChanged();
+
+    void lastCleanupSummaryChanged();
 
 private slots:
     void onSnapshotUpdated(int robotId, QVariantMap snapshot);
@@ -123,6 +128,8 @@ private:
     QVariantList m_historyRows;
 
     QString m_lastExportPath;
+
+    QVariantMap m_lastCleanupSummary;
 
     // 개발 중 테스트 알람 자동 누적 방지용.
     // true로 변경하면 threshold 초과 알람이 iot_alarm_history에 저장됨.

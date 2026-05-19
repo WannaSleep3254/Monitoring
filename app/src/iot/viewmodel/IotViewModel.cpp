@@ -124,6 +124,11 @@ QString IotViewModel::lastError() const
     return m_lastError;
 }
 
+QVariantMap IotViewModel::lastCleanupSummary() const
+{
+    return m_lastCleanupSummary;
+}
+
 bool IotViewModel::saveThreshold(int robotIndex, const QVariantMap& thresholdData)
 {
     const int targetIndex = robotIndex - 1;
@@ -634,11 +639,18 @@ bool IotViewModel::deleteOldHistoryDays(int retentionDays)
         qWarning() << "[IoTViewModel] delete old history failed:"
                    << m_lastError;
 
+        m_lastCleanupSummary.clear();
+        emit lastCleanupSummaryChanged();
+
         return false;
     }
 
+    m_lastCleanupSummary = repo.lastCleanupSummary();
+    emit lastCleanupSummaryChanged();
+
     qDebug() << "[IoTViewModel] old history deleted"
-             << "retentionDays =" << retentionDays;
+             << "retentionDays =" << retentionDays
+             << "summary =" << m_lastCleanupSummary;
 
     return true;
 }
