@@ -18,6 +18,10 @@ int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
 
+    QCoreApplication::setOrganizationName("Gachisoft");
+    QCoreApplication::setOrganizationDomain("gachisoft.co.kr");
+    QCoreApplication::setApplicationName("MonitoringApp");
+
     QQmlApplicationEngine engine;
     // ============================================================
     // Runtime / Gateway

@@ -95,6 +95,7 @@ QString IotDatabase::lastError() const
 
 QString IotDatabase::defaultDatabasePath() const
 {
+#if false // legacy path for testing
     QString basePath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
 
     if (basePath.isEmpty()) {
@@ -102,4 +103,28 @@ QString IotDatabase::defaultDatabasePath() const
     }
 
     return QDir(basePath).filePath("iot_monitoring.db");
+#else   // organization 적용 후 경로: .../Gachisoft/MonitoringApp/iot_monitoring.db ->  .../MonitoringApp/iot_monitoring.db
+    QString roamingPath =
+        QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+
+    if (roamingPath.isEmpty()) {
+        roamingPath = QDir::currentPath();
+    }
+
+    QDir dir(roamingPath);
+
+    // organization 적용 후: .../Gachisoft/MonitoringApp
+    // 기존 경로로 되돌림: .../MonitoringApp
+    if (dir.dirName() == "MonitoringApp") {
+        dir.cdUp();
+
+        if (dir.dirName() == "Gachisoft") {
+            dir.cdUp();
+        }
+
+        return QDir(dir.filePath("MonitoringApp")).filePath("iot_monitoring.db");
+    }
+
+    return QDir(roamingPath).filePath("iot_monitoring.db");
+#endif
 }
