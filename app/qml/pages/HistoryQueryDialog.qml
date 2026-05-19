@@ -1005,8 +1005,16 @@ Popup {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(text))
             return false
 
-        var d = new Date(text + "T00:00:00")
-        return !isNaN(d.getTime())
+        var parts = text.split("-")
+        var y = Number(parts[0])
+        var m = Number(parts[1])
+        var d = Number(parts[2])
+
+        var date = new Date(y, m - 1, d)
+
+        return date.getFullYear() === y
+               && date.getMonth() === m - 1
+               && date.getDate() === d
     }
 
     function customStartIso(text) {
