@@ -967,9 +967,11 @@ Popup {
                             console.warn("[QML] delete old history failed:",
                                          dialogRoot.viewModel.lastError)
 
+                            cleanupResultPopup.titleText = "삭제 실패"
                             cleanupResultPopup.messageText =
                                     "90일 이전 이력 삭제에 실패했습니다.\n" +
                                     dialogRoot.viewModel.lastError
+
                             cleanupConfirmPopup.close()
                             cleanupResultPopup.open()
                             return
@@ -978,8 +980,10 @@ Popup {
                         cleanupConfirmPopup.close()
                         dialogRoot.requestHistoryQuery()
 
+                        cleanupResultPopup.titleText = "삭제 완료"
                         cleanupResultPopup.messageText =
                                 "90일 이전 알람/조치 이력 삭제 처리가 완료되었습니다."
+
                         cleanupResultPopup.open()
                     }
                 }
@@ -999,6 +1003,7 @@ Popup {
         x: Math.round((dialogRoot.width - width) / 2)
         y: Math.round((dialogRoot.height - height) / 2)
 
+        property string titleText: "삭제 완료"
         property string messageText: ""
 
         background: Rectangle {
@@ -1014,7 +1019,7 @@ Popup {
 
             Text {
                 Layout.fillWidth: true
-                text: "삭제 완료"
+                text: cleanupResultPopup.titleText
                 color: "#111827"
                 font.family: "Asta Sans"
                 font.pixelSize: 16
