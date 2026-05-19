@@ -69,7 +69,6 @@ Popup {
             // ------------------------------------------------------------
             RowLayout {
                 Layout.fillWidth: true
-                //Layout.preferredHeight: 62
                 Layout.preferredHeight: historyPeriodCombo.currentText === "사용자 지정" ? 98 : 62
                 Layout.fillHeight: false
                 spacing: 14
@@ -94,7 +93,6 @@ Popup {
                         font.family:    "Asta Sans"
                         font.pixelSize: 12
 
-                        //onCurrentTextChanged: dialogRoot.selectedHistoryIndex = 0
                         onCurrentTextChanged: dialogRoot.requestHistoryQuery()
 
                         contentItem: Text {
@@ -136,8 +134,6 @@ Popup {
                         font.family:    "Asta Sans"
                         font.pixelSize: 12
 
-                        //onCurrentTextChanged: dialogRoot.selectedHistoryIndex = 0
-                        //onCurrentTextChanged: dialogRoot.requestHistoryQuery()
                         onCurrentTextChanged: {
                             if (historyPeriodCombo.currentText === "사용자 지정") {
                                 var now = new Date()
@@ -256,7 +252,6 @@ Popup {
                             selected: dialogRoot.historyFilterType === "전체"
                             onClicked: {
                                 dialogRoot.historyFilterType = "전체"
-                                //dialogRoot.selectedHistoryIndex = 0
                                 dialogRoot.requestHistoryQuery()
                             }
                         }
@@ -451,7 +446,6 @@ Popup {
                                         descText: modelData.desc
                                         actionStatusText: modelData.actionStatus
 
-                                        //onRowClicked: dialogRoot.selectedHistoryIndex = index
                                         onRowClicked: {
                                             dialogRoot.selectedHistoryIndex = index
                                             dialogRoot.actionEditMode = false
@@ -1914,10 +1908,6 @@ Popup {
         }
     }
 
-    // ============================================================
-    // [컴포넌트] HistoryModeCard
-    // 사용 위치: 선택 이력 상세 패널 하단
-    // ============================================================
     // ============================================================
     // [컴포넌트] HistoryModeCard
     // 사용 위치: 선택 이력 상세 패널 하단
