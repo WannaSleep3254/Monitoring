@@ -1,6 +1,7 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+import Qt.labs.settings 1.1
 
 Popup {
     id: dialogRoot
@@ -10,6 +11,14 @@ Popup {
 
     property var viewModel: null
     property bool hasViewModel: viewModel !== null && viewModel !== undefined
+
+    Settings {
+        id: actionOperatorSettings
+        category: "IotHistoryActionOperator"
+
+        property bool rememberEnabled: true
+        property string lastOperatorName: "작업자"
+    }
 
     signal exportCsvRequested(var rows, string robotFilter, string periodFilter, string typeFilter, string searchText)
 
@@ -35,6 +44,21 @@ Popup {
     onOpened: {
         dialogRoot.selectedHistoryIndex = 0
         dialogRoot.requestHistoryQuery()
+    }
+
+    Component.onCompleted: {
+        dialogRoot.rememberActionOperatorEnabled =
+                actionOperatorSettings.rememberEnabled
+
+        dialogRoot.lastActionOperatorText =
+                actionOperatorSettings.lastOperatorName !== ""
+                ? actionOperatorSettings.lastOperatorName
+                : "작업자"
+
+        dialogRoot.actionOperatorText =
+                dialogRoot.rememberActionOperatorEnabled
+                ? dialogRoot.lastActionOperatorText
+                : "작업자"
     }
 
     contentItem: Item {
@@ -697,6 +721,7 @@ Popup {
 
                                     onToggled: {
                                         dialogRoot.rememberActionOperatorEnabled = checked
+                                        actionOperatorSettings.rememberEnabled = checked
 
                                         if (checked) {
                                             dialogRoot.actionOperatorText = dialogRoot.lastActionOperatorText
@@ -899,6 +924,7 @@ Popup {
                                         if (dialogRoot.rememberActionOperatorEnabled &&
                                             savedOperatorName.length > 0) {
                                             dialogRoot.lastActionOperatorText = savedOperatorName
+                                            actionOperatorSettings.lastOperatorName = savedOperatorName
                                         }
 
                                         dialogRoot.actionEditMode = false
@@ -1208,6 +1234,15 @@ Popup {
     property string actionOperatorText: "작업자"
     property string lastActionOperatorText: "작업자"
     property bool rememberActionOperatorEnabled: true
+
+    onRememberActionOperatorEnabledChanged: {
+        actionOperatorSettings.rememberEnabled = dialogRoot.rememberActionOperatorEnabled
+    }
+
+    onLastActionOperatorTextChanged: {
+        actionOperatorSettings.lastOperatorName = dialogRoot.lastActionOperatorText
+    }
+
     // 상태 및 내용 입력용
     property string actionContentText: ""
     property string actionMemoText: ""
