@@ -905,7 +905,8 @@ void IotViewModel::evaluateMetricAlarms(int robotId,
         if (shouldSuppressAlarm(alarm, now))
             continue;
 
-        if (m_database && m_database->isOpen()) {
+//        if (m_database && m_database->isOpen()) {
+        if (m_enableAlarmHistoryInsert && m_database && m_database->isOpen()) {
             IotHistoryRepository repo(m_database->database());
 
             if (!repo.insertAlarm(alarm)) {

@@ -123,4 +123,8 @@ private:
     QVariantList m_historyRows;
 
     QString m_lastExportPath;
+
+    // 개발 중 테스트 알람 자동 누적 방지용.
+    // true로 변경하면 threshold 초과 알람이 iot_alarm_history에 저장됨.
+    bool m_enableAlarmHistoryInsert = false;
 };
