@@ -69,7 +69,8 @@ Popup {
             // ------------------------------------------------------------
             RowLayout {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 62
+                //Layout.preferredHeight: 62
+                Layout.preferredHeight: historyPeriodCombo.currentText === "사용자 지정" ? 98 : 62
                 Layout.fillHeight: false
                 spacing: 14
 
@@ -136,7 +137,22 @@ Popup {
                         font.pixelSize: 12
 
                         //onCurrentTextChanged: dialogRoot.selectedHistoryIndex = 0
-                        onCurrentTextChanged: dialogRoot.requestHistoryQuery()
+                        //onCurrentTextChanged: dialogRoot.requestHistoryQuery()
+                        onCurrentTextChanged: {
+                            if (historyPeriodCombo.currentText === "사용자 지정") {
+                                var now = new Date()
+                                var from = new Date(now)
+                                from.setDate(now.getDate() - 7)
+
+                                if (dialogRoot.customFromDateText === "")
+                                    dialogRoot.customFromDateText = dialogRoot.toDateText(from)
+
+                                if (dialogRoot.customToDateText === "")
+                                    dialogRoot.customToDateText = dialogRoot.toDateText(now)
+                            }
+
+                            dialogRoot.requestHistoryQuery()
+                        }
 
                         contentItem: Text {
                             leftPadding:        8
@@ -153,6 +169,67 @@ Popup {
                             color:        "#fafafa"
                             border.color: historyPeriodCombo.activeFocus ? "#1976d2" : "#d1d5db"
                             border.width: 1
+                        }
+                    }
+                    // 사용자 지정 기간 입력 필드
+                    RowLayout {
+                        visible: historyPeriodCombo.currentText === "사용자 지정"
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 30
+                        spacing: 6
+
+                        TextField {
+                            id: customFromDateField
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 28
+                            text: dialogRoot.customFromDateText
+                            placeholderText: "YYYY-MM-DD"
+                            selectByMouse: true
+                            font.family: "Asta Sans"
+                            font.pixelSize: 11
+
+                            onTextChanged: dialogRoot.customFromDateText = text
+
+                            onEditingFinished: {
+                                dialogRoot.requestHistoryQuery()
+                            }
+
+                            background: Rectangle {
+                                radius: 5
+                                color: "#ffffff"
+                                border.color: parent.activeFocus ? "#2563eb" : "#d1d5db"
+                            }
+                        }
+
+                        Text {
+                            text: "~"
+                            color: "#64748b"
+                            font.family: "Asta Sans"
+                            font.pixelSize: 12
+                            verticalAlignment: Text.AlignVCenter
+                        }
+
+                        TextField {
+                            id: customToDateField
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 28
+                            text: dialogRoot.customToDateText
+                            placeholderText: "YYYY-MM-DD"
+                            selectByMouse: true
+                            font.family: "Asta Sans"
+                            font.pixelSize: 11
+
+                            onTextChanged: dialogRoot.customToDateText = text
+
+                            onEditingFinished: {
+                                dialogRoot.requestHistoryQuery()
+                            }
+
+                            background: Rectangle {
+                                radius: 5
+                                color: "#ffffff"
+                                border.color: parent.activeFocus ? "#2563eb" : "#d1d5db"
+                            }
                         }
                     }
                 }
@@ -901,6 +978,9 @@ Popup {
     property string actionContentText: ""
     property string actionMemoText: ""
     property string actionStatusText: "완료"
+    // 사용자 지정날짜 입력용
+    property string customFromDateText: ""
+    property string customToDateText: ""
     // =============================
     function pad2(v) {
         return v < 10 ? "0" + v : "" + v
@@ -913,6 +993,24 @@ Popup {
                 + pad2(dt.getHours()) + ":"
                 + pad2(dt.getMinutes()) + ":"
                 + pad2(dt.getSeconds())
+    }
+
+    function toDateText(dt) {
+        return dt.getFullYear() + "-"
+                + pad2(dt.getMonth() + 1) + "-"
+                + pad2(dt.getDate())
+    }
+
+    function isValidDateText(text) {
+        return /^\d{4}-\d{2}-\d{2}$/.test(text)
+    }
+
+    function customStartIso(text) {
+        return text + "T00:00:00"
+    }
+
+    function customEndIso(text) {
+        return text + "T23:59:59"
     }
 
     function historyFilterMap() {
@@ -948,6 +1046,12 @@ Popup {
             from.setDate(now.getDate() - 90)
             filter.from = toLocalIso(from)
             filter.to = toLocalIso(now)
+        } else if (historyPeriodCombo.currentText === "사용자 지정") {
+            if (dialogRoot.isValidDateText(dialogRoot.customFromDateText) &&
+                dialogRoot.isValidDateText(dialogRoot.customToDateText)) {
+                filter.from = dialogRoot.customStartIso(dialogRoot.customFromDateText)
+                filter.to = dialogRoot.customEndIso(dialogRoot.customToDateText)
+            }
         }
 
         return filter
