@@ -1002,6 +1002,27 @@ Rectangle {
                     property real _warningValue: chart.warningValue
                     property real _alarmValue:  chart.alarmValue
 
+                    property bool paintPending: false
+
+                    function schedulePaint() {
+                        if (paintPending)
+                            return
+
+                        paintPending = true
+                        repaintTimer.restart()
+                    }
+
+                    Timer {
+                        id: repaintTimer
+                        interval: 100
+                        repeat: false
+
+                        onTriggered: {
+                            cv.paintPending = false
+                            cv.requestPaint()
+                        }
+                    }
+
                     onPaint: {
                         var ctx = getContext("2d")
                         ctx.clearRect(0, 0, width, height)
@@ -1098,12 +1119,16 @@ Rectangle {
                         }
                     }
 
-                    on_SeriesChanged:        requestPaint()
-                    on_NormalValueChanged:   requestPaint()
-                    on_WarningValueChanged:  requestPaint()
-                    on_AlarmValueChanged:    requestPaint()
-                    onWidthChanged:          requestPaint()
-                    onHeightChanged:         requestPaint()
+                    Component.onCompleted: {
+                        schedulePaint()
+                    }
+
+                    on_SeriesChanged:        schedulePaint()    // requestPaint()
+                    on_NormalValueChanged:   schedulePaint()    // requestPaint()
+                    on_WarningValueChanged:  schedulePaint()    // requestPaint()
+                    on_AlarmValueChanged:    schedulePaint()    // requestPaint()
+                    onWidthChanged:          schedulePaint()    // requestPaint()
+                    onHeightChanged:         schedulePaint()    // requestPaint()
                 }
             }
         }
