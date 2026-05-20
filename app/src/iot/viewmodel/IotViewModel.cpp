@@ -134,6 +134,22 @@ QVariantMap IotViewModel::lastCleanupSummary() const
     return m_lastCleanupSummary;
 }
 
+bool IotViewModel::alarmHistoryInsertEnabled() const
+{
+    return m_alarmHistoryInsertEnabled;
+}
+
+void IotViewModel::setAlarmHistoryInsertEnabled(bool enabled)
+{
+    if (m_alarmHistoryInsertEnabled == enabled)
+        return;
+
+    m_alarmHistoryInsertEnabled = enabled;
+    emit alarmHistoryInsertEnabledChanged();
+
+    qDebug() << "[IoTViewModel] alarm history insert enabled =" << enabled;
+}
+
 bool IotViewModel::saveThreshold(int robotIndex, const QVariantMap& thresholdData)
 {
     const int targetIndex = robotIndex - 1;
@@ -932,7 +948,7 @@ void IotViewModel::evaluateMetricAlarms(int robotId,
             continue;
 
 //        if (m_database && m_database->isOpen()) {
-        if (m_enableAlarmHistoryInsert && m_database && m_database->isOpen()) {
+        if (m_alarmHistoryInsertEnabled && m_database && m_database->isOpen()) {
             IotHistoryRepository repo(m_database->database());
 
             if (!repo.insertAlarm(alarm)) {
