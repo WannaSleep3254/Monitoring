@@ -10,6 +10,7 @@
 #include <QUrl>
 #include <QDebug>
 #include <QCoreApplication>
+#include <QSettings>
 
 #include "runtime/MultiChannelRobotGateway.h"
 #include "iot/viewmodel/IotViewModel.h"
@@ -28,9 +29,22 @@ int main(int argc, char *argv[])
     // ============================================================
     auto* robotGateway = new MultiChannelRobotGateway(&engine);
     auto* iotViewModel = new IotViewModel(&engine);
+    // ============================================================
+    // Runtime / Gateway source mode 설정 (dummy, remote)
+    // ============================================================
+    QSettings settings;
+    const QString gatewaySourceMode =
+        settings.value(QStringLiteral("runtime/gatewaySourceMode"),
+                       QStringLiteral("dummy")).toString();
 
-    //robotGateway->setSourceModeName("remote");
+    if (!robotGateway->setSourceModeName(gatewaySourceMode)) {
+        qWarning() << "[Gateway] invalid configured source mode:"
+                   << gatewaySourceMode
+                   << "fallback to dummy";
 
+        robotGateway->setSourceModeName(QStringLiteral("dummy"));
+    }
+    // ============================================================
     iotViewModel->setRobotGateway(robotGateway);
     if (!iotViewModel->initialize()) {
         qWarning() << "[IoTViewModel] initialize failed:"
