@@ -122,8 +122,9 @@ private:
     std::unique_ptr<IotDatabase> m_database;
 
     // 동일 알람 반복 저장 방지용
+    // 운영 기본값: 동일 robotId + axis + metric + level 알람은 300초 내 중복 저장/표시 억제
     QHash<QString, QDateTime> m_lastAlarmTimes;
-    int m_alarmCooldownSec = 60;
+    int m_alarmCooldownSec = 300;   //60;
 
     QVariantList m_historyRows;
 
