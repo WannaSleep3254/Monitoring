@@ -39,7 +39,6 @@ int main(int argc, char *argv[])
     if (!robotGateway->start()) {
         qWarning() << "[Gateway] Failed to start MultiChannelRobotGateway";
     }
-
     const QUrl url(QStringLiteral("qrc:/qml/Main.qml"));
 
     QObject::connect(
