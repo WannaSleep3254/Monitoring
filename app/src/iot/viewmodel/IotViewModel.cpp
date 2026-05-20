@@ -150,6 +150,24 @@ void IotViewModel::setAlarmHistoryInsertEnabled(bool enabled)
     qDebug() << "[IoTViewModel] alarm history insert enabled =" << enabled;
 }
 
+int IotViewModel::alarmCooldownSec() const
+{
+    return m_alarmCooldownSec;
+}
+
+void IotViewModel::setAlarmCooldownSec(int seconds)
+{
+    const int normalized = seconds < 0 ? 0 : seconds;
+
+    if (m_alarmCooldownSec == normalized)
+        return;
+
+    m_alarmCooldownSec = normalized;
+    emit alarmCooldownSecChanged();
+
+    qDebug() << "[IoTViewModel] alarm cooldown sec =" << m_alarmCooldownSec;
+}
+
 bool IotViewModel::saveThreshold(int robotIndex, const QVariantMap& thresholdData)
 {
     const int targetIndex = robotIndex - 1;

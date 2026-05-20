@@ -27,6 +27,11 @@ class IotViewModel : public QObject
                     WRITE setAlarmHistoryInsertEnabled
                     NOTIFY alarmHistoryInsertEnabledChanged)
 
+    Q_PROPERTY(int alarmCooldownSec
+                   READ alarmCooldownSec
+                   WRITE setAlarmCooldownSec
+                   NOTIFY alarmCooldownSecChanged)
+
 public:
     explicit IotViewModel(QObject* parent = nullptr);
 
@@ -55,6 +60,9 @@ public:
     bool alarmHistoryInsertEnabled() const;
     void setAlarmHistoryInsertEnabled(bool enabled);
 
+    int alarmCooldownSec() const;
+    void setAlarmCooldownSec(int seconds);
+
 signals:
     void robotModelsChanged();
     void robotThresholdsChanged();
@@ -63,7 +71,9 @@ signals:
     void lastErrorChanged();
 
     void lastCleanupSummaryChanged();
+
     void alarmHistoryInsertEnabledChanged();
+    void alarmCooldownSecChanged();
 
 private slots:
     void onSnapshotUpdated(int robotId, QVariantMap snapshot);
@@ -142,7 +152,5 @@ private:
 
     // false: 대시보드에는 알람을 표시하지만 DB 이력에는 자동 저장하지 않음
     // true : 임계값 초과 알람을 DB 이력에도 저장
-//    bool m_enableAlarmHistoryInsert = false;
-    // 추천
     bool m_alarmHistoryInsertEnabled = false;
 };
