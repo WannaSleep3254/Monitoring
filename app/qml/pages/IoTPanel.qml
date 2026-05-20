@@ -11,6 +11,9 @@ import QtQuick.Layouts 1.15
 //   - 값 색상: #212121 (강조), 라벨: #9e9e9e
 //   - 액센트: #1976d2
 // =============================================================
+// 최근 알람:
+// - DB 이력 조회 결과가 아니라 현재 실행 중 감지된 실시간 알람 캐시
+// - 실제 저장 이력은 HistoryQueryDialog에서 조회
 Rectangle {
     id: root
     color: "#f0f2f5"
@@ -39,11 +42,27 @@ Rectangle {
     property var timeLabels: ["-50s", "-40s", "-30s", "-20s", "-10s", "Now"]
 
     property bool hasIotViewModel: typeof iotViewModel !== "undefined" && iotViewModel !== null
+
+    property double currentEpochMs: Date.now()
+
+    Timer {
+        interval: 1000
+        repeat: true
+        running: true
+
+        onTriggered: {
+            root.currentEpochMs = Date.now()
+        }
+    }
     // ── 샘플 데이터 ───────────────────────────────────────────
     property var sampleRobotModels: [
         {
             name: "Robot 1 (FR10)",
             running: true,
+            online: true,
+            lastUpdateTime: "16:42:11",
+            lastUpdateAt: "2026-05-20T16:42:11",
+            lastUpdateEpochMs: Date.now(),
             tempSeries: [
                 { axis: "J1", values: [40.1, 40.8, 41.5, 42.0, 42.3, 42.5] },
                 { axis: "J2", values: [41.2, 41.6, 42.1, 43.0, 43.6, 44.1] },
@@ -74,6 +93,10 @@ Rectangle {
         {
             name: "Robot 2 (FR5)",
             running: true,
+            online: true,
+            lastUpdateTime: "16:42:11",
+            lastUpdateAt: "2026-05-20T16:42:11",
+            lastUpdateEpochMs: Date.now(),
             tempSeries: [
                 { axis: "J1", values: [41.5, 42.0, 42.8, 43.4, 43.8, 44.2] },
                 { axis: "J2", values: [42.0, 42.7, 43.3, 44.0, 44.5, 45.0] },
@@ -167,6 +190,52 @@ Rectangle {
         }
         return { axis: maxAxis, value: maxValue }
     }
+    // 값과 임계값의 비율에 따른 위험도 레벨 반환: ratio >= 1.15 -> "경고", ratio >= 1.0 -> "주의", else "정상"
+    function riskLevelFromRatio(ratio) {
+        if (ratio >= 1.15)
+            return "경고"
+
+        if (ratio >= 1.0)
+            return "주의"
+
+        return "정상"
+    }
+    // 로봇 데이터와 임계값을 기반으로 워스트 축 정보 반환 (예: { axis: "J4", metric: "온도", value: 46.3, ratio: 1.15, level: "경고" })
+    function worstAxisInfo(robotData, threshold) {
+        var worst = {
+            axis: "-",
+            metric: "-",
+            value: 0,
+            ratio: 0,
+            level: "정상"
+        }
+
+        if (!robotData || !threshold)
+            return worst
+
+        function updateWorst(series, metric, warningMax) {
+            if (!series || warningMax <= 0)
+                return
+
+            for (var i = 0; i < series.length; ++i) {
+                var v = root.latestValue(series[i])
+                var ratio = v / warningMax
+
+                if (ratio > worst.ratio) {
+                    worst.axis = series[i].axis
+                    worst.metric = metric
+                    worst.value = v
+                    worst.ratio = ratio
+                    worst.level = root.riskLevelFromRatio(ratio)
+                }
+            }
+        }
+
+        updateWorst(robotData.tempSeries, "온도", threshold.temperature.warningMax)
+        updateWorst(robotData.torqueSeries, "부하", threshold.torque.warningMax)
+
+        return worst
+    }
     // 알람 시간 표시: time > occurredAt > occurred_at > "-"
     function alarmDisplayTime(alarm) {
         if (!alarm)
@@ -225,6 +294,52 @@ Rectangle {
             return "#f9a825"
 
         return "#9e9e9e"
+    }
+
+    function dataFreshnessInfo(robotData) {
+        var lastMs = robotData && robotData.lastUpdateEpochMs !== undefined
+                ? Number(robotData.lastUpdateEpochMs)
+                : 0
+
+        if (lastMs <= 0) {
+            return {
+                state: "OFFLINE",
+                label: "OFFLINE",
+                color: "#f1f5f9",
+                borderColor: "#cbd5e1",
+                textColor: "#64748b"
+            }
+        }
+
+        var ageSec = (root.currentEpochMs - lastMs) / 1000.0
+
+        if (ageSec <= 3.0) {
+            return {
+                state: "ONLINE",
+                label: "ONLINE",
+                color: "#e0f2fe",
+                borderColor: "#38bdf8",
+                textColor: "#0369a1"
+            }
+        }
+
+        if (ageSec <= 10.0) {
+            return {
+                state: "STALE",
+                label: "STALE",
+                color: "#fff7ed",
+                borderColor: "#fdba74",
+                textColor: "#c2410c"
+            }
+        }
+
+        return {
+            state: "OFFLINE",
+            label: "OFFLINE",
+            color: "#f1f5f9",
+            borderColor: "#cbd5e1",
+            textColor: "#64748b"
+        }
     }
     // ── 다이얼로그 ────────────────────────────────────────────
     ThresholdSettingDialog {
@@ -343,12 +458,14 @@ Rectangle {
             spacing: 12
 
             Repeater {
-                model: root.robotModels
+                model: root.robotModels ? root.robotModels.length : 0
 
                 // ── 개별 Robot 카드 ───────────────────────────
                 Rectangle {
                     id: robotCard
-                    property var robotData:  modelData
+                    property var robotData: root.robotModels && root.robotModels[index]
+                                            ? root.robotModels[index]
+                                            : {}
                     property int robotIndex: index
 
                     Layout.fillWidth:  true
@@ -377,15 +494,50 @@ Rectangle {
                             }
 
                             Text {
-                                text:           robotCard.robotData.name
-                                font.family:    "Asta Sans"
+                                text: robotCard.robotData.name
+                                font.family: "Asta Sans"
                                 font.pixelSize: 18
-                                font.bold:      true
-                                color:          "#212121"
+                                font.bold: true
+                                color: "#212121"
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
                             }
 
-                            Item { Layout.fillWidth: true }
+                            Text {
+                                text: "Last " +
+                                      (robotCard.robotData.lastUpdateTime !== undefined
+                                       ? robotCard.robotData.lastUpdateTime
+                                       : "-")
+                                font.family: "Asta Sans"
+                                font.pixelSize: 10
+                                color: "#64748b"
+                                verticalAlignment: Text.AlignVCenter
+                                Layout.alignment: Qt.AlignVCenter
+                                Layout.preferredWidth: 78
+                                elide: Text.ElideRight
+                            }
 
+                            // 온라인 상태 표시
+                            Rectangle {
+                                property var freshness: root.dataFreshnessInfo(robotCard.robotData)
+
+                                width: 72
+                                height: 22
+                                radius: 11
+                                color: freshness.color
+                                border.color: freshness.borderColor
+                                border.width: 1
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: parent.freshness.label
+                                    font.family: "Asta Sans"
+                                    font.pixelSize: 10
+                                    font.bold: true
+                                    color: parent.freshness.textColor
+                                }
+                            }
+                            // 실행 상태 표시
                             Rectangle {
                                 width:        58
                                 height:       22
@@ -438,11 +590,19 @@ Rectangle {
 
                             MetricCard {
                                 Layout.fillWidth: true
-                                cardLabel:   "워스트 축"
-                                cardValue:   root.maxLatestInfo(robotCard.robotData.tempSeries).axis
-                                cardUnit:    ""
-                                cardSub:     "온도 기준"
-                                accentColor: "#f9a825"
+
+                                property var threshold: root.thresholdFor(robotCard.robotIndex)
+                                property var worst: root.worstAxisInfo(robotCard.robotData, threshold)
+
+                                cardLabel: "종합 위험축"
+                                cardValue: worst.axis
+                                cardUnit: ""
+                                cardSub: worst.metric + " 기준 / " + worst.level
+                                accentColor: worst.level === "경고"
+                                             ? "#c62828"
+                                             : worst.level === "주의"
+                                               ? "#f9a825"
+                                               : "#2e7d32"
                             }
                         }
 
@@ -510,7 +670,7 @@ Rectangle {
                                         spacing: 6
                                         Rectangle { width: 3; height: 14; radius: 1; color: "#f9a825" }
                                         Text {
-                                            text:           "알람 이력"
+                                            text:           "최근 알람"
                                             font.family:    "Asta Sans"
                                             font.pixelSize: 13
                                             font.bold:      true
@@ -602,7 +762,7 @@ Rectangle {
                                         spacing: 6
                                         Rectangle { width: 3; height: 14; radius: 1; color: "#1976d2" }
                                         Text {
-                                            text:           "위험도 / 조치 요청"
+                                            text:           "위험도 / 권장 조치"
                                             font.family:    "Asta Sans"
                                             font.pixelSize: 13
                                             font.bold:      true
@@ -906,6 +1066,27 @@ Rectangle {
                     property real _warningValue: chart.warningValue
                     property real _alarmValue:  chart.alarmValue
 
+                    property bool paintPending: false
+
+                    function schedulePaint() {
+                        if (paintPending)
+                            return
+
+                        paintPending = true
+                        repaintTimer.restart()
+                    }
+
+                    Timer {
+                        id: repaintTimer
+                        interval: 100
+                        repeat: false
+
+                        onTriggered: {
+                            cv.paintPending = false
+                            cv.requestPaint()
+                        }
+                    }
+
                     onPaint: {
                         var ctx = getContext("2d")
                         ctx.clearRect(0, 0, width, height)
@@ -1002,12 +1183,16 @@ Rectangle {
                         }
                     }
 
-                    on_SeriesChanged:        requestPaint()
-                    on_NormalValueChanged:   requestPaint()
-                    on_WarningValueChanged:  requestPaint()
-                    on_AlarmValueChanged:    requestPaint()
-                    onWidthChanged:          requestPaint()
-                    onHeightChanged:         requestPaint()
+                    Component.onCompleted: {
+                        schedulePaint()
+                    }
+
+                    on_SeriesChanged:        schedulePaint()    // requestPaint()
+                    on_NormalValueChanged:   schedulePaint()    // requestPaint()
+                    on_WarningValueChanged:  schedulePaint()    // requestPaint()
+                    on_AlarmValueChanged:    schedulePaint()    // requestPaint()
+                    onWidthChanged:          schedulePaint()    // requestPaint()
+                    onHeightChanged:         schedulePaint()    // requestPaint()
                 }
             }
         }

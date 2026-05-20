@@ -17,6 +17,11 @@
 #include <algorithm>
 #include <utility>
 
+// 실시간 알람 처리 정책:
+// - appendAlarmToRobotModel(): 대시보드 표시용 최근 알람 갱신
+// - insertAlarm(): DB 이력 저장용, m_enableAlarmHistoryInsert가 true일 때만 수행
+// - 동일 알람 반복 저장은 shouldSuppressAlarm()으로 억제
+
 IotViewModel::IotViewModel(QObject* parent)
     : QObject(parent)
 {
@@ -127,6 +132,40 @@ QString IotViewModel::lastError() const
 QVariantMap IotViewModel::lastCleanupSummary() const
 {
     return m_lastCleanupSummary;
+}
+
+bool IotViewModel::alarmHistoryInsertEnabled() const
+{
+    return m_alarmHistoryInsertEnabled;
+}
+
+void IotViewModel::setAlarmHistoryInsertEnabled(bool enabled)
+{
+    if (m_alarmHistoryInsertEnabled == enabled)
+        return;
+
+    m_alarmHistoryInsertEnabled = enabled;
+    emit alarmHistoryInsertEnabledChanged();
+
+    qDebug() << "[IoTViewModel] alarm history insert enabled =" << enabled;
+}
+
+int IotViewModel::alarmCooldownSec() const
+{
+    return m_alarmCooldownSec;
+}
+
+void IotViewModel::setAlarmCooldownSec(int seconds)
+{
+    const int normalized = seconds < 0 ? 0 : seconds;
+
+    if (m_alarmCooldownSec == normalized)
+        return;
+
+    m_alarmCooldownSec = normalized;
+    emit alarmCooldownSecChanged();
+
+    qDebug() << "[IoTViewModel] alarm cooldown sec =" << m_alarmCooldownSec;
 }
 
 bool IotViewModel::saveThreshold(int robotIndex, const QVariantMap& thresholdData)
@@ -759,6 +798,10 @@ void IotViewModel::initializeDefaultModels()
         QVariantMap robot;
         robot["name"] = name;
         robot["running"] = false;
+        robot["online"] = false;
+        robot["lastUpdateAt"] = "-";
+        robot["lastUpdateTime"] = "-";
+        robot["lastUpdateEpochMs"] = 0;
 
         QVariantList tempSeries;
         QVariantList torqueSeries;
@@ -807,8 +850,13 @@ void IotViewModel::updateRobotModelFromSnapshot(int robotId, const QVariantMap& 
         return;
 
     QVariantMap robot = m_robotModels[index].toMap();
+    const QDateTime now = QDateTime::currentDateTime();
 
     robot["running"] = snapshot.value("running", false).toBool();
+    robot["online"] = true;
+    robot["lastUpdateAt"] = now.toString(Qt::ISODate);
+    robot["lastUpdateTime"] = now.toString("HH:mm:ss");
+    robot["lastUpdateEpochMs"] = now.toMSecsSinceEpoch();
 
     QVariantList temperatures = snapshot.value("driverTemperatures").toList();
     QVariantList torques = snapshot.value("torques").toList();
@@ -918,7 +966,7 @@ void IotViewModel::evaluateMetricAlarms(int robotId,
             continue;
 
 //        if (m_database && m_database->isOpen()) {
-        if (m_enableAlarmHistoryInsert && m_database && m_database->isOpen()) {
+        if (m_alarmHistoryInsertEnabled && m_database && m_database->isOpen()) {
             IotHistoryRepository repo(m_database->database());
 
             if (!repo.insertAlarm(alarm)) {

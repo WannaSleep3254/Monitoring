@@ -22,6 +22,15 @@ class IotViewModel : public QObject
     Q_PROPERTY(QString lastExportPath READ lastExportPath NOTIFY lastExportPathChanged)
     Q_PROPERTY(QString lastError READ lastError NOTIFY lastErrorChanged)
     Q_PROPERTY(QVariantMap lastCleanupSummary READ lastCleanupSummary NOTIFY lastCleanupSummaryChanged)
+    Q_PROPERTY(bool alarmHistoryInsertEnabled
+                    READ alarmHistoryInsertEnabled
+                    WRITE setAlarmHistoryInsertEnabled
+                    NOTIFY alarmHistoryInsertEnabledChanged)
+
+    Q_PROPERTY(int alarmCooldownSec
+                   READ alarmCooldownSec
+                   WRITE setAlarmCooldownSec
+                   NOTIFY alarmCooldownSecChanged)
 
 public:
     explicit IotViewModel(QObject* parent = nullptr);
@@ -48,6 +57,12 @@ public:
 
     QVariantMap lastCleanupSummary() const;
 
+    bool alarmHistoryInsertEnabled() const;
+    void setAlarmHistoryInsertEnabled(bool enabled);
+
+    int alarmCooldownSec() const;
+    void setAlarmCooldownSec(int seconds);
+
 signals:
     void robotModelsChanged();
     void robotThresholdsChanged();
@@ -56,6 +71,9 @@ signals:
     void lastErrorChanged();
 
     void lastCleanupSummaryChanged();
+
+    void alarmHistoryInsertEnabledChanged();
+    void alarmCooldownSecChanged();
 
 private slots:
     void onSnapshotUpdated(int robotId, QVariantMap snapshot);
@@ -122,8 +140,9 @@ private:
     std::unique_ptr<IotDatabase> m_database;
 
     // 동일 알람 반복 저장 방지용
+    // 운영 기본값: 동일 robotId + axis + metric + level 알람은 300초 내 중복 저장/표시 억제
     QHash<QString, QDateTime> m_lastAlarmTimes;
-    int m_alarmCooldownSec = 60;
+    int m_alarmCooldownSec = 300;   //60;
 
     QVariantList m_historyRows;
 
@@ -131,7 +150,7 @@ private:
 
     QVariantMap m_lastCleanupSummary;
 
-    // 개발 중 테스트 알람 자동 누적 방지용.
-    // true로 변경하면 threshold 초과 알람이 iot_alarm_history에 저장됨.
-    bool m_enableAlarmHistoryInsert = false;
+    // false: 대시보드에는 알람을 표시하지만 DB 이력에는 자동 저장하지 않음
+    // true : 임계값 초과 알람을 DB 이력에도 저장
+    bool m_alarmHistoryInsertEnabled = false;
 };
