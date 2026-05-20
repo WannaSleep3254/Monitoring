@@ -80,6 +80,9 @@ Rectangle {
         {
             name: "Robot 2 (FR5)",
             running: true,
+            online: true,
+            lastUpdateTime: "16:42:11",
+            lastUpdateAt: "2026-05-20T16:42:11",
             tempSeries: [
                 { axis: "J1", values: [41.5, 42.0, 42.8, 43.4, 43.8, 44.2] },
                 { axis: "J2", values: [42.0, 42.7, 43.3, 44.0, 44.5, 45.0] },
@@ -428,34 +431,30 @@ Rectangle {
                                 color:  "#1976d2"
                             }
 
-                            ColumnLayout {
+                            Text {
+                                text: robotCard.robotData.name
+                                font.family: "Asta Sans"
+                                font.pixelSize: 18
+                                font.bold: true
+                                color: "#212121"
+                                elide: Text.ElideRight
                                 Layout.fillWidth: true
-                                spacing: 0
-
-                                Text {
-                                    Layout.fillWidth: true
-                                    text: robotCard.robotData.name
-                                    font.family: "Asta Sans"
-                                    font.pixelSize: 18
-                                    font.bold: true
-                                    color: "#212121"
-                                    elide: Text.ElideRight
-                                }
-
-                                Text {
-                                    Layout.fillWidth: true
-                                    text: "Last update: " +
-                                          (robotCard.robotData.lastUpdateTime !== undefined
-                                           ? robotCard.robotData.lastUpdateTime
-                                           : "-")
-                                    font.family: "Asta Sans"
-                                    font.pixelSize: 10
-                                    color: "#94a3b8"
-                                    elide: Text.ElideRight
-                                }
                             }
 
-                            Item { Layout.fillWidth: true }
+                            Text {
+                                text: "Last " +
+                                      (robotCard.robotData.lastUpdateTime !== undefined
+                                       ? robotCard.robotData.lastUpdateTime
+                                       : "-")
+                                font.family: "Asta Sans"
+                                font.pixelSize: 10
+                                color: "#64748b"
+                                verticalAlignment: Text.AlignVCenter
+                                Layout.alignment: Qt.AlignVCenter
+                                Layout.preferredWidth: 78
+                                elide: Text.ElideRight
+                            }
+
                             // 온라인 상태 표시
                             Rectangle {
                                 width: 72
