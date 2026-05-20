@@ -31,14 +31,12 @@ private:
     };
 
 private slots:
-//    void publishDummySnapshot();
     void pollSnapshots();
 
 private:
     void publishDummySnapshot();
     void pollRemoteSnapshots();
 
-//    QTimer m_dummyTimer;
     QTimer m_pollTimer;
     GatewaySourceMode m_sourceMode = GatewaySourceMode::Dummy;
 

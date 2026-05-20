@@ -6,26 +6,12 @@
 MultiChannelRobotGateway::MultiChannelRobotGateway(QObject* parent)
     : IRobotGateway(parent)
 {
-#if false
-    connect(&m_dummyTimer, &QTimer::timeout,
-            this, &MultiChannelRobotGateway::publishDummySnapshot);
-#else
     connect(&m_pollTimer, &QTimer::timeout,
             this, &MultiChannelRobotGateway::pollSnapshots);
-#endif
 }
 
 bool MultiChannelRobotGateway::start()
 {
-#if false
-    if (m_dummyTimer.isActive())
-        return true;
-
-    publishDummySnapshot();
-
-    m_dummyTimer.start(1000);
-    qDebug() << "[Gateway] MultiChannelRobotGateway started";
-#else
     if (m_pollTimer.isActive())
         return true;
 
@@ -33,17 +19,13 @@ bool MultiChannelRobotGateway::start()
 
     m_pollTimer.start(1000);
     qDebug() << "[Gateway] MultiChannelRobotGateway started";
-#endif
+
     return true;
 }
 
 void MultiChannelRobotGateway::stop()
 {
-#if false
-    m_dummyTimer.stop();
-#else
     m_pollTimer.stop();
-#endif
 }
 
 bool MultiChannelRobotGateway::isConnected(int robotId) const
