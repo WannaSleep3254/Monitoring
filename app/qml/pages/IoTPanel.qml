@@ -564,7 +564,7 @@ Rectangle {
                                         spacing: 6
                                         Rectangle { width: 3; height: 14; radius: 1; color: "#f9a825" }
                                         Text {
-                                            text:           "알람 이력"
+                                            text:           "최근 알람"
                                             font.family:    "Asta Sans"
                                             font.pixelSize: 13
                                             font.bold:      true
@@ -656,7 +656,7 @@ Rectangle {
                                         spacing: 6
                                         Rectangle { width: 3; height: 14; radius: 1; color: "#1976d2" }
                                         Text {
-                                            text:           "위험도 / 조치 요청"
+                                            text:           "위험도 / 권장 조치"
                                             font.family:    "Asta Sans"
                                             font.pixelSize: 13
                                             font.bold:      true
