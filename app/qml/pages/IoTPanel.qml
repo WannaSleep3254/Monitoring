@@ -47,6 +47,9 @@ Rectangle {
         {
             name: "Robot 1 (FR10)",
             running: true,
+            online: true,
+            lastUpdateTime: "16:42:11",
+            lastUpdateAt: "2026-05-20T16:42:11",
             tempSeries: [
                 { axis: "J1", values: [40.1, 40.8, 41.5, 42.0, 42.3, 42.5] },
                 { axis: "J2", values: [41.2, 41.6, 42.1, 43.0, 43.6, 44.1] },
@@ -425,16 +428,53 @@ Rectangle {
                                 color:  "#1976d2"
                             }
 
-                            Text {
-                                text:           robotCard.robotData.name
-                                font.family:    "Asta Sans"
-                                font.pixelSize: 18
-                                font.bold:      true
-                                color:          "#212121"
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 0
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: robotCard.robotData.name
+                                    font.family: "Asta Sans"
+                                    font.pixelSize: 18
+                                    font.bold: true
+                                    color: "#212121"
+                                    elide: Text.ElideRight
+                                }
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: "Last update: " +
+                                          (robotCard.robotData.lastUpdateTime !== undefined
+                                           ? robotCard.robotData.lastUpdateTime
+                                           : "-")
+                                    font.family: "Asta Sans"
+                                    font.pixelSize: 10
+                                    color: "#94a3b8"
+                                    elide: Text.ElideRight
+                                }
                             }
 
                             Item { Layout.fillWidth: true }
+                            // 온라인 상태 표시
+                            Rectangle {
+                                width: 72
+                                height: 22
+                                radius: 11
+                                color: robotCard.robotData.online ? "#e0f2fe" : "#f1f5f9"
+                                border.color: robotCard.robotData.online ? "#38bdf8" : "#cbd5e1"
+                                border.width: 1
 
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: robotCard.robotData.online ? "ONLINE" : "OFFLINE"
+                                    font.family: "Asta Sans"
+                                    font.pixelSize: 10
+                                    font.bold: true
+                                    color: robotCard.robotData.online ? "#0369a1" : "#64748b"
+                                }
+                            }
+                            // 실행 상태 표시
                             Rectangle {
                                 width:        58
                                 height:       22

@@ -764,6 +764,9 @@ void IotViewModel::initializeDefaultModels()
         QVariantMap robot;
         robot["name"] = name;
         robot["running"] = false;
+        robot["online"] = false;
+        robot["lastUpdateAt"] = "-";
+        robot["lastUpdateTime"] = "-";
 
         QVariantList tempSeries;
         QVariantList torqueSeries;
@@ -812,8 +815,12 @@ void IotViewModel::updateRobotModelFromSnapshot(int robotId, const QVariantMap& 
         return;
 
     QVariantMap robot = m_robotModels[index].toMap();
+    const QDateTime now = QDateTime::currentDateTime();
 
     robot["running"] = snapshot.value("running", false).toBool();
+    robot["online"] = true;
+    robot["lastUpdateAt"] = now.toString(Qt::ISODate);
+    robot["lastUpdateTime"] = now.toString("HH:mm:ss");
 
     QVariantList temperatures = snapshot.value("driverTemperatures").toList();
     QVariantList torques = snapshot.value("torques").toList();
