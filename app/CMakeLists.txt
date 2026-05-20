@@ -22,6 +22,7 @@ set(RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/RobotRuntimeTypes.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/MultiChannelRobotGateway.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/MultiChannelRobotGateway.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/RemoteMessageTypes.h
 )
 set(IOT_SOURCES
     # iot 관련
