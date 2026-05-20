@@ -42,6 +42,18 @@ Rectangle {
     property var timeLabels: ["-50s", "-40s", "-30s", "-20s", "-10s", "Now"]
 
     property bool hasIotViewModel: typeof iotViewModel !== "undefined" && iotViewModel !== null
+
+    property double currentEpochMs: Date.now()
+
+    Timer {
+        interval: 1000
+        repeat: true
+        running: true
+
+        onTriggered: {
+            root.currentEpochMs = Date.now()
+        }
+    }
     // ── 샘플 데이터 ───────────────────────────────────────────
     property var sampleRobotModels: [
         {
@@ -50,6 +62,7 @@ Rectangle {
             online: true,
             lastUpdateTime: "16:42:11",
             lastUpdateAt: "2026-05-20T16:42:11",
+            lastUpdateEpochMs: Date.now(),
             tempSeries: [
                 { axis: "J1", values: [40.1, 40.8, 41.5, 42.0, 42.3, 42.5] },
                 { axis: "J2", values: [41.2, 41.6, 42.1, 43.0, 43.6, 44.1] },
@@ -83,6 +96,7 @@ Rectangle {
             online: true,
             lastUpdateTime: "16:42:11",
             lastUpdateAt: "2026-05-20T16:42:11",
+            lastUpdateEpochMs: Date.now(),
             tempSeries: [
                 { axis: "J1", values: [41.5, 42.0, 42.8, 43.4, 43.8, 44.2] },
                 { axis: "J2", values: [42.0, 42.7, 43.3, 44.0, 44.5, 45.0] },
@@ -281,6 +295,52 @@ Rectangle {
 
         return "#9e9e9e"
     }
+
+    function dataFreshnessInfo(robotData) {
+        var lastMs = robotData && robotData.lastUpdateEpochMs !== undefined
+                ? Number(robotData.lastUpdateEpochMs)
+                : 0
+
+        if (lastMs <= 0) {
+            return {
+                state: "OFFLINE",
+                label: "OFFLINE",
+                color: "#f1f5f9",
+                borderColor: "#cbd5e1",
+                textColor: "#64748b"
+            }
+        }
+
+        var ageSec = (root.currentEpochMs - lastMs) / 1000.0
+
+        if (ageSec <= 3.0) {
+            return {
+                state: "ONLINE",
+                label: "ONLINE",
+                color: "#e0f2fe",
+                borderColor: "#38bdf8",
+                textColor: "#0369a1"
+            }
+        }
+
+        if (ageSec <= 10.0) {
+            return {
+                state: "STALE",
+                label: "STALE",
+                color: "#fff7ed",
+                borderColor: "#fdba74",
+                textColor: "#c2410c"
+            }
+        }
+
+        return {
+            state: "OFFLINE",
+            label: "OFFLINE",
+            color: "#f1f5f9",
+            borderColor: "#cbd5e1",
+            textColor: "#64748b"
+        }
+    }
     // ── 다이얼로그 ────────────────────────────────────────────
     ThresholdSettingDialog {
         id: thresholdDialog
@@ -403,7 +463,6 @@ Rectangle {
                 // ── 개별 Robot 카드 ───────────────────────────
                 Rectangle {
                     id: robotCard
-//                    property var robotData: root.robotModels[index]
                     property var robotData: root.robotModels && root.robotModels[index]
                                             ? root.robotModels[index]
                                             : {}
@@ -460,20 +519,22 @@ Rectangle {
 
                             // 온라인 상태 표시
                             Rectangle {
+                                property var freshness: root.dataFreshnessInfo(robotCard.robotData)
+
                                 width: 72
                                 height: 22
                                 radius: 11
-                                color: robotCard.robotData.online ? "#e0f2fe" : "#f1f5f9"
-                                border.color: robotCard.robotData.online ? "#38bdf8" : "#cbd5e1"
+                                color: freshness.color
+                                border.color: freshness.borderColor
                                 border.width: 1
 
                                 Text {
                                     anchors.centerIn: parent
-                                    text: robotCard.robotData.online ? "ONLINE" : "OFFLINE"
+                                    text: parent.freshness.label
                                     font.family: "Asta Sans"
                                     font.pixelSize: 10
                                     font.bold: true
-                                    color: robotCard.robotData.online ? "#0369a1" : "#64748b"
+                                    color: parent.freshness.textColor
                                 }
                             }
                             // 실행 상태 표시
