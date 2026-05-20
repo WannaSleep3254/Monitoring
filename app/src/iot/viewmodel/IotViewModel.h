@@ -131,7 +131,7 @@ private:
 
     QVariantMap m_lastCleanupSummary;
 
-    // 개발 중 테스트 알람 자동 누적 방지용.
-    // true로 변경하면 threshold 초과 알람이 iot_alarm_history에 저장됨.
+    // false: 대시보드에는 알람을 표시하지만 DB 이력에는 자동 저장하지 않음
+    // true : 임계값 초과 알람을 DB 이력에도 저장
     bool m_enableAlarmHistoryInsert = false;
 };

@@ -17,6 +17,11 @@
 #include <algorithm>
 #include <utility>
 
+// 실시간 알람 처리 정책:
+// - appendAlarmToRobotModel(): 대시보드 표시용 최근 알람 갱신
+// - insertAlarm(): DB 이력 저장용, m_enableAlarmHistoryInsert가 true일 때만 수행
+// - 동일 알람 반복 저장은 shouldSuppressAlarm()으로 억제
+
 IotViewModel::IotViewModel(QObject* parent)
     : QObject(parent)
 {
