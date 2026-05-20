@@ -398,12 +398,15 @@ Rectangle {
             spacing: 12
 
             Repeater {
-                model: root.robotModels
+                model: root.robotModels ? root.robotModels.length : 0
 
                 // ── 개별 Robot 카드 ───────────────────────────
                 Rectangle {
                     id: robotCard
-                    property var robotData:  modelData
+//                    property var robotData: root.robotModels[index]
+                    property var robotData: root.robotModels && root.robotModels[index]
+                                            ? root.robotModels[index]
+                                            : {}
                     property int robotIndex: index
 
                     Layout.fillWidth:  true
