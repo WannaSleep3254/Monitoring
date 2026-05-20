@@ -167,6 +167,52 @@ Rectangle {
         }
         return { axis: maxAxis, value: maxValue }
     }
+    // 값과 임계값의 비율에 따른 위험도 레벨 반환: ratio >= 1.15 -> "경고", ratio >= 1.0 -> "주의", else "정상"
+    function riskLevelFromRatio(ratio) {
+        if (ratio >= 1.15)
+            return "경고"
+
+        if (ratio >= 1.0)
+            return "주의"
+
+        return "정상"
+    }
+    // 로봇 데이터와 임계값을 기반으로 워스트 축 정보 반환 (예: { axis: "J4", metric: "온도", value: 46.3, ratio: 1.15, level: "경고" })
+    function worstAxisInfo(robotData, threshold) {
+        var worst = {
+            axis: "-",
+            metric: "-",
+            value: 0,
+            ratio: 0,
+            level: "정상"
+        }
+
+        if (!robotData || !threshold)
+            return worst
+
+        function updateWorst(series, metric, warningMax) {
+            if (!series || warningMax <= 0)
+                return
+
+            for (var i = 0; i < series.length; ++i) {
+                var v = root.latestValue(series[i])
+                var ratio = v / warningMax
+
+                if (ratio > worst.ratio) {
+                    worst.axis = series[i].axis
+                    worst.metric = metric
+                    worst.value = v
+                    worst.ratio = ratio
+                    worst.level = root.riskLevelFromRatio(ratio)
+                }
+            }
+        }
+
+        updateWorst(robotData.tempSeries, "온도", threshold.temperature.warningMax)
+        updateWorst(robotData.torqueSeries, "부하", threshold.torque.warningMax)
+
+        return worst
+    }
     // 알람 시간 표시: time > occurredAt > occurred_at > "-"
     function alarmDisplayTime(alarm) {
         if (!alarm)
@@ -438,11 +484,19 @@ Rectangle {
 
                             MetricCard {
                                 Layout.fillWidth: true
-                                cardLabel:   "워스트 축"
-                                cardValue:   root.maxLatestInfo(robotCard.robotData.tempSeries).axis
-                                cardUnit:    ""
-                                cardSub:     "온도 기준"
-                                accentColor: "#f9a825"
+
+                                property var threshold: root.thresholdFor(robotCard.robotIndex)
+                                property var worst: root.worstAxisInfo(robotCard.robotData, threshold)
+
+                                cardLabel: "종합 위험축"
+                                cardValue: worst.axis
+                                cardUnit: ""
+                                cardSub: worst.metric + " 기준 / " + worst.level
+                                accentColor: worst.level === "경고"
+                                             ? "#c62828"
+                                             : worst.level === "주의"
+                                               ? "#f9a825"
+                                               : "#2e7d32"
                             }
                         }
 
