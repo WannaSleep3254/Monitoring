@@ -24,10 +24,23 @@ public:
     void startJointJog(int robotId, int joint, bool positive) override;
     void stopJointJog(int robotId) override;
 
+private:
+    enum class GatewaySourceMode {
+        Dummy,
+        Remote
+    };
+
 private slots:
-    void publishDummySnapshot();
+//    void publishDummySnapshot();
+    void pollSnapshots();
 
 private:
-    QTimer m_dummyTimer;
+    void publishDummySnapshot();
+    void pollRemoteSnapshots();
+
+//    QTimer m_dummyTimer;
+    QTimer m_pollTimer;
+    GatewaySourceMode m_sourceMode = GatewaySourceMode::Dummy;
+
     quint64 m_sequence = 0;
 };

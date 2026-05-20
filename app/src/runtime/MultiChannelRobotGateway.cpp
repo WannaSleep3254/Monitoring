@@ -6,12 +6,18 @@
 MultiChannelRobotGateway::MultiChannelRobotGateway(QObject* parent)
     : IRobotGateway(parent)
 {
+#if false
     connect(&m_dummyTimer, &QTimer::timeout,
             this, &MultiChannelRobotGateway::publishDummySnapshot);
+#else
+    connect(&m_pollTimer, &QTimer::timeout,
+            this, &MultiChannelRobotGateway::pollSnapshots);
+#endif
 }
 
 bool MultiChannelRobotGateway::start()
 {
+#if false
     if (m_dummyTimer.isActive())
         return true;
 
@@ -19,12 +25,25 @@ bool MultiChannelRobotGateway::start()
 
     m_dummyTimer.start(1000);
     qDebug() << "[Gateway] MultiChannelRobotGateway started";
+#else
+    if (m_pollTimer.isActive())
+        return true;
+
+    pollSnapshots();
+
+    m_pollTimer.start(1000);
+    qDebug() << "[Gateway] MultiChannelRobotGateway started";
+#endif
     return true;
 }
 
 void MultiChannelRobotGateway::stop()
 {
+#if false
     m_dummyTimer.stop();
+#else
+    m_pollTimer.stop();
+#endif
 }
 
 bool MultiChannelRobotGateway::isConnected(int robotId) const
@@ -50,6 +69,10 @@ void MultiChannelRobotGateway::clearError(int robotId)
 
 void MultiChannelRobotGateway::startJointJog(int robotId, int joint, bool positive)
 {
+    // TODO:
+    // Remote 모드에서는 GUI PC -> Robot PC command channel로 startJointJog 명령 전송.
+    // Jog 명령은 button press/release 구조와 heartbeat timeout 안전정지가 필요함.
+
     emit commandFinished(robotId,
                          QString("startJointJog J%1 %2")
                              .arg(joint)
@@ -62,6 +85,32 @@ void MultiChannelRobotGateway::startJointJog(int robotId, int joint, bool positi
 void MultiChannelRobotGateway::stopJointJog(int robotId)
 {
     emit commandFinished(robotId, "stopJointJog", true, 0, "dummy jog stop");
+}
+
+void MultiChannelRobotGateway::pollSnapshots()
+{
+    switch (m_sourceMode) {
+    case GatewaySourceMode::Dummy:
+        publishDummySnapshot();
+        break;
+
+    case GatewaySourceMode::Remote:
+        pollRemoteSnapshots();
+        break;
+    }
+}
+
+void MultiChannelRobotGateway::pollRemoteSnapshots()
+{
+    // TODO:
+    // Robot PC -> GUI PC 원격 모니터링 데이터 수신 구조로 확장 예정.
+    //
+    // 권장 구조:
+    // - Monitoring channel: Robot PC -> GUI PC, ZeroMQ PUB/SUB
+    // - Command channel: GUI PC -> Robot PC, ZeroMQ REQ/REP 또는 DEALER/ROUTER
+    //
+    // 수신된 payload는 UnifiedRobotSnapshot 호환 QVariantMap으로 변환 후
+    // emit snapshotUpdated(robotId, snapshot) 호출.
 }
 
 void MultiChannelRobotGateway::publishDummySnapshot()
@@ -87,3 +136,4 @@ void MultiChannelRobotGateway::publishDummySnapshot()
         emit snapshotUpdated(robotId, s.toMap());
     }
 }
+
