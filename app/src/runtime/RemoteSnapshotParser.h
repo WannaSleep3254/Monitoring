@@ -1,8 +1,10 @@
 #pragma once
 
 #include <QByteArray>
+#include <QDateTime>
 #include <QJsonObject>
 #include <QString>
+#include <QVariantList>
 #include <QVariantMap>
 
 class RemoteSnapshotParser
