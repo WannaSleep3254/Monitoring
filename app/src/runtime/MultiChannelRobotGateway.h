@@ -3,6 +3,7 @@
 #include "IRobotGateway.h"
 #include "RobotRuntimeTypes.h"
 
+#include <QString>
 #include <QTimer>
 
 class MultiChannelRobotGateway : public IRobotGateway
@@ -23,6 +24,9 @@ public:
 
     void startJointJog(int robotId, int joint, bool positive) override;
     void stopJointJog(int robotId) override;
+
+    QString sourceModeName() const;
+    bool setSourceModeName(const QString& modeName);
 
 private:
     enum class GatewaySourceMode {

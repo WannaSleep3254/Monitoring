@@ -26,7 +26,7 @@ bool MultiChannelRobotGateway::start()
     pollSnapshots();
 
     m_pollTimer.start(1000);
-    qDebug() << "[Gateway] MultiChannelRobotGateway started";
+    qDebug() << "[Gateway] MultiChannelRobotGateway started mode =" << sourceModeName();
 
     return true;
 }
@@ -75,6 +75,54 @@ void MultiChannelRobotGateway::startJointJog(int robotId, int joint, bool positi
 void MultiChannelRobotGateway::stopJointJog(int robotId)
 {
     emit commandFinished(robotId, "stopJointJog", true, 0, "dummy jog stop");
+}
+
+QString MultiChannelRobotGateway::sourceModeName() const
+{
+    switch (m_sourceMode) {
+    case GatewaySourceMode::Dummy:
+        return QStringLiteral("dummy");
+
+    case GatewaySourceMode::Remote:
+        return QStringLiteral("remote");
+    }
+
+    return QStringLiteral("unknown");
+}
+
+bool MultiChannelRobotGateway::setSourceModeName(const QString& modeName)
+{
+    const QString normalized = modeName.trimmed().toLower();
+
+    GatewaySourceMode nextMode;
+
+    if (normalized == QStringLiteral("dummy")) {
+        nextMode = GatewaySourceMode::Dummy;
+    } else if (normalized == QStringLiteral("remote")) {
+        nextMode = GatewaySourceMode::Remote;
+    } else {
+        qWarning() << "[Gateway] invalid source mode:" << modeName;
+        return false;
+    }
+
+    if (m_sourceMode == nextMode)
+        return true;
+
+    const bool wasActive = m_pollTimer.isActive();
+
+    if (wasActive)
+        m_pollTimer.stop();
+
+    m_sourceMode = nextMode;
+
+    qDebug() << "[Gateway] source mode changed =" << sourceModeName();
+
+    if (wasActive) {
+        pollSnapshots();
+        m_pollTimer.start(1000);
+    }
+
+    return true;
 }
 
 void MultiChannelRobotGateway::pollSnapshots()

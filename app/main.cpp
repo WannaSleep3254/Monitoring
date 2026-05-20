@@ -29,6 +29,8 @@ int main(int argc, char *argv[])
     auto* robotGateway = new MultiChannelRobotGateway(&engine);
     auto* iotViewModel = new IotViewModel(&engine);
 
+    //robotGateway->setSourceModeName("remote");
+
     iotViewModel->setRobotGateway(robotGateway);
     if (!iotViewModel->initialize()) {
         qWarning() << "[IoTViewModel] initialize failed:"
