@@ -25,7 +25,10 @@ set(RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/RemoteMessageTypes.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/RemoteSnapshotParser.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/RemoteSnapshotParser.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/RemoteCommandBuilder.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/RemoteCommandBuilder.cpp
 )
+
 set(IOT_SOURCES
     # iot 관련
     ${CMAKE_CURRENT_SOURCE_DIR}/src/iot/viewmodel/IotViewModel.h
