@@ -12,6 +12,8 @@
 #include <zmq.hpp>
 #endif
 
+#include <initializer_list>
+
 namespace
 {
 QJsonArray makeArray(std::initializer_list<double> values)
@@ -134,7 +136,7 @@ int main(int argc, char* argv[])
 
                 const QByteArray payload =
                     buildSnapshot(robotId, sequenceNumber);
-
+#if false
                 socket.send(
                     zmq::buffer(topic.toUtf8().constData(),
                                 static_cast<size_t>(topic.toUtf8().size())),
@@ -144,7 +146,19 @@ int main(int argc, char* argv[])
                     zmq::buffer(payload.constData(),
                                 static_cast<size_t>(payload.size())),
                     zmq::send_flags::none);
+#else
+                const QByteArray topicPayload = topic.toUtf8();
 
+                socket.send(
+                    zmq::buffer(topicPayload.constData(),
+                                static_cast<size_t>(topicPayload.size())),
+                    zmq::send_flags::sndmore);
+
+                socket.send(
+                    zmq::buffer(payload.constData(),
+                                static_cast<size_t>(payload.size())),
+                    zmq::send_flags::none);
+#endif
                 qInfo() << "[ZmqSnapshotDryRunPublisher] topic ="
                         << topic
                         << "payload bytes ="
