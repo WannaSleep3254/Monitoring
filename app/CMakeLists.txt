@@ -12,7 +12,7 @@ set(CMAKE_AUTORCC ON)
 # ----------------------------
 # Optional ZeroMQ Transport
 # ----------------------------
-option(ENABLE_ZEROMQ_TRANSPORT "Enable ZeroMQ remote transport" ON) #OFF)
+option(ENABLE_ZEROMQ_TRANSPORT "Enable ZeroMQ remote transport" OFF)
 
 # 소스 목록
 set(APP_SOURCES
