@@ -89,4 +89,29 @@ if(ENABLE_ZEROMQ_TRANSPORT)
             "${ZEROMQ_DLL_PATH}"
             "$<TARGET_FILE_DIR:zmq_command_dryrun_server>"
     )
+    #----------------------------
+    add_executable(zmq_snapshot_dryrun_publisher
+        zmq_snapshot_dryrun_publisher.cpp
+    )
+
+    target_compile_definitions(zmq_snapshot_dryrun_publisher PRIVATE
+        ENABLE_ZEROMQ_TRANSPORT
+    )
+
+    target_include_directories(zmq_snapshot_dryrun_publisher PRIVATE
+        "${ZEROMQ_INCLUDE_DIR}"
+    )
+
+    target_link_libraries(zmq_snapshot_dryrun_publisher PRIVATE
+        Qt${QT_VERSION_MAJOR}::Core
+        "${ZEROMQ_LIB_PATH}"
+    )
+
+    add_custom_command(TARGET zmq_snapshot_dryrun_publisher POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${ZEROMQ_DLL_PATH}"
+            "$<TARGET_FILE_DIR:zmq_snapshot_dryrun_publisher>"
+    )
 endif()
+
+
