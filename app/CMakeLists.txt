@@ -22,11 +22,16 @@ set(RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/RobotRuntimeTypes.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/MultiChannelRobotGateway.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/MultiChannelRobotGateway.cpp
+    # 메시지 타입
     ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/RemoteMessageTypes.h
+    # 로봇 상태 스냅샷 파싱
     ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/RemoteSnapshotParser.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/RemoteSnapshotParser.cpp
+    # 원격 명령 생성 및 응답 파싱
     ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/RemoteCommandBuilder.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/RemoteCommandBuilder.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/RemoteCommandResponseParser.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/RemoteCommandResponseParser.cpp
 )
 
 set(IOT_SOURCES

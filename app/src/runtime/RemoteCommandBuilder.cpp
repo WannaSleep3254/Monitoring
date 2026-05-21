@@ -152,5 +152,5 @@ QByteArray RemoteCommandBuilder::buildCommand(int robotId,
 QString RemoteCommandBuilder::makeCommandId()
 {
     return QStringLiteral("cmd-%1")
-    .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+        .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
 }
