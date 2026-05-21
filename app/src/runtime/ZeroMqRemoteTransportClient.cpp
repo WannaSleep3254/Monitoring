@@ -4,6 +4,8 @@
 
 #ifdef ENABLE_ZEROMQ_TRANSPORT
 #include <zmq.hpp>
+
+#include <optional>
 #endif
 
 ZeroMqRemoteTransportClient::ZeroMqRemoteTransportClient(QObject* parent)
@@ -115,17 +117,58 @@ void ZeroMqRemoteTransportClient::sendCommand(const QByteArray& requestPayload)
 
     return;
 #else
-    if (!m_running) {
+    if (!m_running || !m_commandSocket) {
         emit errorOccurred(QStringLiteral("ZeroMQ transport is not running"));
         return;
     }
 
-    // TODO:
-    // - REQ socket으로 requestPayload 전송
-    // - response 수신
-    // - commandResponsePayloadReceived(responsePayload) emit
+    try {
+        zmq::message_t requestMessage(
+            requestPayload.constData(),
+            static_cast<size_t>(requestPayload.size()));
 
-    qDebug() << "[ZeroMqTransport] command request placeholder =" << requestPayload;
+        const auto sendResult =
+            m_commandSocket->send(requestMessage, zmq::send_flags::none);
+
+        if (!sendResult.has_value()) {
+            const QString message =
+                QStringLiteral("ZeroMQ command send timed out");
+
+            qWarning() << "[ZeroMqTransport]" << message;
+            emit errorOccurred(message);
+            return;
+        }
+
+        zmq::message_t responseMessage;
+        const auto recvResult =
+            m_commandSocket->recv(responseMessage, zmq::recv_flags::none);
+
+        if (!recvResult.has_value()) {
+            const QString message =
+                QStringLiteral("ZeroMQ command response timed out");
+
+            qWarning() << "[ZeroMqTransport]" << message;
+            emit errorOccurred(message);
+            return;
+        }
+
+        const QByteArray responsePayload(
+            static_cast<const char*>(responseMessage.data()),
+            static_cast<int>(responseMessage.size()));
+
+        emit commandResponsePayloadReceived(responsePayload);
+
+        qDebug() << "[ZeroMqTransport] command response received bytes ="
+                 << responsePayload.size();
+
+    } catch (const zmq::error_t& error) {
+        const QString message =
+            QStringLiteral("ZeroMQ command failed: %1")
+                .arg(QString::fromLocal8Bit(error.what()));
+
+        qWarning() << "[ZeroMqTransport]" << message;
+        emit errorOccurred(message);
+    }
 #endif
 }
 
