@@ -35,3 +35,5 @@ ui_*.h
 !3rdparty/zeromq/bin/
 !3rdparty/zeromq/bin/msvc2022_x64/
 !3rdparty/zeromq/bin/msvc2022_x64/libzmq-mt-4_3_5.dll
+!3rdparty/zeromq/bin/msvc2019_x64/
+!3rdparty/zeromq/bin/msvc2019_x64/libzmq-mt-4_3_5.dll
