@@ -14,6 +14,16 @@ Rectangle {
     property string robot2JogMode: "joint"
 
     property bool robotManualMode: true
+    function jointIndexFromName(name) {
+        if (typeof name !== "string")
+            return 0
+
+        if (name.length < 2 || name.charAt(0) !== "J")
+            return 0
+
+        var index = parseInt(name.substring(1))
+        return index >= 1 && index <= 6 ? index : 0
+    }
 
     property var robot1JointModel: [
         { name: "J1", value: "90.264", unit: "deg" },
