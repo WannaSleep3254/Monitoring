@@ -1,22 +1,13 @@
 #include "MultiChannelRobotGateway.h"
 
-//#include "RemoteMessageTypes.h"
 #include "DryRunRemoteTransportClient.h"
-
 #include "RemoteSnapshotParser.h"
 #include "RemoteCommandBuilder.h"
 #include "RemoteCommandResponseParser.h"
+#include "RobotRuntimeTypes.h"
 
 #include <QDateTime>
 #include <QDebug>
-#if false
-#include <QJsonArray>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QJsonParseError>
-
-#include <initializer_list>
-#endif
 
 MultiChannelRobotGateway::MultiChannelRobotGateway(QObject* parent)
     : IRobotGateway(parent)
@@ -143,26 +134,7 @@ void MultiChannelRobotGateway::stopJointJog(int robotId)
 
     emit commandFinished(robotId, "stopJointJog", true, 0, "dummy jog stop");
 }
-/*
-void MultiChannelRobotGateway::sendRemoteCommand(const QByteArray& requestPayload)
-{
-    if (m_sourceMode != GatewaySourceMode::Remote) {
-        emit errorOccurred(0, QStringLiteral("Remote command requested in non-remote mode"));
-        return;
-    }
 
-    ensureRemoteTransport();
-
-    if (!m_remoteTransport->isRunning()) {
-        const QString error = QStringLiteral("Remote transport is not running");
-        qWarning() << "[Gateway]" << error;
-        emit errorOccurred(0, error);
-        return;
-    }
-
-    m_remoteTransport->sendCommand(requestPayload);
-}
-*/
 QString MultiChannelRobotGateway::sourceModeName() const
 {
     switch (m_sourceMode) {
@@ -295,6 +267,12 @@ void MultiChannelRobotGateway::handleRemoteCommandResponsePayload(const QByteArr
                          parsed.ok,
                          parsed.code,
                          parsed.message);
+}
+
+void MultiChannelRobotGateway::handleRemoteTransportError(const QString& message)
+{
+    qWarning() << "[Gateway] remote transport error:" << message;
+    emit errorOccurred(0, message);
 }
 
 void MultiChannelRobotGateway::sendRemoteCommand(const QByteArray& requestPayload)

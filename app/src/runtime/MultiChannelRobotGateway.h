@@ -1,7 +1,6 @@
 #pragma once
 
 #include "IRobotGateway.h"
-#include "RobotRuntimeTypes.h"
 #include "IRemoteTransportClient.h"
 
 #include <QString>
@@ -45,17 +44,7 @@ private slots:
 
 private:
     void publishDummySnapshot();
-#if false
-    void pollRemoteSnapshots();
 
-    void sendRemoteCommandDryRun(const QByteArray& requestPayload,
-                                 const QString& successMessage);
-
-    QTimer m_pollTimer;
-    GatewaySourceMode m_sourceMode = GatewaySourceMode::Dummy;
-
-    quint64 m_sequence = 0;
-#else
     void ensureRemoteTransport();
     void configureRemoteTransport();
     void sendRemoteCommand(const QByteArray& requestPayload);
@@ -67,5 +56,4 @@ private:
     bool m_remoteConnected = false;
 
     quint64 m_sequence = 0;
-#endif
 };
