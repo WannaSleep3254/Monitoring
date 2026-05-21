@@ -41,6 +41,9 @@ private:
     void publishDummySnapshot();
     void pollRemoteSnapshots();
 
+    void sendRemoteCommandDryRun(const QByteArray& requestPayload,
+                                 const QString& successMessage);
+
     QTimer m_pollTimer;
     GatewaySourceMode m_sourceMode = GatewaySourceMode::Dummy;
 

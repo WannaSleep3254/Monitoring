@@ -16,7 +16,7 @@ RemoteCommandResponseParser::parseJson(const QByteArray& payload)
 
     if (parseError.error != QJsonParseError::NoError) {
         result.error = QStringLiteral("JSON parse error: %1")
-        .arg(parseError.errorString());
+                           .arg(parseError.errorString());
         return result;
     }
 
@@ -37,7 +37,8 @@ RemoteCommandResponseParser::parseObject(const QJsonObject& object)
         object.value(RemoteMessage::Field::MessageType).toString();
 
     if (messageType != RemoteMessage::Type::CommandResponse) {
-        result.error = QStringLiteral("Invalid messageType: %1").arg(messageType);
+        result.error = QStringLiteral("Invalid messageType: %1")
+                           .arg(messageType);
         return result;
     }
 

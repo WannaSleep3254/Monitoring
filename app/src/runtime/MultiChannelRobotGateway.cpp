@@ -2,12 +2,15 @@
 
 #include "RemoteMessageTypes.h"
 #include "RemoteSnapshotParser.h"
+#include "RemoteCommandBuilder.h"
+#include "RemoteCommandResponseParser.h"
 
 #include <QDateTime>
 #include <QDebug>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonParseError>
 
 #include <initializer_list>
 
@@ -44,24 +47,60 @@ bool MultiChannelRobotGateway::isConnected(int robotId) const
 
 void MultiChannelRobotGateway::setManualMode(int robotId)
 {
+    if (m_sourceMode == GatewaySourceMode::Remote) {
+        const QByteArray request =
+            RemoteCommandBuilder::buildSetManualMode(robotId);
+
+        sendRemoteCommandDryRun(request, QStringLiteral("remote dry-run manual mode"));
+        return;
+    }
+
     emit commandFinished(robotId, "setManualMode", true, 0, "dummy manual mode");
 }
 
 void MultiChannelRobotGateway::setAutoMode(int robotId)
 {
+    if (m_sourceMode == GatewaySourceMode::Remote) {
+        const QByteArray request =
+            RemoteCommandBuilder::buildSetAutoMode(robotId);
+
+        sendRemoteCommandDryRun(request, QStringLiteral("remote dry-run auto mode"));
+        return;
+    }
+
     emit commandFinished(robotId, "setAutoMode", true, 0, "dummy auto mode");
 }
 
 void MultiChannelRobotGateway::clearError(int robotId)
 {
+    if (m_sourceMode == GatewaySourceMode::Remote) {
+        const QByteArray request =
+            RemoteCommandBuilder::buildClearError(robotId);
+
+        sendRemoteCommandDryRun(request, QStringLiteral("remote dry-run clear error"));
+        return;
+    }
+
     emit commandFinished(robotId, "clearError", true, 0, "dummy clear error");
 }
 
 void MultiChannelRobotGateway::startJointJog(int robotId, int joint, bool positive)
 {
-    // TODO:
-    // Remote 모드에서는 GUI PC -> Robot PC command channel로 startJointJog 명령 전송.
-    // Jog 명령은 button press/release 구조와 heartbeat timeout 안전정지가 필요함.
+    if (m_sourceMode == GatewaySourceMode::Remote) {
+        constexpr double kDryRunJogSpeed = 10.0;
+
+        const QByteArray request =
+            RemoteCommandBuilder::buildStartJointJog(robotId,
+                                                     joint,
+                                                     positive,
+                                                     kDryRunJogSpeed);
+
+        sendRemoteCommandDryRun(
+            request,
+            QStringLiteral("remote dry-run jog start"));
+
+        return;
+    }
 
     emit commandFinished(robotId,
                          QString("startJointJog J%1 %2")
@@ -74,7 +113,87 @@ void MultiChannelRobotGateway::startJointJog(int robotId, int joint, bool positi
 
 void MultiChannelRobotGateway::stopJointJog(int robotId)
 {
+    if (m_sourceMode == GatewaySourceMode::Remote) {
+        const QByteArray request =
+            RemoteCommandBuilder::buildStopJointJog(robotId);
+
+        sendRemoteCommandDryRun(request, QStringLiteral("remote dry-run jog stop"));
+        return;
+    }
+
     emit commandFinished(robotId, "stopJointJog", true, 0, "dummy jog stop");
+}
+
+void MultiChannelRobotGateway::sendRemoteCommandDryRun(const QByteArray& requestPayload,
+                                                       const QString& successMessage)
+{
+    QJsonParseError parseError;
+    const QJsonDocument requestDoc =
+        QJsonDocument::fromJson(requestPayload, &parseError);
+
+    if (parseError.error != QJsonParseError::NoError || !requestDoc.isObject()) {
+        const QString error =
+            QStringLiteral("Remote command request parse failed: %1")
+                .arg(parseError.errorString());
+
+        qWarning() << "[Gateway]" << error;
+        emit errorOccurred(0, error);
+        return;
+    }
+
+    const QJsonObject requestObject = requestDoc.object();
+
+    const int robotId =
+        requestObject.value(RemoteMessage::Field::RobotId).toInt(0);
+
+    const QString commandId =
+        requestObject.value(RemoteMessage::Field::CommandId).toString();
+
+    const QString command =
+        requestObject.value(RemoteMessage::Field::Command).toString();
+
+    QJsonObject responseObject;
+    responseObject[RemoteMessage::Field::MessageType] =
+        RemoteMessage::Type::CommandResponse;
+
+    responseObject[RemoteMessage::Field::SchemaVersion] = 1;
+    responseObject[RemoteMessage::Field::CommandId] = commandId;
+    responseObject[RemoteMessage::Field::RobotId] = robotId;
+    responseObject[RemoteMessage::Field::Command] = command;
+
+    responseObject[RemoteMessage::Field::Ok] = true;
+    responseObject[RemoteMessage::Field::Code] =
+        RemoteMessage::toInt(RemoteMessage::ResponseCode::Ok);
+
+    responseObject[RemoteMessage::Field::Message] = successMessage;
+    responseObject[RemoteMessage::Field::Timestamp] =
+        QDateTime::currentDateTime().toString(Qt::ISODateWithMs);
+
+    const QByteArray responsePayload =
+        QJsonDocument(responseObject).toJson(QJsonDocument::Compact);
+
+    const auto parsed =
+        RemoteCommandResponseParser::parseJson(responsePayload);
+
+    if (!parsed.parsed) {
+        const QString error =
+            QStringLiteral("Remote command response parse failed: %1")
+                .arg(parsed.error);
+
+        qWarning() << "[Gateway]" << error;
+        emit errorOccurred(robotId, error);
+        return;
+    }
+
+    qDebug() << "[Gateway] remote command dry-run"
+             << "request =" << requestPayload
+             << "response =" << responsePayload;
+
+    emit commandFinished(parsed.robotId,
+                         parsed.command,
+                         parsed.ok,
+                         parsed.code,
+                         parsed.message);
 }
 
 QString MultiChannelRobotGateway::sourceModeName() const
