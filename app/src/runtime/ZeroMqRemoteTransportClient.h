@@ -31,6 +31,8 @@ public:
     void sendCommand(const QByteArray& requestPayload) override;
 
 private:
+    void cleanupTransport();
+
 #ifdef ENABLE_ZEROMQ_TRANSPORT
     void resetSockets();
 

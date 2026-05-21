@@ -13,7 +13,7 @@ ZeroMqRemoteTransportClient::ZeroMqRemoteTransportClient(QObject* parent)
 
 ZeroMqRemoteTransportClient::~ZeroMqRemoteTransportClient()
 {
-    stop();
+    cleanupTransport();
 }
 
 void ZeroMqRemoteTransportClient::configure(const RemoteTransportConfig& config)
@@ -93,15 +93,8 @@ void ZeroMqRemoteTransportClient::stop()
     if (!m_running)
         return;
 
-#ifdef ENABLE_ZEROMQ_TRANSPORT
-    // TODO:
-    // - SUB socket close
-    // - REQ socket close
-    // - worker thread stop
-    resetSockets();
-#endif
+    cleanupTransport();
 
-    m_running = false;
     emit connectionStateChanged(false);
 
     qDebug() << "[ZeroMqTransport] stopped";
@@ -134,6 +127,15 @@ void ZeroMqRemoteTransportClient::sendCommand(const QByteArray& requestPayload)
 
     qDebug() << "[ZeroMqTransport] command request placeholder =" << requestPayload;
 #endif
+}
+
+void ZeroMqRemoteTransportClient::cleanupTransport()
+{
+#ifdef ENABLE_ZEROMQ_TRANSPORT
+    resetSockets();
+#endif
+
+    m_running = false;
 }
 
 #ifdef ENABLE_ZEROMQ_TRANSPORT
