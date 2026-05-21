@@ -1,6 +1,8 @@
 #include "MultiChannelRobotGateway.h"
-
+//
 #include "DryRunRemoteTransportClient.h"
+#include "ZeroMqRemoteTransportClient.h"
+//
 #include "RemoteSnapshotParser.h"
 #include "RemoteCommandBuilder.h"
 #include "RemoteCommandResponseParser.h"
@@ -8,6 +10,7 @@
 
 #include <QDateTime>
 #include <QDebug>
+#include <QSettings>
 
 MultiChannelRobotGateway::MultiChannelRobotGateway(QObject* parent)
     : IRobotGateway(parent)
@@ -191,7 +194,30 @@ void MultiChannelRobotGateway::ensureRemoteTransport()
     if (m_remoteTransport)
         return;
 
-    auto* transport = new DryRunRemoteTransportClient(this);
+    QSettings settings;
+
+    const QString transportType =
+        settings.value(QStringLiteral("runtime/remoteTransportType"),
+                       QStringLiteral("dryrun"))
+            .toString()
+            .trimmed()
+            .toLower();
+
+    IRemoteTransportClient* transport = nullptr;
+
+    if (transportType == QStringLiteral("zeromq")) {
+        transport = new ZeroMqRemoteTransportClient(this);
+    } else if (transportType == QStringLiteral("dryrun")) {
+        transport = new DryRunRemoteTransportClient(this);
+    } else {
+        qWarning() << "[Gateway] invalid remoteTransportType:"
+                   << transportType
+                   << "fallback to dryrun";
+
+        transport = new DryRunRemoteTransportClient(this);
+    }
+
+    qDebug() << "[Gateway] remote transport type =" << transportType;
 
     connect(transport,
             &IRemoteTransportClient::snapshotPayloadReceived,
@@ -221,13 +247,51 @@ void MultiChannelRobotGateway::configureRemoteTransport()
     if (!m_remoteTransport)
         return;
 
+    QSettings settings;
+
+    const QString transportType =
+        settings.value(QStringLiteral("runtime/remoteTransportType"),
+                       QStringLiteral("dryrun"))
+            .toString()
+            .trimmed()
+            .toLower();
+
     RemoteTransportConfig config;
-    config.snapshotEndpoint = QStringLiteral("dryrun://snapshot");
-    config.commandEndpoint = QStringLiteral("dryrun://command");
-    config.snapshotTopic = QStringLiteral("robot/");
-    config.commandTimeoutMs = 1000;
+
+    if (transportType == QStringLiteral("zeromq")) {
+        config.snapshotEndpoint =
+            settings.value(QStringLiteral("runtime/snapshotEndpoint"),
+                           QStringLiteral("tcp://127.0.0.1:5556"))
+                .toString();
+
+        config.commandEndpoint =
+            settings.value(QStringLiteral("runtime/commandEndpoint"),
+                           QStringLiteral("tcp://127.0.0.1:5557"))
+                .toString();
+
+        config.snapshotTopic =
+            settings.value(QStringLiteral("runtime/snapshotTopic"),
+                           QStringLiteral("robot/"))
+                .toString();
+
+        config.commandTimeoutMs =
+            settings.value(QStringLiteral("runtime/commandTimeoutMs"), 1000)
+                .toInt();
+    } else {
+        config.snapshotEndpoint = QStringLiteral("dryrun://snapshot");
+        config.commandEndpoint = QStringLiteral("dryrun://command");
+        config.snapshotTopic = QStringLiteral("robot/");
+        config.commandTimeoutMs = 1000;
+    }
 
     m_remoteTransport->configure(config);
+
+    qDebug() << "[Gateway] remote transport configured"
+             << "type =" << transportType
+             << "snapshotEndpoint =" << config.snapshotEndpoint
+             << "commandEndpoint =" << config.commandEndpoint
+             << "topic =" << config.snapshotTopic
+             << "timeoutMs =" << config.commandTimeoutMs;
 }
 
 void MultiChannelRobotGateway::handleRemoteSnapshotPayload(const QByteArray& payload)
