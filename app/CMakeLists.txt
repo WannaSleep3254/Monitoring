@@ -9,6 +9,11 @@ set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
+# ----------------------------
+# Optional ZeroMQ Transport
+# ----------------------------
+option(ENABLE_ZEROMQ_TRANSPORT "Enable ZeroMQ remote transport" OFF)
+
 # 소스 목록
 set(APP_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
@@ -105,6 +110,80 @@ target_link_libraries(MonitoringApp PRIVATE
     Qt${QT_VERSION_MAJOR}::Network
     monitoring_core
 )
+
+# ----------------------------
+# Optional ZeroMQ Transport
+# 기본값 OFF
+# - Qt 6.x + MSVC2022 x64: 1차 지원
+# - Qt 5.15 + MSVC2019 x64: 유지 가능
+# - MinGW: 보류, ON 시 차단
+# ----------------------------
+if(ENABLE_ZEROMQ_TRANSPORT)
+    if(MINGW)
+        message(FATAL_ERROR "ZeroMQ transport is not supported for MinGW in this project")
+    endif()
+
+    if(NOT MSVC)
+        message(FATAL_ERROR "Bundled ZeroMQ transport is currently supported only for MSVC")
+    endif()
+
+    if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
+        message(FATAL_ERROR "Bundled ZeroMQ transport currently supports x64 only")
+    endif()
+
+    if(MSVC_VERSION GREATER_EQUAL 1930)
+        set(ZEROMQ_PLATFORM_DIR "msvc2022_x64")
+    elseif(MSVC_VERSION GREATER_EQUAL 1920)
+        set(ZEROMQ_PLATFORM_DIR "msvc2019_x64")
+    else()
+        message(FATAL_ERROR "Unsupported MSVC version for bundled ZeroMQ")
+    endif()
+
+    set(ZEROMQ_ROOT "${CMAKE_SOURCE_DIR}/3rdparty/zeromq")
+    set(ZEROMQ_INCLUDE_DIR "${ZEROMQ_ROOT}/include")
+    set(ZEROMQ_LIB_PATH "${ZEROMQ_ROOT}/lib/${ZEROMQ_PLATFORM_DIR}/libzmq.lib")
+    set(ZEROMQ_DLL_PATH "${ZEROMQ_ROOT}/bin/${ZEROMQ_PLATFORM_DIR}/libzmq.dll")
+
+    if(NOT EXISTS "${ZEROMQ_INCLUDE_DIR}/zmq.h")
+        message(FATAL_ERROR "Missing ZeroMQ header: ${ZEROMQ_INCLUDE_DIR}/zmq.h")
+    endif()
+
+    if(NOT EXISTS "${ZEROMQ_INCLUDE_DIR}/zmq.hpp")
+        message(FATAL_ERROR "Missing cppzmq header: ${ZEROMQ_INCLUDE_DIR}/zmq.hpp")
+    endif()
+
+    if(NOT EXISTS "${ZEROMQ_LIB_PATH}")
+        message(FATAL_ERROR "Missing ZeroMQ import library: ${ZEROMQ_LIB_PATH}")
+    endif()
+
+    if(NOT EXISTS "${ZEROMQ_DLL_PATH}")
+        message(FATAL_ERROR "Missing ZeroMQ runtime DLL: ${ZEROMQ_DLL_PATH}")
+    endif()
+
+    target_compile_definitions(MonitoringApp PRIVATE
+        ENABLE_ZEROMQ_TRANSPORT
+    )
+
+    target_include_directories(MonitoringApp PRIVATE
+        "${ZEROMQ_INCLUDE_DIR}"
+    )
+
+    target_link_libraries(MonitoringApp PRIVATE
+        "${ZEROMQ_LIB_PATH}"
+    )
+
+    add_custom_command(TARGET MonitoringApp POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${ZEROMQ_DLL_PATH}"
+            "$<TARGET_FILE_DIR:MonitoringApp>"
+    )
+
+    message(STATUS "ZeroMQ transport enabled")
+    message(STATUS "ZeroMQ platform dir: ${ZEROMQ_PLATFORM_DIR}")
+    message(STATUS "ZeroMQ include dir: ${ZEROMQ_INCLUDE_DIR}")
+    message(STATUS "ZeroMQ lib path: ${ZEROMQ_LIB_PATH}")
+    message(STATUS "ZeroMQ dll path: ${ZEROMQ_DLL_PATH}")
+endif()
 
 # ----------------------------
 # Optimize (MSVC) - 최종 링크 단계에서 효과 큼
