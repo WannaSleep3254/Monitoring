@@ -27,6 +27,9 @@ set(RUNTIME_SOURCES
     # DryRunRemoteTransportClient는 실제 네트워크 통신 없이 로봇 상태를 시뮬레이션하는 테스트용 구현체
     ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/DryRunRemoteTransportClient.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/DryRunRemoteTransportClient.cpp
+    # ZeroMQRemoteTransportClient는 ZeroMQ를 이용해 실제 로봇과 통신하는 구현체
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/ZeroMqRemoteTransportClient.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/ZeroMqRemoteTransportClient.cpp
     # 메시지 타입
     ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/RemoteMessageTypes.h
     # 로봇 상태 스냅샷 파싱
