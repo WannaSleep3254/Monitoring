@@ -185,7 +185,7 @@ QByteArray DryRunRemoteTransportClient::buildCommandResponsePayload(
     if (parseError.error != QJsonParseError::NoError || !requestDoc.isObject()) {
         if (errorMessage) {
             *errorMessage = QStringLiteral("Command request parse failed: %1")
-            .arg(parseError.errorString());
+                                .arg(parseError.errorString());
         }
 
         return {};

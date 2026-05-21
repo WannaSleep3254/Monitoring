@@ -1,18 +1,22 @@
 #include "MultiChannelRobotGateway.h"
 
-#include "RemoteMessageTypes.h"
+//#include "RemoteMessageTypes.h"
+#include "DryRunRemoteTransportClient.h"
+
 #include "RemoteSnapshotParser.h"
 #include "RemoteCommandBuilder.h"
 #include "RemoteCommandResponseParser.h"
 
 #include <QDateTime>
 #include <QDebug>
+#if false
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonParseError>
 
 #include <initializer_list>
+#endif
 
 MultiChannelRobotGateway::MultiChannelRobotGateway(QObject* parent)
     : IRobotGateway(parent)
@@ -23,10 +27,21 @@ MultiChannelRobotGateway::MultiChannelRobotGateway(QObject* parent)
 
 bool MultiChannelRobotGateway::start()
 {
+    if (m_sourceMode == GatewaySourceMode::Remote) {
+        ensureRemoteTransport();
+        configureRemoteTransport();
+
+        if (!m_remoteTransport->start())
+            return false;
+
+        qDebug() << "[Gateway] MultiChannelRobotGateway started mode =" << sourceModeName();
+        return true;
+    }
+
     if (m_pollTimer.isActive())
         return true;
 
-    pollSnapshots();
+    publishDummySnapshot();
 
     m_pollTimer.start(1000);
     qDebug() << "[Gateway] MultiChannelRobotGateway started mode =" << sourceModeName();
@@ -37,11 +52,19 @@ bool MultiChannelRobotGateway::start()
 void MultiChannelRobotGateway::stop()
 {
     m_pollTimer.stop();
+
+    if (m_remoteTransport) {
+        m_remoteTransport->stop();
+    }
 }
 
 bool MultiChannelRobotGateway::isConnected(int robotId) const
 {
     Q_UNUSED(robotId)
+
+    if (m_sourceMode == GatewaySourceMode::Remote)
+        return m_remoteConnected;
+
     return true;
 }
 
@@ -51,7 +74,7 @@ void MultiChannelRobotGateway::setManualMode(int robotId)
         const QByteArray request =
             RemoteCommandBuilder::buildSetManualMode(robotId);
 
-        sendRemoteCommandDryRun(request, QStringLiteral("remote dry-run manual mode"));
+        sendRemoteCommand(request);
         return;
     }
 
@@ -64,7 +87,7 @@ void MultiChannelRobotGateway::setAutoMode(int robotId)
         const QByteArray request =
             RemoteCommandBuilder::buildSetAutoMode(robotId);
 
-        sendRemoteCommandDryRun(request, QStringLiteral("remote dry-run auto mode"));
+        sendRemoteCommand(request);
         return;
     }
 
@@ -77,7 +100,7 @@ void MultiChannelRobotGateway::clearError(int robotId)
         const QByteArray request =
             RemoteCommandBuilder::buildClearError(robotId);
 
-        sendRemoteCommandDryRun(request, QStringLiteral("remote dry-run clear error"));
+        sendRemoteCommand(request);
         return;
     }
 
@@ -95,10 +118,7 @@ void MultiChannelRobotGateway::startJointJog(int robotId, int joint, bool positi
                                                      positive,
                                                      kDryRunJogSpeed);
 
-        sendRemoteCommandDryRun(
-            request,
-            QStringLiteral("remote dry-run jog start"));
-
+        sendRemoteCommand(request);
         return;
     }
 
@@ -117,85 +137,32 @@ void MultiChannelRobotGateway::stopJointJog(int robotId)
         const QByteArray request =
             RemoteCommandBuilder::buildStopJointJog(robotId);
 
-        sendRemoteCommandDryRun(request, QStringLiteral("remote dry-run jog stop"));
+        sendRemoteCommand(request);
         return;
     }
 
     emit commandFinished(robotId, "stopJointJog", true, 0, "dummy jog stop");
 }
-
-void MultiChannelRobotGateway::sendRemoteCommandDryRun(const QByteArray& requestPayload,
-                                                       const QString& successMessage)
+/*
+void MultiChannelRobotGateway::sendRemoteCommand(const QByteArray& requestPayload)
 {
-    QJsonParseError parseError;
-    const QJsonDocument requestDoc =
-        QJsonDocument::fromJson(requestPayload, &parseError);
+    if (m_sourceMode != GatewaySourceMode::Remote) {
+        emit errorOccurred(0, QStringLiteral("Remote command requested in non-remote mode"));
+        return;
+    }
 
-    if (parseError.error != QJsonParseError::NoError || !requestDoc.isObject()) {
-        const QString error =
-            QStringLiteral("Remote command request parse failed: %1")
-                .arg(parseError.errorString());
+    ensureRemoteTransport();
 
+    if (!m_remoteTransport->isRunning()) {
+        const QString error = QStringLiteral("Remote transport is not running");
         qWarning() << "[Gateway]" << error;
         emit errorOccurred(0, error);
         return;
     }
 
-    const QJsonObject requestObject = requestDoc.object();
-
-    const int robotId =
-        requestObject.value(RemoteMessage::Field::RobotId).toInt(0);
-
-    const QString commandId =
-        requestObject.value(RemoteMessage::Field::CommandId).toString();
-
-    const QString command =
-        requestObject.value(RemoteMessage::Field::Command).toString();
-
-    QJsonObject responseObject;
-    responseObject[RemoteMessage::Field::MessageType] =
-        RemoteMessage::Type::CommandResponse;
-
-    responseObject[RemoteMessage::Field::SchemaVersion] = 1;
-    responseObject[RemoteMessage::Field::CommandId] = commandId;
-    responseObject[RemoteMessage::Field::RobotId] = robotId;
-    responseObject[RemoteMessage::Field::Command] = command;
-
-    responseObject[RemoteMessage::Field::Ok] = true;
-    responseObject[RemoteMessage::Field::Code] =
-        RemoteMessage::toInt(RemoteMessage::ResponseCode::Ok);
-
-    responseObject[RemoteMessage::Field::Message] = successMessage;
-    responseObject[RemoteMessage::Field::Timestamp] =
-        QDateTime::currentDateTime().toString(Qt::ISODateWithMs);
-
-    const QByteArray responsePayload =
-        QJsonDocument(responseObject).toJson(QJsonDocument::Compact);
-
-    const auto parsed =
-        RemoteCommandResponseParser::parseJson(responsePayload);
-
-    if (!parsed.parsed) {
-        const QString error =
-            QStringLiteral("Remote command response parse failed: %1")
-                .arg(parsed.error);
-
-        qWarning() << "[Gateway]" << error;
-        emit errorOccurred(robotId, error);
-        return;
-    }
-
-    qDebug() << "[Gateway] remote command dry-run"
-             << "request =" << requestPayload
-             << "response =" << responsePayload;
-
-    emit commandFinished(parsed.robotId,
-                         parsed.command,
-                         parsed.ok,
-                         parsed.code,
-                         parsed.message);
+    m_remoteTransport->sendCommand(requestPayload);
 }
-
+*/
 QString MultiChannelRobotGateway::sourceModeName() const
 {
     switch (m_sourceMode) {
@@ -227,21 +194,136 @@ bool MultiChannelRobotGateway::setSourceModeName(const QString& modeName)
     if (m_sourceMode == nextMode)
         return true;
 
-    const bool wasActive = m_pollTimer.isActive();
+    const bool dummyWasActive = m_pollTimer.isActive();
+    const bool remoteWasActive = m_remoteTransport && m_remoteTransport->isRunning();
 
-    if (wasActive)
+    if (dummyWasActive)
         m_pollTimer.stop();
+
+    if (remoteWasActive)
+        m_remoteTransport->stop();
 
     m_sourceMode = nextMode;
 
     qDebug() << "[Gateway] source mode changed =" << sourceModeName();
 
-    if (wasActive) {
-        pollSnapshots();
-        m_pollTimer.start(1000);
+    if (dummyWasActive || remoteWasActive) {
+        start();
     }
 
     return true;
+}
+
+void MultiChannelRobotGateway::ensureRemoteTransport()
+{
+    if (m_remoteTransport)
+        return;
+
+    auto* transport = new DryRunRemoteTransportClient(this);
+
+    connect(transport,
+            &IRemoteTransportClient::snapshotPayloadReceived,
+            this,
+            &MultiChannelRobotGateway::handleRemoteSnapshotPayload);
+
+    connect(transport,
+            &IRemoteTransportClient::commandResponsePayloadReceived,
+            this,
+            &MultiChannelRobotGateway::handleRemoteCommandResponsePayload);
+
+    connect(transport,
+            &IRemoteTransportClient::connectionStateChanged,
+            this,
+            &MultiChannelRobotGateway::handleRemoteConnectionStateChanged);
+
+    connect(transport,
+            &IRemoteTransportClient::errorOccurred,
+            this,
+            &MultiChannelRobotGateway::handleRemoteTransportError);
+
+    m_remoteTransport = transport;
+}
+
+void MultiChannelRobotGateway::configureRemoteTransport()
+{
+    if (!m_remoteTransport)
+        return;
+
+    RemoteTransportConfig config;
+    config.snapshotEndpoint = QStringLiteral("dryrun://snapshot");
+    config.commandEndpoint = QStringLiteral("dryrun://command");
+    config.snapshotTopic = QStringLiteral("robot/");
+    config.commandTimeoutMs = 1000;
+
+    m_remoteTransport->configure(config);
+}
+
+void MultiChannelRobotGateway::handleRemoteSnapshotPayload(const QByteArray& payload)
+{
+    const auto parsed = RemoteSnapshotParser::parseJson(payload);
+
+    if (!parsed.ok) {
+        const QString error =
+            QStringLiteral("Remote snapshot parse failed: %1")
+                .arg(parsed.error);
+
+        qWarning() << "[Gateway]" << error;
+        emit errorOccurred(0, error);
+        return;
+    }
+
+    emit snapshotUpdated(parsed.robotId, parsed.snapshot);
+}
+
+void MultiChannelRobotGateway::handleRemoteCommandResponsePayload(const QByteArray& payload)
+{
+    const auto parsed =
+        RemoteCommandResponseParser::parseJson(payload);
+
+    if (!parsed.parsed) {
+        const QString error =
+            QStringLiteral("Remote command response parse failed: %1")
+                .arg(parsed.error);
+
+        qWarning() << "[Gateway]" << error;
+        emit errorOccurred(0, error);
+        return;
+    }
+
+    emit commandFinished(parsed.robotId,
+                         parsed.command,
+                         parsed.ok,
+                         parsed.code,
+                         parsed.message);
+}
+
+void MultiChannelRobotGateway::sendRemoteCommand(const QByteArray& requestPayload)
+{
+    if (m_sourceMode != GatewaySourceMode::Remote) {
+        emit errorOccurred(0, QStringLiteral("Remote command requested in non-remote mode"));
+        return;
+    }
+
+    ensureRemoteTransport();
+
+    if (!m_remoteTransport->isRunning()) {
+        const QString error = QStringLiteral("Remote transport is not running");
+        qWarning() << "[Gateway]" << error;
+        emit errorOccurred(0, error);
+        return;
+    }
+
+    m_remoteTransport->sendCommand(requestPayload);
+}
+
+void MultiChannelRobotGateway::handleRemoteConnectionStateChanged(bool connected)
+{
+    m_remoteConnected = connected;
+
+    emit connectionStateChanged(1, connected);
+    emit connectionStateChanged(2, connected);
+
+    qDebug() << "[Gateway] remote transport connected =" << connected;
 }
 
 void MultiChannelRobotGateway::pollSnapshots()
@@ -252,82 +334,11 @@ void MultiChannelRobotGateway::pollSnapshots()
         break;
 
     case GatewaySourceMode::Remote:
-        pollRemoteSnapshots();
+        // Remote mode는 IRemoteTransportClient의 snapshotPayloadReceived signal 기반.
         break;
     }
 }
 
-void MultiChannelRobotGateway::pollRemoteSnapshots()
-{
-    // Dry-run path:
-    // 실제 ZeroMQ 수신 전, Remote Snapshot JSON -> Parser -> snapshotUpdated 흐름 검증용.
-    // 기본 sourceMode는 Dummy이므로 일반 실행에는 영향 없음.
-
-    auto makeArray = [](std::initializer_list<double> values) {
-        QJsonArray array;
-        for (double value : values) {
-            array.append(value);
-        }
-        return array;
-    };
-
-    ++m_sequence;
-
-    for (int robotId = 1; robotId <= 2; ++robotId) {
-        QJsonObject object;
-
-        object[RemoteMessage::Field::MessageType] =
-            RemoteMessage::Type::Snapshot;
-
-        object[RemoteMessage::Field::SchemaVersion] = 1;
-
-        object[RemoteMessage::Field::RobotId] = robotId;
-        object[RemoteMessage::Field::RobotName] =
-            QStringLiteral("Robot %1").arg(robotId);
-        object[RemoteMessage::Field::Model] =
-            robotId == 1 ? QStringLiteral("FR10") : QStringLiteral("FR5");
-
-        object[RemoteMessage::Field::Connected] = true;
-        object[RemoteMessage::Field::Running] = true;
-
-        object[RemoteMessage::Field::JointPositions] =
-            makeArray({ 0.0, 10.0, 20.0, 30.0, 40.0, 50.0 });
-
-        object[RemoteMessage::Field::TcpPose] =
-            makeArray({ 100.0, 200.0, 300.0, 180.0, 0.0, 90.0 });
-
-        object[RemoteMessage::Field::Torques] =
-            makeArray({ 10.1, 9.8, 14.5, 11.2, 8.4, 10.9 });
-
-        object[RemoteMessage::Field::DriverTemperatures] =
-            makeArray({ 40.1, 41.2, 42.3, 43.4, 44.5, 45.6 });
-
-        object[RemoteMessage::Field::RobotState] = QStringLiteral("RUN");
-        object[RemoteMessage::Field::ErrorText] = QStringLiteral("0");
-        object[RemoteMessage::Field::SequenceState] = QStringLiteral("IDLE");
-        object[RemoteMessage::Field::InterlockState] = QStringLiteral("OK");
-
-        object[RemoteMessage::Field::Timestamp] =
-            QDateTime::currentDateTime().toString(Qt::ISODateWithMs);
-
-        object[RemoteMessage::Field::SequenceNumber] =
-            static_cast<double>(m_sequence);
-
-        const QByteArray payload =
-            QJsonDocument(object).toJson(QJsonDocument::Compact);
-
-        const auto parsed = RemoteSnapshotParser::parseJson(payload);
-
-        if (!parsed.ok) {
-            emit errorOccurred(robotId, parsed.error);
-            qWarning() << "[Gateway] remote snapshot dry-run parse failed:"
-                       << parsed.error;
-            continue;
-        }
-
-        emit snapshotUpdated(parsed.robotId, parsed.snapshot);
-    }
-}
 
 void MultiChannelRobotGateway::publishDummySnapshot()
 {

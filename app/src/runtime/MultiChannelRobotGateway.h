@@ -2,6 +2,7 @@
 
 #include "IRobotGateway.h"
 #include "RobotRuntimeTypes.h"
+#include "IRemoteTransportClient.h"
 
 #include <QString>
 #include <QTimer>
@@ -36,9 +37,15 @@ private:
 
 private slots:
     void pollSnapshots();
+    // Remote transport client slots:
+    void handleRemoteSnapshotPayload(const QByteArray& payload);
+    void handleRemoteCommandResponsePayload(const QByteArray& payload);
+    void handleRemoteTransportError(const QString& message);
+    void handleRemoteConnectionStateChanged(bool connected);
 
 private:
     void publishDummySnapshot();
+#if false
     void pollRemoteSnapshots();
 
     void sendRemoteCommandDryRun(const QByteArray& requestPayload,
@@ -48,4 +55,17 @@ private:
     GatewaySourceMode m_sourceMode = GatewaySourceMode::Dummy;
 
     quint64 m_sequence = 0;
+#else
+    void ensureRemoteTransport();
+    void configureRemoteTransport();
+    void sendRemoteCommand(const QByteArray& requestPayload);
+
+    QTimer m_pollTimer;
+    GatewaySourceMode m_sourceMode = GatewaySourceMode::Dummy;
+
+    IRemoteTransportClient* m_remoteTransport = nullptr;
+    bool m_remoteConnected = false;
+
+    quint64 m_sequence = 0;
+#endif
 };
