@@ -167,7 +167,57 @@ void IotViewModel::setAlarmCooldownSec(int seconds)
 
     qDebug() << "[IoTViewModel] alarm cooldown sec =" << m_alarmCooldownSec;
 }
+// QML에서 호출됨. robotIndex는 1부터 시작하는 로봇 번호임에 유의.
+void IotViewModel::setRobotManualMode(int robotId)
+{
+    if (!m_gateway) {
+        qWarning() << "[IoTViewModel] robot gateway is null";
+        return;
+    }
 
+    m_gateway->setManualMode(robotId);
+}
+
+void IotViewModel::setRobotAutoMode(int robotId)
+{
+    if (!m_gateway) {
+        qWarning() << "[IoTViewModel] robot gateway is null";
+        return;
+    }
+
+    m_gateway->setAutoMode(robotId);
+}
+
+void IotViewModel::clearRobotError(int robotId)
+{
+    if (!m_gateway) {
+        qWarning() << "[IoTViewModel] robot gateway is null";
+        return;
+    }
+
+    m_gateway->clearError(robotId);
+}
+
+void IotViewModel::startRobotJointJog(int robotId, int joint, bool positive)
+{
+    if (!m_gateway) {
+        qWarning() << "[IoTViewModel] robot gateway is null";
+        return;
+    }
+
+    m_gateway->startJointJog(robotId, joint, positive);
+}
+
+void IotViewModel::stopRobotJointJog(int robotId)
+{
+    if (!m_gateway) {
+        qWarning() << "[IoTViewModel] robot gateway is null";
+        return;
+    }
+
+    m_gateway->stopJointJog(robotId);
+}
+// QML에서 호출됨. robotIndex는 1부터 시작하는 로봇 번호임에 유의.
 bool IotViewModel::saveThreshold(int robotIndex, const QVariantMap& thresholdData)
 {
     const int targetIndex = robotIndex - 1;

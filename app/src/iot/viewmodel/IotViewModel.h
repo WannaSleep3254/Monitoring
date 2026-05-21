@@ -63,6 +63,14 @@ public:
     int alarmCooldownSec() const;
     void setAlarmCooldownSec(int seconds);
 
+public: // Command invokers
+    Q_INVOKABLE void setRobotManualMode(int robotId);
+    Q_INVOKABLE void setRobotAutoMode(int robotId);
+    Q_INVOKABLE void clearRobotError(int robotId);
+
+    Q_INVOKABLE void startRobotJointJog(int robotId, int joint, bool positive);
+    Q_INVOKABLE void stopRobotJointJog(int robotId);
+
 signals:
     void robotModelsChanged();
     void robotThresholdsChanged();

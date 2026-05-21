@@ -2,7 +2,7 @@ import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
 
-import "qrc:/qml/components"
+import "../components"
 
 Rectangle {
     id: root
@@ -292,8 +292,22 @@ Rectangle {
                         Layout.preferredWidth: 46
                         Layout.fillWidth: false
 
-                        onPressed: console.log("[QML] Robot" + jogPanel.robotId + " jog minus:", modelData.name, jogPanel.jogMode)
-                        onReleased: console.log("[QML] Robot" + jogPanel.robotId + " jog stop:", modelData.name)
+                        onPressed: {
+                            console.log("[QML] Robot" + jogPanel.robotId + " jog minus:", modelData.name, jogPanel.jogMode)
+
+                            if (jogPanel.jogMode === "joint") {
+                                var joint = root.jointIndexFromName(modelData.name)
+                                if (joint > 0)
+                                    iotViewModel.startRobotJointJog(jogPanel.robotId, joint, false)
+                            }
+                        }
+                        onReleased: {
+                            console.log("[QML] Robot" + jogPanel.robotId + " jog stop:", modelData.name)
+
+                            if (jogPanel.jogMode === "joint") {
+                                iotViewModel.stopRobotJointJog(jogPanel.robotId)
+                            }
+                        }
                     }
 
                     TextField {
@@ -326,8 +340,22 @@ Rectangle {
                         Layout.preferredWidth: 46
                         Layout.fillWidth: false
 
-                        onPressed: console.log("[QML] Robot" + jogPanel.robotId + " jog plus:", modelData.name, jogPanel.jogMode)
-                        onReleased: console.log("[QML] Robot" + jogPanel.robotId + " jog stop:", modelData.name)
+                        onPressed: {
+                            console.log("[QML] Robot" + jogPanel.robotId + " jog plus:", modelData.name, jogPanel.jogMode)
+
+                            if (jogPanel.jogMode === "joint") {
+                                var joint = root.jointIndexFromName(modelData.name)
+                                if (joint > 0)
+                                    iotViewModel.startRobotJointJog(jogPanel.robotId, joint, true)
+                            }
+                        }
+                        onReleased: {
+                            console.log("[QML] Robot" + jogPanel.robotId + " jog stop:", modelData.name)
+
+                            if (jogPanel.jogMode === "joint") {
+                                iotViewModel.stopRobotJointJog(jogPanel.robotId)
+                            }
+                        }
                     }
                 }
             }
@@ -647,6 +675,9 @@ Rectangle {
                                 onClicked: {
                                     root.robotManualMode = true
                                     console.log("[QML] Robot manual mode")
+
+                                    iotViewModel.setRobotManualMode(1)
+                                    iotViewModel.setRobotManualMode(2)
                                 }
                             }
 
@@ -656,6 +687,9 @@ Rectangle {
                                 onClicked: {
                                     root.robotManualMode = false
                                     console.log("[QML] Robot auto mode")
+
+                                    iotViewModel.setRobotAutoMode(1)
+                                    iotViewModel.setRobotAutoMode(2)
                                 }
                             }
                         }
@@ -680,7 +714,12 @@ Rectangle {
                             PlainButton {
                                 text: "전체 에러 해제"
                                 Layout.columnSpan: 2
-                                onClicked: console.log("[QML] Clear all errors")
+                                onClicked: {
+                                    console.log("[QML] Clear all errors")
+                                    iotViewModel.clearRobotError(1)
+                                    iotViewModel.clearRobotError(2)
+                                }
+
                             }
 
                             PlainButton {
