@@ -21,6 +21,16 @@ bool ZeroMqRemoteTransportClient::start()
     if (m_running)
         return true;
 
+#ifndef ENABLE_ZEROMQ_TRANSPORT
+    const QString message =
+        QStringLiteral("ZeroMQ transport is disabled at build time");
+
+    qWarning() << "[ZeroMqTransport]" << message;
+    emit errorOccurred(message);
+    emit connectionStateChanged(false);
+
+    return false;
+#else
     // TODO:
     // - ZeroMQ context 생성
     // - SUB socket 생성
@@ -38,6 +48,7 @@ bool ZeroMqRemoteTransportClient::start()
              << "topic =" << m_config.snapshotTopic;
 
     return true;
+#endif
 }
 
 void ZeroMqRemoteTransportClient::stop()
@@ -45,10 +56,12 @@ void ZeroMqRemoteTransportClient::stop()
     if (!m_running)
         return;
 
+#ifdef ENABLE_ZEROMQ_TRANSPORT
     // TODO:
     // - SUB socket close
     // - REQ socket close
     // - worker thread stop
+#endif
 
     m_running = false;
     emit connectionStateChanged(false);
@@ -63,6 +76,14 @@ bool ZeroMqRemoteTransportClient::isRunning() const
 
 void ZeroMqRemoteTransportClient::sendCommand(const QByteArray& requestPayload)
 {
+#ifndef ENABLE_ZEROMQ_TRANSPORT
+    Q_UNUSED(requestPayload)
+
+    emit errorOccurred(
+        QStringLiteral("ZeroMQ transport is disabled at build time"));
+
+    return;
+#else
     if (!m_running) {
         emit errorOccurred(QStringLiteral("ZeroMQ transport is not running"));
         return;
@@ -74,4 +95,5 @@ void ZeroMqRemoteTransportClient::sendCommand(const QByteArray& requestPayload)
     // - commandResponsePayloadReceived(responsePayload) emit
 
     qDebug() << "[ZeroMqTransport] command request placeholder =" << requestPayload;
+#endif
 }
