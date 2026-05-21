@@ -2,6 +2,10 @@
 
 #include <QDebug>
 
+#ifdef ENABLE_ZEROMQ_TRANSPORT
+#include <zmq.hpp>
+#endif
+
 ZeroMqRemoteTransportClient::ZeroMqRemoteTransportClient(QObject* parent)
     : IRemoteTransportClient(parent)
 {
