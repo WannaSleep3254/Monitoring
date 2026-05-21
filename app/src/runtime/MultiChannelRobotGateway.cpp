@@ -1,8 +1,8 @@
 #include "MultiChannelRobotGateway.h"
-//
+// 원격 제어 transport 구현체
 #include "DryRunRemoteTransportClient.h"
 #include "ZeroMqRemoteTransportClient.h"
-//
+// 원격 메시지 생성/파싱 유틸리티
 #include "RemoteSnapshotParser.h"
 #include "RemoteCommandBuilder.h"
 #include "RemoteCommandResponseParser.h"
