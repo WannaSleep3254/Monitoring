@@ -141,8 +141,11 @@ if(ENABLE_ZEROMQ_TRANSPORT)
 
     set(ZEROMQ_ROOT "${CMAKE_SOURCE_DIR}/3rdparty/zeromq")
     set(ZEROMQ_INCLUDE_DIR "${ZEROMQ_ROOT}/include")
-    set(ZEROMQ_LIB_PATH "${ZEROMQ_ROOT}/lib/${ZEROMQ_PLATFORM_DIR}/libzmq.lib")
-    set(ZEROMQ_DLL_PATH "${ZEROMQ_ROOT}/bin/${ZEROMQ_PLATFORM_DIR}/libzmq.dll")
+    set(ZEROMQ_LIB_NAME "libzmq-mt-4_3_5.lib")
+    set(ZEROMQ_DLL_NAME "libzmq-mt-4_3_5.dll")
+
+    set(ZEROMQ_LIB_PATH "${ZEROMQ_ROOT}/lib/${ZEROMQ_PLATFORM_DIR}/${ZEROMQ_LIB_NAME}")
+    set(ZEROMQ_DLL_PATH "${ZEROMQ_ROOT}/bin/${ZEROMQ_PLATFORM_DIR}/${ZEROMQ_DLL_NAME}")
 
     if(NOT EXISTS "${ZEROMQ_INCLUDE_DIR}/zmq.h")
         message(FATAL_ERROR "Missing ZeroMQ header: ${ZEROMQ_INCLUDE_DIR}/zmq.h")
