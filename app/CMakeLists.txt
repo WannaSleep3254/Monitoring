@@ -22,6 +22,8 @@ set(RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/RobotRuntimeTypes.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/MultiChannelRobotGateway.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/MultiChannelRobotGateway.cpp
+    # 원격 통신 인터페이스
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/IRemoteTransportClient.h
     # 메시지 타입
     ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/RemoteMessageTypes.h
     # 로봇 상태 스냅샷 파싱
