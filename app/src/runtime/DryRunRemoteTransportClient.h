@@ -1,51 +1,35 @@
 #pragma once
 
-#include "IRobotGateway.h"
-#include "RobotRuntimeTypes.h"
+#include "IRemoteTransportClient.h"
 
-#include <QString>
+#include <QByteArray>
 #include <QTimer>
 
-class MultiChannelRobotGateway : public IRobotGateway
+class DryRunRemoteTransportClient : public IRemoteTransportClient
 {
     Q_OBJECT
 
 public:
-    explicit MultiChannelRobotGateway(QObject* parent = nullptr);
+    explicit DryRunRemoteTransportClient(QObject* parent = nullptr);
+
+    void configure(const RemoteTransportConfig& config) override;
 
     bool start() override;
     void stop() override;
+    bool isRunning() const override;
 
-    bool isConnected(int robotId) const override;
-
-    void setManualMode(int robotId) override;
-    void setAutoMode(int robotId) override;
-    void clearError(int robotId) override;
-
-    void startJointJog(int robotId, int joint, bool positive) override;
-    void stopJointJog(int robotId) override;
-
-    QString sourceModeName() const;
-    bool setSourceModeName(const QString& modeName);
-
-private:
-    enum class GatewaySourceMode {
-        Dummy,
-        Remote
-    };
+    void sendCommand(const QByteArray& requestPayload) override;
 
 private slots:
-    void pollSnapshots();
+    void publishDryRunSnapshots();
 
 private:
-    void publishDummySnapshot();
-    void pollRemoteSnapshots();
+    QByteArray buildSnapshotPayload(int robotId);
+    QByteArray buildCommandResponsePayload(const QByteArray& requestPayload,
+                                           QString* errorMessage = nullptr) const;
 
-    void sendRemoteCommandDryRun(const QByteArray& requestPayload,
-                                 const QString& successMessage);
-
-    QTimer m_pollTimer;
-    GatewaySourceMode m_sourceMode = GatewaySourceMode::Dummy;
-
+    RemoteTransportConfig m_config;
+    QTimer m_snapshotTimer;
+    bool m_running = false;
     quint64 m_sequence = 0;
 };
