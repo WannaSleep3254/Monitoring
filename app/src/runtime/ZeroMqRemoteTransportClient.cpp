@@ -11,6 +11,11 @@ ZeroMqRemoteTransportClient::ZeroMqRemoteTransportClient(QObject* parent)
 {
 }
 
+ZeroMqRemoteTransportClient::~ZeroMqRemoteTransportClient()
+{
+    stop();
+}
+
 void ZeroMqRemoteTransportClient::configure(const RemoteTransportConfig& config)
 {
     m_config = config;
@@ -31,23 +36,55 @@ bool ZeroMqRemoteTransportClient::start()
 
     return false;
 #else
-    // TODO:
-    // - ZeroMQ context 생성
-    // - SUB socket 생성
-    // - snapshotEndpoint connect
-    // - snapshotTopic subscribe
-    // - REQ socket 생성
-    // - commandEndpoint connect
+    try {
+        m_context = std::make_unique<zmq::context_t>(1);
 
-    m_running = true;
-    emit connectionStateChanged(true);
+        m_snapshotSocket =
+            std::make_unique<zmq::socket_t>(*m_context, zmq::socket_type::sub);
 
-    qDebug() << "[ZeroMqTransport] started"
-             << "snapshotEndpoint =" << m_config.snapshotEndpoint
-             << "commandEndpoint =" << m_config.commandEndpoint
-             << "topic =" << m_config.snapshotTopic;
+        m_commandSocket =
+            std::make_unique<zmq::socket_t>(*m_context, zmq::socket_type::req);
 
-    return true;
+        const std::string snapshotEndpoint =
+            m_config.snapshotEndpoint.toStdString();
+
+        const std::string commandEndpoint =
+            m_config.commandEndpoint.toStdString();
+
+        const std::string snapshotTopic =
+            m_config.snapshotTopic.toStdString();
+
+        m_snapshotSocket->set(zmq::sockopt::subscribe, snapshotTopic);
+        m_snapshotSocket->connect(snapshotEndpoint);
+
+        m_commandSocket->set(zmq::sockopt::linger, 0);
+        m_commandSocket->set(zmq::sockopt::rcvtimeo, m_config.commandTimeoutMs);
+        m_commandSocket->set(zmq::sockopt::sndtimeo, m_config.commandTimeoutMs);
+        m_commandSocket->connect(commandEndpoint);
+
+        m_running = true;
+        emit connectionStateChanged(true);
+
+        qDebug() << "[ZeroMqTransport] started"
+                 << "snapshotEndpoint =" << m_config.snapshotEndpoint
+                 << "commandEndpoint =" << m_config.commandEndpoint
+                 << "topic =" << m_config.snapshotTopic;
+
+        return true;
+    } catch (const zmq::error_t& error) {
+        const QString message =
+            QStringLiteral("ZeroMQ start failed: %1")
+                .arg(QString::fromLocal8Bit(error.what()));
+
+        qWarning() << "[ZeroMqTransport]" << message;
+
+        resetSockets();
+
+        emit errorOccurred(message);
+        emit connectionStateChanged(false);
+
+        return false;
+    }
 #endif
 }
 
@@ -61,6 +98,7 @@ void ZeroMqRemoteTransportClient::stop()
     // - SUB socket close
     // - REQ socket close
     // - worker thread stop
+    resetSockets();
 #endif
 
     m_running = false;
@@ -97,3 +135,30 @@ void ZeroMqRemoteTransportClient::sendCommand(const QByteArray& requestPayload)
     qDebug() << "[ZeroMqTransport] command request placeholder =" << requestPayload;
 #endif
 }
+
+#ifdef ENABLE_ZEROMQ_TRANSPORT
+void ZeroMqRemoteTransportClient::resetSockets()
+{
+    try {
+        if (m_snapshotSocket) {
+            m_snapshotSocket->close();
+        }
+
+        if (m_commandSocket) {
+            m_commandSocket->close();
+        }
+
+        if (m_context) {
+            m_context->shutdown();
+            m_context->close();
+        }
+    } catch (const zmq::error_t& error) {
+        qWarning() << "[ZeroMqTransport] reset failed:"
+                   << QString::fromLocal8Bit(error.what());
+    }
+
+    m_snapshotSocket.reset();
+    m_commandSocket.reset();
+    m_context.reset();
+}
+#endif
