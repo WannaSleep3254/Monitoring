@@ -295,3 +295,75 @@ app/src/runtime/ZeroMqRemoteTransportClient.cpp
 ```
 
 따라서 실제 Robot PC 연동 전에는 반드시 ZeroMQ 또는 TCP 구현체를 추가해야 한다.
+
+## 15. ZeroMQ Build Option Policy
+
+ZeroMQ 실제 transport는 선택 빌드 옵션으로 관리한다.
+
+```txt
+ENABLE_ZEROMQ_TRANSPORT = OFF
+```
+
+기본값은 `OFF`이다.
+
+### OFF 상태
+
+```txt
+- ZeroMQ header 검사 안 함
+- libzmq.lib 링크 안 함
+- libzmq.dll 복사 안 함
+- Dummy / DryRun transport 빌드 가능
+- ZeroMQ 미설치 개발 PC에서도 빌드 가능
+```
+
+### ON 상태
+
+```txt
+- MinGW 빌드 차단
+- MSVC 빌드만 허용
+- x64만 허용
+- MSVC 버전에 따라 3rdparty 경로 자동 선택
+- ZeroMQ include / lib / dll 존재 여부 검사
+```
+
+### 지원 범위
+
+| 구분 | 지원 상태 | Platform Directory |
+|---|---|---|
+| Qt 6.x + MSVC2022 x64 | 1차 지원 | `msvc2022_x64` |
+| Qt 5.15 + MSVC2019 x64 | 유지 가능 | `msvc2019_x64` |
+| MinGW | 보류 | 지원 안 함 |
+
+### CMake 옵션
+
+Qt Creator 또는 CMake configure 시 아래 옵션으로 활성화한다.
+
+```txt
+-DENABLE_ZEROMQ_TRANSPORT=ON
+```
+
+기본 개발 환경에서는 `OFF` 상태를 유지한다.
+
+```txt
+-DENABLE_ZEROMQ_TRANSPORT=OFF
+```
+
+### 요구 파일
+
+`ENABLE_ZEROMQ_TRANSPORT=ON`일 때 아래 파일이 필요하다.
+
+```txt
+3rdparty/zeromq/include/zmq.h
+3rdparty/zeromq/include/zmq.hpp
+3rdparty/zeromq/lib/<platform>/libzmq.lib
+3rdparty/zeromq/bin/<platform>/libzmq.dll
+```
+
+현재 CMake 기준 platform directory는 다음과 같다.
+
+```txt
+MSVC2022 x64 → msvc2022_x64
+MSVC2019 x64 → msvc2019_x64
+```
+
+ZeroMQ 파일명이 `libzmq.lib`, `libzmq.dll`과 다를 경우 CMake 경로를 실제 파일명에 맞게 수정해야 한다.
