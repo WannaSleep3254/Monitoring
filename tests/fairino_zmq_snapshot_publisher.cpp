@@ -15,6 +15,8 @@
 #include <zmq.hpp>
 #endif
 
+#include <algorithm>
+#include <cmath>
 #include <array>
 #include <atomic>
 #include <csignal>
@@ -100,6 +102,60 @@ QByteArray buildSnapshotPayload(int robotId,
         static_cast<double>(data.sequence_number);
 
     return QJsonDocument(snapshot).toJson(QJsonDocument::Compact);
+}
+
+template <typename T, std::size_t N>
+double maxAbsArray(const std::array<T, N>& values)
+{
+    double maxValue = 0.0;
+
+    for (const auto& value : values) {
+        maxValue = std::max(maxValue, std::abs(static_cast<double>(value)));
+    }
+
+    return maxValue;
+}
+
+template <typename T, std::size_t N>
+double maxArray(const std::array<T, N>& values)
+{
+    double maxValue = static_cast<double>(values.front());
+
+    for (const auto& value : values) {
+        maxValue = std::max(maxValue, static_cast<double>(value));
+    }
+
+    return maxValue;
+}
+
+void logSnapshotDiagnostics(
+    int robotId,
+    const monitoring::FairinoMonitorService::SnapshotWithMeta& data)
+{
+    const monitoring::RobotSnapshot& s = data.snapshot;
+
+    // 로그 과다 방지: 약 1초 주기
+    if (data.sequence_number % 5 != 0) {
+        return;
+    }
+
+    qInfo() << "[FairinoZmqPublisher][Diag]"
+            << "robotId =" << robotId
+            << "seq =" << static_cast<qulonglong>(data.sequence_number)
+            << "connected =" << s.connected
+            << "motion_done =" << s.motion_done
+            << "sdk_com_state =" << s.sdk_com_state
+            << "emergency_stop =" << s.emergency_stop
+            << "temperature_valid =" << s.temperature_valid
+            << "driver_torque_valid =" << s.driver_torque_valid
+            << "max_joint_torque =" << maxAbsArray(s.joint_torque)
+            << "max_driver_torque =" << maxAbsArray(s.driver_torque)
+            << "max_driver_temperature =" << maxArray(s.driver_temperature)
+            << "last_temp_error =" << s.last_temperature_error
+            << "last_driver_torque_error =" << s.last_driver_torque_error
+            << "last_poll_error_code =" << s.last_poll_error_code
+            << "last_poll_error ="
+            << QString::fromStdString(s.last_poll_error);
 }
 
 bool publishSnapshot(zmq::socket_t& socket,
@@ -190,6 +246,8 @@ int main(int argc, char* argv[])
 
         robot1.setCallback(
             [&](const monitoring::FairinoMonitorService::SnapshotWithMeta& data) {
+                logSnapshotDiagnostics(1, data);
+
                 const QByteArray payload = buildSnapshotPayload(1, data);
 
                 std::lock_guard<std::mutex> lock(publishMutex);
@@ -198,6 +256,8 @@ int main(int argc, char* argv[])
 
         robot2.setCallback(
             [&](const monitoring::FairinoMonitorService::SnapshotWithMeta& data) {
+                logSnapshotDiagnostics(2, data);
+
                 const QByteArray payload = buildSnapshotPayload(2, data);
 
                 std::lock_guard<std::mutex> lock(publishMutex);
