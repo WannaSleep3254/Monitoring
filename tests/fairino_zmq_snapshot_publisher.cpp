@@ -47,6 +47,31 @@ QJsonArray toJsonArray(const std::array<T, N>& values)
     return array;
 }
 
+
+template <typename T, std::size_t N>
+double maxAbsArray(const std::array<T, N>& values)
+{
+    double maxValue = 0.0;
+
+    for (const auto& value : values) {
+        maxValue = std::max(maxValue, std::abs(static_cast<double>(value)));
+    }
+
+    return maxValue;
+}
+
+template <typename T, std::size_t N>
+double maxArray(const std::array<T, N>& values)
+{
+    double maxValue = static_cast<double>(values.front());
+
+    for (const auto& value : values) {
+        maxValue = std::max(maxValue, static_cast<double>(value));
+    }
+
+    return maxValue;
+}
+
 QString toIsoTimestamp(const std::chrono::system_clock::time_point& timestamp)
 {
     const auto millis =
@@ -77,7 +102,17 @@ QByteArray buildSnapshotPayload(int robotId,
 
     snapshot["jointPositions"] = toJsonArray(s.joint_pos_deg);
     snapshot["tcpPose"] = toJsonArray(s.tcp_pose);
-    snapshot["torques"] = toJsonArray(s.joint_torque);
+//    snapshot["torques"] = toJsonArray(s.joint_torque);
+    snapshot["torques"] =
+        s.driver_torque_valid
+            ? toJsonArray(s.driver_torque)
+            : toJsonArray(s.joint_torque);
+
+    snapshot["torqueSource"] =
+        s.driver_torque_valid
+            ? QStringLiteral("driver_torque")
+            : QStringLiteral("joint_torque");
+
     snapshot["driverTemperatures"] = toJsonArray(s.driver_temperature);
 
     snapshot["robotState"] =
@@ -102,30 +137,6 @@ QByteArray buildSnapshotPayload(int robotId,
         static_cast<double>(data.sequence_number);
 
     return QJsonDocument(snapshot).toJson(QJsonDocument::Compact);
-}
-
-template <typename T, std::size_t N>
-double maxAbsArray(const std::array<T, N>& values)
-{
-    double maxValue = 0.0;
-
-    for (const auto& value : values) {
-        maxValue = std::max(maxValue, std::abs(static_cast<double>(value)));
-    }
-
-    return maxValue;
-}
-
-template <typename T, std::size_t N>
-double maxArray(const std::array<T, N>& values)
-{
-    double maxValue = static_cast<double>(values.front());
-
-    for (const auto& value : values) {
-        maxValue = std::max(maxValue, static_cast<double>(value));
-    }
-
-    return maxValue;
 }
 
 void logSnapshotDiagnostics(
