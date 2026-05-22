@@ -11,6 +11,8 @@
 #include <QDateTime>
 #include <QDebug>
 #include <QSettings>
+#include <QSysInfo>
+#include <QUuid>
 
 #include <algorithm>
 #include <cmath>
@@ -69,7 +71,7 @@ void MultiChannelRobotGateway::setManualMode(int robotId)
 {
     if (m_sourceMode == GatewaySourceMode::Remote) {
         const QByteArray request =
-            RemoteCommandBuilder::buildSetManualMode(robotId);
+            RemoteCommandBuilder::buildSetManualMode(robotId, controllerId());
 
         sendRemoteCommand(request);
         return;
@@ -82,7 +84,7 @@ void MultiChannelRobotGateway::setAutoMode(int robotId)
 {
     if (m_sourceMode == GatewaySourceMode::Remote) {
         const QByteArray request =
-            RemoteCommandBuilder::buildSetAutoMode(robotId);
+            RemoteCommandBuilder::buildSetAutoMode(robotId, controllerId());
 
         sendRemoteCommand(request);
         return;
@@ -95,7 +97,7 @@ void MultiChannelRobotGateway::clearError(int robotId)
 {
     if (m_sourceMode == GatewaySourceMode::Remote) {
         const QByteArray request =
-            RemoteCommandBuilder::buildClearError(robotId);
+            RemoteCommandBuilder::buildClearError(robotId, controllerId());
 
         sendRemoteCommand(request);
         return;
@@ -113,7 +115,8 @@ void MultiChannelRobotGateway::startJointJog(int robotId, int joint, bool positi
             RemoteCommandBuilder::buildStartJointJog(robotId,
                                                      joint,
                                                      positive,
-                                                     kDryRunJogSpeed);
+                                                     kDryRunJogSpeed,
+                                                     controllerId());
 
         sendRemoteCommand(request);
         return;
@@ -132,7 +135,7 @@ void MultiChannelRobotGateway::stopJointJog(int robotId)
 {
     if (m_sourceMode == GatewaySourceMode::Remote) {
         const QByteArray request =
-            RemoteCommandBuilder::buildStopJointJog(robotId);
+            RemoteCommandBuilder::buildStopJointJog(robotId, controllerId());
 
         sendRemoteCommand(request);
         return;
@@ -295,6 +298,49 @@ void MultiChannelRobotGateway::configureRemoteTransport()
              << "commandEndpoint =" << config.commandEndpoint
              << "topic =" << config.snapshotTopic
              << "timeoutMs =" << config.commandTimeoutMs;
+}
+
+QString MultiChannelRobotGateway::controllerId()
+{
+    if (!m_controllerId.trimmed().isEmpty()) {
+        return m_controllerId;
+    }
+
+    QSettings settings;
+
+    const QString configured =
+        settings.value(QStringLiteral("runtime/controllerId"))
+            .toString()
+            .trimmed();
+
+    if (!configured.isEmpty()) {
+        m_controllerId = configured;
+
+        qDebug() << "[Gateway] controllerId =" << m_controllerId;
+        return m_controllerId;
+    }
+
+    QString hostName = QSysInfo::machineHostName().trimmed();
+
+    if (hostName.isEmpty()) {
+        hostName = QStringLiteral("unknown-host");
+    }
+
+    const QString suffix =
+        QUuid::createUuid()
+            .toString(QUuid::WithoutBraces)
+            .left(8);
+
+    m_controllerId =
+        QStringLiteral("%1-%2")
+            .arg(hostName, suffix);
+
+    settings.setValue(QStringLiteral("runtime/controllerId"),
+                      m_controllerId);
+
+    qDebug() << "[Gateway] generated controllerId =" << m_controllerId;
+
+    return m_controllerId;
 }
 
 void MultiChannelRobotGateway::handleRemoteSnapshotPayload(const QByteArray& payload)

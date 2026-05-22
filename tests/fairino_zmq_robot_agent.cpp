@@ -342,6 +342,10 @@ bool ensureCommandMaster(const CommandRequest& request,
                          CommandMasterState& masterState,
                          QString& rejectMessage)
 {
+    if (isSafetyStopCommand(request.command)) {
+        return true;
+    }
+
     if (!requiresCommandMaster(request.command)) {
         return true;
     }

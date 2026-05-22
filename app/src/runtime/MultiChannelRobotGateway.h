@@ -43,17 +43,22 @@ private slots:
     void handleRemoteConnectionStateChanged(bool connected);
 
 private:
+    // Dummy source mode용 snapshot 생성 및 publish.
     void publishDummySnapshot();
 
     void ensureRemoteTransport();
     void configureRemoteTransport();
     void sendRemoteCommand(const QByteArray& requestPayload);
+    // Remote command에 포함할 고유 controller ID 생성. 앱 실행 중에는 고정값 유지.
+    QString controllerId();
 
     QTimer m_pollTimer;
     GatewaySourceMode m_sourceMode = GatewaySourceMode::Dummy;
 
     IRemoteTransportClient* m_remoteTransport = nullptr;
     bool m_remoteConnected = false;
+
+    QString m_controllerId;
 
     quint64 m_sequence = 0;
 };
