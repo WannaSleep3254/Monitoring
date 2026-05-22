@@ -18,6 +18,7 @@
 
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <csignal>
 #include <cstdint>
 #include <mutex>
@@ -30,6 +31,46 @@ std::atomic_bool g_running { true };
 void handleSignal(int)
 {
     g_running = false;
+}
+
+constexpr int kMaxRobotCount = 2;
+constexpr int kJogHeartbeatTimeoutMs = 500;
+
+using SteadyClock = std::chrono::steady_clock;
+
+struct JogWatchdogState
+{
+    bool active = false;
+    int joint = 0;
+    QString sessionId;
+    SteadyClock::time_point lastHeartbeat;
+};
+
+
+struct CommandRequest
+{
+    bool parsed = false;
+    QString error;
+
+    QString commandId;
+    int robotId = 0;
+    QString command;
+    QJsonObject params;
+};
+
+using JogWatchdogStates =
+    std::array<JogWatchdogState, kMaxRobotCount + 1>;
+
+QString defaultJogSessionId(const CommandRequest& request)
+{
+    const QString requested =
+        request.params.value("jogSessionId").toString();
+
+    if (!requested.isEmpty()) {
+        return requested;
+    }
+
+    return request.commandId;
 }
 
 template <typename T, std::size_t N>
@@ -152,16 +193,6 @@ bool publishSnapshot(zmq::socket_t& socket,
     return true;
 }
 
-struct CommandRequest
-{
-    bool parsed = false;
-    QString error;
-
-    QString commandId;
-    int robotId = 0;
-    QString command;
-    QJsonObject params;
-};
 
 CommandRequest parseCommandRequest(const QByteArray& payload)
 {
@@ -271,9 +302,53 @@ monitoring::FairinoMonitorService* selectRobot(
     return nullptr;
 }
 
+void checkJogTimeouts(JogWatchdogStates& jogStates,
+                      monitoring::FairinoMonitorService& robot1,
+                      monitoring::FairinoMonitorService& robot2)
+{
+    const auto now = SteadyClock::now();
+
+    for (int robotId = 1; robotId <= kMaxRobotCount; ++robotId) {
+        JogWatchdogState& state = jogStates[robotId];
+
+        if (!state.active) {
+            continue;
+        }
+
+        const auto elapsedMs =
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                now - state.lastHeartbeat).count();
+
+        if (elapsedMs < kJogHeartbeatTimeoutMs) {
+            continue;
+        }
+
+        monitoring::FairinoMonitorService* robot =
+            selectRobot(robotId, robot1, robot2);
+
+        if (robot && robot->isRunning()) {
+            const auto result = robot->stopJointJogEx();
+
+            qWarning() << "[FairinoZmqRobotAgent]"
+                       << "jog heartbeat timeout stop"
+                       << "robotId =" << robotId
+                       << "joint =" << state.joint
+                       << "elapsedMs =" << static_cast<qlonglong>(elapsedMs)
+                       << "ok =" << result.ok
+                       << "code =" << result.code
+                       << "message =" << QString::fromStdString(result.message);
+        }
+
+        state.active = false;
+        state.joint = 0;
+        state.sessionId.clear();
+    }
+}
+
 QByteArray executeCommand(const CommandRequest& request,
                           monitoring::FairinoMonitorService& robot1,
-                          monitoring::FairinoMonitorService& robot2)
+                          monitoring::FairinoMonitorService& robot2,
+                          JogWatchdogStates& jogStates)
 {
     monitoring::FairinoMonitorService* robot =
         selectRobot(request.robotId, robot1, robot2);
@@ -308,6 +383,18 @@ QByteArray executeCommand(const CommandRequest& request,
     } else if (request.command == QStringLiteral("stopJointJog")) {
         result = robot->stopJointJogEx();
 
+        if (request.robotId >= 1 && request.robotId <= kMaxRobotCount) {
+            JogWatchdogState& state = jogStates[request.robotId];
+
+            state.active = false;
+            state.joint = 0;
+            state.sessionId.clear();
+
+            qInfo() << "[FairinoZmqRobotAgent]"
+                    << "jog watchdog stopped"
+                    << "robotId =" << request.robotId;
+        }
+
     } else if (request.command == QStringLiteral("startJointJog")) {
         const int joint =
             request.params.value("joint").toInt(0);
@@ -333,12 +420,56 @@ QByteArray executeCommand(const CommandRequest& request,
                                         kDefaultAccPercent,
                                         kMaxJogDegree);
 
+        if (result.ok && request.robotId >= 1 && request.robotId <= kMaxRobotCount) {
+            JogWatchdogState& state = jogStates[request.robotId];
+
+            state.active = true;
+            state.joint = joint;
+            state.sessionId = defaultJogSessionId(request);
+            state.lastHeartbeat = SteadyClock::now();
+
+            qInfo() << "[FairinoZmqRobotAgent]"
+                    << "jog watchdog started"
+                    << "robotId =" << request.robotId
+                    << "joint =" << joint
+                    << "sessionId =" << state.sessionId;
+        }
+
     } else if (request.command == QStringLiteral("jogHeartbeat")) {
+        if (request.robotId < 1 || request.robotId > kMaxRobotCount) {
+            return buildResponse(request,
+                                 false,
+                                 101,
+                                 QStringLiteral("Invalid robotId for jog heartbeat"));
+        }
+
+        JogWatchdogState& state = jogStates[request.robotId];
+
+        if (!state.active) {
+            return buildResponse(request,
+                                 true,
+                                 0,
+                                 QStringLiteral("jog heartbeat ignored: no active jog"));
+        }
+
+        const QString requestedSessionId =
+            request.params.value(QStringLiteral("jogSessionId")).toString();
+
+        if (!requestedSessionId.isEmpty() &&
+            !state.sessionId.isEmpty() &&
+            requestedSessionId != state.sessionId) {
+            return buildResponse(request,
+                                 false,
+                                 101,
+                                 QStringLiteral("jog heartbeat session mismatch"));
+        }
+
+        state.lastHeartbeat = SteadyClock::now();
+
         return buildResponse(request,
                              true,
                              0,
                              QStringLiteral("jog heartbeat ok"));
-
     } else {
         return buildResponse(request,
                              false,
@@ -413,6 +544,8 @@ int main(int argc, char* argv[])
         monitoring::FairinoMonitorService robot1;
         monitoring::FairinoMonitorService robot2;
 
+        JogWatchdogStates jogStates;
+
         monitoring::FairinoMonitorService::Options opt1;
         opt1.robot_id = 1;
         opt1.poll_period_ms = 200;
@@ -459,6 +592,7 @@ int main(int argc, char* argv[])
                 repSocket.recv(requestMessage, zmq::recv_flags::none);
 
             if (!recvResult.has_value()) {
+                checkJogTimeouts(jogStates, robot1, robot2);
                 continue;
             }
 
@@ -479,7 +613,7 @@ int main(int argc, char* argv[])
                     buildParseErrorResponse(request.error);
             } else {
                 responsePayload =
-                    executeCommand(request, robot1, robot2);
+                    executeCommand(request, robot1, robot2, jogStates);
             }
 
             repSocket.send(
@@ -489,6 +623,8 @@ int main(int argc, char* argv[])
 
             qInfo() << "[FairinoZmqRobotAgent] command response ="
                     << responsePayload;
+
+            checkJogTimeouts(jogStates, robot1, robot2);
         }
 
         qInfo() << "[FairinoZmqRobotAgent] stopping...";
