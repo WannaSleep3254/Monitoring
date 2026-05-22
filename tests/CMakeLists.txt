@@ -183,6 +183,41 @@ if(ENABLE_ZEROMQ_TRANSPORT)
                 "$<TARGET_FILE_DIR:fairino_zmq_command_server>"
         )
     endif()
+
+    # ----------------------------
+    # Fairino ZeroMQ robot agent
+    # ----------------------------
+    add_executable(fairino_zmq_robot_agent
+        fairino_zmq_robot_agent.cpp
+    )
+
+    target_compile_definitions(fairino_zmq_robot_agent PRIVATE
+        ENABLE_ZEROMQ_TRANSPORT
+    )
+
+    target_include_directories(fairino_zmq_robot_agent PRIVATE
+        "${ZEROMQ_INCLUDE_DIR}"
+    )
+
+    target_link_libraries(fairino_zmq_robot_agent PRIVATE
+        Qt${QT_VERSION_MAJOR}::Core
+        monitoring_core
+        "${ZEROMQ_LIB_PATH}"
+    )
+
+    add_custom_command(TARGET fairino_zmq_robot_agent POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${ZEROMQ_DLL_PATH}"
+            "$<TARGET_FILE_DIR:fairino_zmq_robot_agent>"
+    )
+
+    if (WIN32)
+        add_custom_command(TARGET fairino_zmq_robot_agent POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${FAIRINO_LIB_DIR}/fairino.dll"
+                "$<TARGET_FILE_DIR:fairino_zmq_robot_agent>"
+        )
+    endif()
 endif()
 
 
