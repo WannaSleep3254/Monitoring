@@ -64,7 +64,7 @@ using JogWatchdogStates =
 QString defaultJogSessionId(const CommandRequest& request)
 {
     const QString requested =
-        request.params.value("jogSessionId").toString();
+        request.params.value(QStringLiteral("jogSessionId")).toString();
 
     if (!requested.isEmpty()) {
         return requested;
