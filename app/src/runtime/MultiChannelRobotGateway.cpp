@@ -12,6 +12,9 @@
 #include <QDebug>
 #include <QSettings>
 
+#include <algorithm>
+#include <cmath>
+
 MultiChannelRobotGateway::MultiChannelRobotGateway(QObject* parent)
     : IRobotGateway(parent)
 {
@@ -307,6 +310,19 @@ void MultiChannelRobotGateway::handleRemoteSnapshotPayload(const QByteArray& pay
         emit errorOccurred(0, error);
         return;
     }
+
+    const QVariantList torques =
+        parsed.snapshot.value(QStringLiteral("torques")).toList();
+
+    double maxTorque = 0.0;
+    for (const QVariant& value : torques) {
+        maxTorque = std::max(maxTorque, std::abs(value.toDouble()));
+    }
+
+    qDebug() << "[Gateway][SnapshotDiag]"
+             << "robotId =" << parsed.robotId
+             << "maxTorque =" << maxTorque
+             << "torques =" << torques;
 
     emit snapshotUpdated(parsed.robotId, parsed.snapshot);
 }

@@ -102,7 +102,7 @@ QByteArray buildSnapshotPayload(int robotId,
 
     snapshot["jointPositions"] = toJsonArray(s.joint_pos_deg);
     snapshot["tcpPose"] = toJsonArray(s.tcp_pose);
-//    snapshot["torques"] = toJsonArray(s.joint_torque);
+
     snapshot["torques"] =
         s.driver_torque_valid
             ? toJsonArray(s.driver_torque)

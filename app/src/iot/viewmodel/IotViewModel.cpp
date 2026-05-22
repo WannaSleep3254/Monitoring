@@ -15,6 +15,7 @@
 #include <QDebug>
 
 #include <algorithm>
+#include <cmath>
 #include <utility>
 
 // 실시간 알람 처리 정책:
@@ -932,12 +933,31 @@ void IotViewModel::updateRobotModelFromSnapshot(int robotId, const QVariantMap& 
         return series;
     };
 
+    auto pushLatestTorque = [](QVariantList series, const QVariantList& values) {
+        for (int i = 0; i < series.size() && i < values.size(); ++i) {
+            QVariantMap axis = series[i].toMap();
+            QVariantList history = axis.value("values").toList();
+
+            while (history.size() >= 6) {
+                history.removeFirst();
+            }
+
+            history.push_back(std::abs(values[i].toDouble()));
+
+            axis["values"] = history;
+            series[i] = axis;
+        }
+
+        return series;
+    };
+
     if (!temperatures.isEmpty()) {
         tempSeries = pushLatest(tempSeries, temperatures);
     }
 
     if (!torques.isEmpty()) {
-        torqueSeries = pushLatest(torqueSeries, torques);
+//        torqueSeries = pushLatest(torqueSeries, torques);
+        torqueSeries = pushLatestTorque(torqueSeries, torques);
     }
 
     robot["tempSeries"] = tempSeries;
@@ -950,6 +970,7 @@ void IotViewModel::updateRobotModelFromSnapshot(int robotId, const QVariantMap& 
 
 void IotViewModel::evaluateAlarms(int robotId, const QVariantMap& snapshot)
 {
+#if false
     const QVariantMap threshold = thresholdForRobot(robotId);
 
     const QVariantList temperatures = snapshot.value("driverTemperatures").toList();
@@ -970,6 +991,38 @@ void IotViewModel::evaluateAlarms(int robotId, const QVariantMap& snapshot)
                          "torque",
                          torques,
                          torqueThreshold);
+#else
+    const QVariantMap threshold = thresholdForRobot(robotId);
+
+    const QVariantList temperatures =
+        snapshot.value("driverTemperatures").toList();
+
+    const QVariantList rawTorques =
+        snapshot.value("torques").toList();
+
+    QVariantList torques;
+    torques.reserve(rawTorques.size());
+
+    for (const QVariant& value : rawTorques) {
+        torques.push_back(std::abs(value.toDouble()));
+    }
+
+    const QVariantMap temperatureThreshold =
+        threshold.value("temperature").toMap();
+
+    const QVariantMap torqueThreshold =
+        threshold.value("torque").toMap();
+
+    evaluateMetricAlarms(robotId,
+                         "temperature",
+                         temperatures,
+                         temperatureThreshold);
+
+    evaluateMetricAlarms(robotId,
+                         "torque",
+                         torques,
+                         torqueThreshold);
+#endif
 }
 
 void IotViewModel::evaluateMetricAlarms(int robotId,
