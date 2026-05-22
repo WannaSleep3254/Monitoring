@@ -6,6 +6,7 @@
 #include <zmq.hpp>
 
 #include <optional>
+#include <chrono>
 #endif
 
 ZeroMqRemoteTransportClient::ZeroMqRemoteTransportClient(QObject* parent)
@@ -57,6 +58,7 @@ bool ZeroMqRemoteTransportClient::start()
             m_config.snapshotTopic.toStdString();
 
         m_snapshotSocket->set(zmq::sockopt::subscribe, snapshotTopic);
+        m_snapshotSocket->set(zmq::sockopt::rcvtimeo, 100);
         m_snapshotSocket->connect(snapshotEndpoint);
 
         m_commandSocket->set(zmq::sockopt::linger, 0);
@@ -65,6 +67,8 @@ bool ZeroMqRemoteTransportClient::start()
         m_commandSocket->connect(commandEndpoint);
 
         m_running = true;
+        startSnapshotWorker();
+
         emit connectionStateChanged(true);
 
         qDebug() << "[ZeroMqTransport] started"
@@ -175,6 +179,7 @@ void ZeroMqRemoteTransportClient::sendCommand(const QByteArray& requestPayload)
 void ZeroMqRemoteTransportClient::cleanupTransport()
 {
 #ifdef ENABLE_ZEROMQ_TRANSPORT
+    stopSnapshotWorker();
     resetSockets();
 #endif
 
@@ -182,6 +187,90 @@ void ZeroMqRemoteTransportClient::cleanupTransport()
 }
 
 #ifdef ENABLE_ZEROMQ_TRANSPORT
+void ZeroMqRemoteTransportClient::startSnapshotWorker()
+{
+    if (m_snapshotThreadRunning)
+        return;
+
+    m_snapshotThreadRunning = true;
+
+    m_snapshotThread =
+        std::thread([this]() {
+            snapshotReceiveLoop();
+        });
+}
+
+void ZeroMqRemoteTransportClient::stopSnapshotWorker()
+{
+    if (!m_snapshotThreadRunning)
+        return;
+
+    m_snapshotThreadRunning = false;
+
+    if (m_snapshotThread.joinable()) {
+        m_snapshotThread.join();
+    }
+}
+
+void ZeroMqRemoteTransportClient::snapshotReceiveLoop()
+{
+    qDebug() << "[ZeroMqTransport] snapshot worker started";
+
+    while (m_snapshotThreadRunning) {
+        try {
+            if (!m_snapshotSocket) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                continue;
+            }
+
+            zmq::message_t topicMessage;
+            const auto topicResult =
+                m_snapshotSocket->recv(topicMessage, zmq::recv_flags::none);
+
+            if (!topicResult.has_value()) {
+                continue; // timeout
+            }
+
+            zmq::message_t payloadMessage;
+            const auto payloadResult =
+                m_snapshotSocket->recv(payloadMessage, zmq::recv_flags::none);
+
+            if (!payloadResult.has_value()) {
+                emit errorOccurred(
+                    QStringLiteral("ZeroMQ snapshot payload frame missing"));
+                continue;
+            }
+
+            const QByteArray topicPayload(
+                static_cast<const char*>(topicMessage.data()),
+                static_cast<int>(topicMessage.size()));
+
+            const QByteArray snapshotPayload(
+                static_cast<const char*>(payloadMessage.data()),
+                static_cast<int>(payloadMessage.size()));
+
+            Q_UNUSED(topicPayload)
+
+            emit snapshotPayloadReceived(snapshotPayload);
+
+        } catch (const zmq::error_t& error) {
+            if (!m_snapshotThreadRunning)
+                break;
+
+            const QString message =
+                QStringLiteral("ZeroMQ snapshot receive failed: %1")
+                    .arg(QString::fromLocal8Bit(error.what()));
+
+            qWarning() << "[ZeroMqTransport]" << message;
+            emit errorOccurred(message);
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+    }
+
+    qDebug() << "[ZeroMqTransport] snapshot worker stopped";
+}
+
 void ZeroMqRemoteTransportClient::resetSockets()
 {
     try {

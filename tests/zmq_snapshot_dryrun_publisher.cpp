@@ -100,11 +100,6 @@ int main(int argc, char* argv[])
 {
     QCoreApplication app(argc, argv);
 
-#ifndef ENABLE_ZEROMQ_TRANSPORT
-    qCritical() << "[ZmqSnapshotDryRunPublisher]"
-                << "ZeroMQ transport is disabled at build time";
-    return 1;
-#else
     const QString endpoint =
         app.arguments().size() >= 2
             ? app.arguments().at(1)
@@ -136,17 +131,7 @@ int main(int argc, char* argv[])
 
                 const QByteArray payload =
                     buildSnapshot(robotId, sequenceNumber);
-#if false
-                socket.send(
-                    zmq::buffer(topic.toUtf8().constData(),
-                                static_cast<size_t>(topic.toUtf8().size())),
-                    zmq::send_flags::sndmore);
 
-                socket.send(
-                    zmq::buffer(payload.constData(),
-                                static_cast<size_t>(payload.size())),
-                    zmq::send_flags::none);
-#else
                 const QByteArray topicPayload = topic.toUtf8();
 
                 socket.send(
@@ -158,7 +143,7 @@ int main(int argc, char* argv[])
                     zmq::buffer(payload.constData(),
                                 static_cast<size_t>(payload.size())),
                     zmq::send_flags::none);
-#endif
+
                 qInfo() << "[ZmqSnapshotDryRunPublisher] topic ="
                         << topic
                         << "payload bytes ="
@@ -175,5 +160,4 @@ int main(int argc, char* argv[])
     }
 
     return 0;
-#endif
 }

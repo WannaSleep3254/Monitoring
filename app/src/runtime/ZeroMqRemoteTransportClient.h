@@ -5,6 +5,8 @@
 #include <QByteArray>
 
 #include <memory>
+#include <atomic>
+#include <thread>
 
 #ifdef ENABLE_ZEROMQ_TRANSPORT
 namespace zmq
@@ -35,10 +37,16 @@ private:
 
 #ifdef ENABLE_ZEROMQ_TRANSPORT
     void resetSockets();
+    void startSnapshotWorker();
+    void stopSnapshotWorker();
+    void snapshotReceiveLoop();
 
     std::unique_ptr<zmq::context_t> m_context;
     std::unique_ptr<zmq::socket_t> m_snapshotSocket;
     std::unique_ptr<zmq::socket_t> m_commandSocket;
+
+    std::thread m_snapshotThread;
+    std::atomic_bool m_snapshotThreadRunning { false };
 #endif
 
     RemoteTransportConfig m_config;
