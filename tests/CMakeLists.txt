@@ -147,7 +147,7 @@ if(ENABLE_ZEROMQ_TRANSPORT)
                 "${FAIRINO_LIB_DIR}/fairino.dll"
                 "$<TARGET_FILE_DIR:fairino_zmq_snapshot_publisher>"
         )
-endif()
+    endif()
 endif()
 
 
