@@ -35,6 +35,7 @@ void handleSignal(int)
 
 constexpr int kMaxRobotCount = 2;
 constexpr int kJogHeartbeatTimeoutMs = 500;
+constexpr int kCommandMasterLeaseTimeoutMs = 3000;
 
 using SteadyClock = std::chrono::steady_clock;
 
@@ -55,7 +56,15 @@ struct CommandRequest
     QString commandId;
     int robotId = 0;
     QString command;
+    QString operatorName;
     QJsonObject params;
+};
+
+struct CommandMasterState
+{
+    bool active = false;
+    QString ownerId;
+    SteadyClock::time_point lastCommand;
 };
 
 using JogWatchdogStates =
@@ -71,6 +80,17 @@ QString defaultJogSessionId(const CommandRequest& request)
     }
 
     return request.commandId;
+}
+
+QString commandOwnerId(const CommandRequest& request)
+{
+    if (!request.operatorName.trimmed().isEmpty()) {
+        return request.operatorName.trimmed();
+    }
+
+    // 현재 GUI에서 operator를 아직 안 보내므로 fallback 사용.
+    // 다중 GUI 제어권 구분은 다음 단계에서 clientId/operatorName 전달 필요.
+    return QStringLiteral("default-controller");
 }
 
 template <typename T, std::size_t N>
@@ -224,6 +244,7 @@ CommandRequest parseCommandRequest(const QByteArray& payload)
     result.commandId = object.value("commandId").toString();
     result.robotId = object.value("robotId").toInt(0);
     result.command = object.value("command").toString();
+    result.operatorName = object.value(QStringLiteral("operator")).toString();
     result.params = object.value("params").toObject();
 
     if (result.commandId.isEmpty()) {
@@ -288,6 +309,21 @@ QByteArray buildParseErrorResponse(const QString& error)
     return QJsonDocument(response).toJson(QJsonDocument::Compact);
 }
 
+bool requiresCommandMaster(const QString& command)
+{
+    return command == QStringLiteral("setManualMode") ||
+           command == QStringLiteral("setAutoMode") ||
+           command == QStringLiteral("clearError") ||
+           command == QStringLiteral("startJointJog") ||
+           command == QStringLiteral("jogHeartbeat");
+}
+
+bool isSafetyStopCommand(const QString& command)
+{
+    return command == QStringLiteral("stopJointJog") ||
+           command == QStringLiteral("stop");
+}
+
 monitoring::FairinoMonitorService* selectRobot(
     int robotId,
     monitoring::FairinoMonitorService& robot1,
@@ -300,6 +336,57 @@ monitoring::FairinoMonitorService* selectRobot(
         return &robot2;
 
     return nullptr;
+}
+
+bool ensureCommandMaster(const CommandRequest& request,
+                         CommandMasterState& masterState,
+                         QString& rejectMessage)
+{
+    if (!requiresCommandMaster(request.command)) {
+        return true;
+    }
+
+    const QString ownerId = commandOwnerId(request);
+    const auto now = SteadyClock::now();
+
+    if (masterState.active) {
+        const auto elapsedMs =
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                now - masterState.lastCommand).count();
+
+        if (elapsedMs >= kCommandMasterLeaseTimeoutMs) {
+            qWarning() << "[FairinoZmqRobotAgent]"
+                       << "command master lease expired"
+                       << "owner =" << masterState.ownerId
+                       << "elapsedMs =" << static_cast<qlonglong>(elapsedMs);
+
+            masterState.active = false;
+            masterState.ownerId.clear();
+        }
+    }
+
+    if (!masterState.active) {
+        masterState.active = true;
+        masterState.ownerId = ownerId;
+        masterState.lastCommand = now;
+
+        qInfo() << "[FairinoZmqRobotAgent]"
+                << "command master acquired"
+                << "owner =" << masterState.ownerId;
+
+        return true;
+    }
+
+    if (masterState.ownerId == ownerId) {
+        masterState.lastCommand = now;
+        return true;
+    }
+
+    rejectMessage =
+        QStringLiteral("Command master is held by %1")
+            .arg(masterState.ownerId);
+
+    return false;
 }
 
 void checkJogTimeouts(JogWatchdogStates& jogStates,
@@ -348,7 +435,8 @@ void checkJogTimeouts(JogWatchdogStates& jogStates,
 QByteArray executeCommand(const CommandRequest& request,
                           monitoring::FairinoMonitorService& robot1,
                           monitoring::FairinoMonitorService& robot2,
-                          JogWatchdogStates& jogStates)
+                          JogWatchdogStates& jogStates,
+                          CommandMasterState& masterState)
 {
     monitoring::FairinoMonitorService* robot =
         selectRobot(request.robotId, robot1, robot2);
@@ -359,6 +447,14 @@ QByteArray executeCommand(const CommandRequest& request,
                              102,
                              QStringLiteral("Robot not found: %1")
                                  .arg(request.robotId));
+    }
+
+    QString masterRejectMessage;
+    if (!ensureCommandMaster(request, masterState, masterRejectMessage)) {
+        return buildResponse(request,
+                             false,
+                             400,
+                             masterRejectMessage);
     }
 
     if (!robot->isRunning()) {
@@ -393,6 +489,15 @@ QByteArray executeCommand(const CommandRequest& request,
             qInfo() << "[FairinoZmqRobotAgent]"
                     << "jog watchdog stopped"
                     << "robotId =" << request.robotId;
+        }
+
+        if (masterState.active) {
+            qInfo() << "[FairinoZmqRobotAgent]"
+                    << "command master released by stopJointJog"
+                    << "owner =" << masterState.ownerId;
+
+            masterState.active = false;
+            masterState.ownerId.clear();
         }
 
     } else if (request.command == QStringLiteral("startJointJog")) {
@@ -545,6 +650,7 @@ int main(int argc, char* argv[])
         monitoring::FairinoMonitorService robot2;
 
         JogWatchdogStates jogStates;
+        CommandMasterState commandMaster;
 
         monitoring::FairinoMonitorService::Options opt1;
         opt1.robot_id = 1;
@@ -613,7 +719,7 @@ int main(int argc, char* argv[])
                     buildParseErrorResponse(request.error);
             } else {
                 responsePayload =
-                    executeCommand(request, robot1, robot2, jogStates);
+                    executeCommand(request, robot1, robot2, jogStates, commandMaster);
             }
 
             repSocket.send(
