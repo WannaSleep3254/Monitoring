@@ -318,12 +318,12 @@ void MultiChannelRobotGateway::handleRemoteSnapshotPayload(const QByteArray& pay
     for (const QVariant& value : torques) {
         maxTorque = std::max(maxTorque, std::abs(value.toDouble()));
     }
-
+#if false
     qDebug() << "[Gateway][SnapshotDiag]"
              << "robotId =" << parsed.robotId
              << "maxTorque =" << maxTorque
              << "torques =" << torques;
-
+#endif
     emit snapshotUpdated(parsed.robotId, parsed.snapshot);
 }
 

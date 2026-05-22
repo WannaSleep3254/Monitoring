@@ -970,28 +970,6 @@ void IotViewModel::updateRobotModelFromSnapshot(int robotId, const QVariantMap& 
 
 void IotViewModel::evaluateAlarms(int robotId, const QVariantMap& snapshot)
 {
-#if false
-    const QVariantMap threshold = thresholdForRobot(robotId);
-
-    const QVariantList temperatures = snapshot.value("driverTemperatures").toList();
-    const QVariantList torques = snapshot.value("torques").toList();
-
-    const QVariantMap temperatureThreshold =
-        threshold.value("temperature").toMap();
-
-    const QVariantMap torqueThreshold =
-        threshold.value("torque").toMap();
-
-    evaluateMetricAlarms(robotId,
-                         "temperature",
-                         temperatures,
-                         temperatureThreshold);
-
-    evaluateMetricAlarms(robotId,
-                         "torque",
-                         torques,
-                         torqueThreshold);
-#else
     const QVariantMap threshold = thresholdForRobot(robotId);
 
     const QVariantList temperatures =
@@ -1022,7 +1000,6 @@ void IotViewModel::evaluateAlarms(int robotId, const QVariantMap& snapshot)
                          "torque",
                          torques,
                          torqueThreshold);
-#endif
 }
 
 void IotViewModel::evaluateMetricAlarms(int robotId,
