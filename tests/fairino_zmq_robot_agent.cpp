@@ -395,7 +395,8 @@ bool ensureCommandMaster(const CommandRequest& request,
 
 void checkJogTimeouts(JogWatchdogStates& jogStates,
                       monitoring::FairinoMonitorService& robot1,
-                      monitoring::FairinoMonitorService& robot2)
+                      monitoring::FairinoMonitorService& robot2,
+                      CommandMasterState& masterState)
 {
     const auto now = SteadyClock::now();
 
@@ -433,6 +434,16 @@ void checkJogTimeouts(JogWatchdogStates& jogStates,
         state.active = false;
         state.joint = 0;
         state.sessionId.clear();
+
+        if (masterState.active) {
+            qInfo() << "[FairinoZmqRobotAgent]"
+                    << "command master released by jog timeout"
+                    << "owner =" << masterState.ownerId
+                    << "robotId =" << robotId;
+
+            masterState.active = false;
+            masterState.ownerId.clear();
+        }
     }
 }
 
@@ -702,7 +713,7 @@ int main(int argc, char* argv[])
                 repSocket.recv(requestMessage, zmq::recv_flags::none);
 
             if (!recvResult.has_value()) {
-                checkJogTimeouts(jogStates, robot1, robot2);
+                checkJogTimeouts(jogStates, robot1, robot2, commandMaster);
                 continue;
             }
 
@@ -734,7 +745,7 @@ int main(int argc, char* argv[])
             qInfo() << "[FairinoZmqRobotAgent] command response ="
                     << responsePayload;
 
-            checkJogTimeouts(jogStates, robot1, robot2);
+            checkJogTimeouts(jogStates, robot1, robot2, commandMaster);
         }
 
         qInfo() << "[FairinoZmqRobotAgent] stopping...";
