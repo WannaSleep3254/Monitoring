@@ -144,6 +144,26 @@ void MultiChannelRobotGateway::stopJointJog(int robotId)
     emit commandFinished(robotId, "stopJointJog", true, 0, "dummy jog stop");
 }
 
+void MultiChannelRobotGateway::sendJogHeartbeat(int robotId,
+                                                const QString& jogSessionId)
+{
+    if (m_sourceMode == GatewaySourceMode::Remote) {
+        const QByteArray request =
+            RemoteCommandBuilder::buildJogHeartbeat(robotId,
+                                                    jogSessionId,
+                                                    controllerId());
+
+        sendRemoteCommand(request);
+        return;
+    }
+
+    emit commandFinished(robotId,
+                         QStringLiteral("jogHeartbeat"),
+                         true,
+                         0,
+                         QStringLiteral("dummy jog heartbeat"));
+}
+
 QString MultiChannelRobotGateway::sourceModeName() const
 {
     switch (m_sourceMode) {

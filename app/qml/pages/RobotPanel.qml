@@ -235,6 +235,46 @@ Rectangle {
         property string jogMode: "joint"
         property var jogModel: []
 
+        property int activeJogJoint: 0
+        property bool activeJogPositive: true
+        property int jogHeartbeatIntervalMs: 150
+
+        function startJointJogWithHeartbeat(joint, positive) {
+            if (joint <= 0)
+                return
+
+            activeJogJoint = joint
+            activeJogPositive = positive
+
+            iotViewModel.startRobotJointJog(robotId, joint, positive)
+            jogHeartbeatTimer.restart()
+        }
+
+        function stopJointJogWithHeartbeat() {
+            jogHeartbeatTimer.stop()
+
+            if (activeJogJoint > 0) {
+                iotViewModel.stopRobotJointJog(robotId)
+            }
+
+            activeJogJoint = 0
+        }
+
+        Timer {
+            id: jogHeartbeatTimer
+            interval: jogPanel.jogHeartbeatIntervalMs
+            repeat: true
+            running: false
+
+            onTriggered: {
+                if (jogPanel.activeJogJoint > 0) {
+                    iotViewModel.sendRobotJogHeartbeat(jogPanel.robotId)
+                } else {
+                    stop()
+                }
+            }
+        }
+
         Layout.fillWidth: true
         Layout.preferredHeight: 44 + 28 + 4 + (jogModel.length * 28) + ((jogModel.length - 1) * 4)
 
@@ -308,14 +348,21 @@ Rectangle {
                             if (jogPanel.jogMode === "joint") {
                                 var joint = root.jointIndexFromName(modelData.name)
                                 if (joint > 0)
-                                    iotViewModel.startRobotJointJog(jogPanel.robotId, joint, false)
+                                    jogPanel.startJointJogWithHeartbeat(joint, false)
                             }
                         }
                         onReleased: {
                             console.log("[QML] Robot" + jogPanel.robotId + " jog stop:", modelData.name)
 
                             if (jogPanel.jogMode === "joint") {
-                                iotViewModel.stopRobotJointJog(jogPanel.robotId)
+                                jogPanel.stopJointJogWithHeartbeat()
+                            }
+                        }
+                        onCanceled: {
+                            console.log("[QML] Robot" + jogPanel.robotId + " jog canceled:", modelData.name)
+
+                            if (jogPanel.jogMode === "joint") {
+                                jogPanel.stopJointJogWithHeartbeat()
                             }
                         }
                     }
@@ -356,14 +403,21 @@ Rectangle {
                             if (jogPanel.jogMode === "joint") {
                                 var joint = root.jointIndexFromName(modelData.name)
                                 if (joint > 0)
-                                    iotViewModel.startRobotJointJog(jogPanel.robotId, joint, true)
+                                    jogPanel.startJointJogWithHeartbeat(joint, true)
                             }
                         }
                         onReleased: {
                             console.log("[QML] Robot" + jogPanel.robotId + " jog stop:", modelData.name)
 
                             if (jogPanel.jogMode === "joint") {
-                                iotViewModel.stopRobotJointJog(jogPanel.robotId)
+                                jogPanel.stopJointJogWithHeartbeat()
+                            }
+                        }
+                        onCanceled: {
+                            console.log("[QML] Robot" + jogPanel.robotId + " jog canceled:", modelData.name)
+
+                            if (jogPanel.jogMode === "joint") {
+                                jogPanel.stopJointJogWithHeartbeat()
                             }
                         }
                     }

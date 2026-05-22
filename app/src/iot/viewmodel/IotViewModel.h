@@ -70,6 +70,7 @@ public: // Command invokers
 
     Q_INVOKABLE void startRobotJointJog(int robotId, int joint, bool positive);
     Q_INVOKABLE void stopRobotJointJog(int robotId);
+    Q_INVOKABLE void sendRobotJogHeartbeat(int robotId);
 
 signals:
     void robotModelsChanged();

@@ -24,6 +24,8 @@ public:
 
     void startJointJog(int robotId, int joint, bool positive) override;
     void stopJointJog(int robotId) override;
+    void sendJogHeartbeat(int robotId,
+                          const QString& jogSessionId = QString()) override;
 
     QString sourceModeName() const;
     bool setSourceModeName(const QString& modeName);

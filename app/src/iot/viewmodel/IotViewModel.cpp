@@ -218,6 +218,16 @@ void IotViewModel::stopRobotJointJog(int robotId)
 
     m_gateway->stopJointJog(robotId);
 }
+
+void IotViewModel::sendRobotJogHeartbeat(int robotId)
+{
+    if (!m_gateway) {
+        qWarning() << "[IoTViewModel] robot gateway is null";
+        return;
+    }
+
+    m_gateway->sendJogHeartbeat(robotId);
+}
 // QML에서 호출됨. robotIndex는 1부터 시작하는 로봇 번호임에 유의.
 bool IotViewModel::saveThreshold(int robotIndex, const QVariantMap& thresholdData)
 {

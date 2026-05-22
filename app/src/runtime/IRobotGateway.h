@@ -26,6 +26,8 @@ public:
 
     virtual void startJointJog(int robotId, int joint, bool positive) = 0;
     virtual void stopJointJog(int robotId) = 0;
+    virtual void sendJogHeartbeat(int robotId,
+                                  const QString& jogSessionId = QString()) = 0;
 
 signals:
     void snapshotUpdated(int robotId, QVariantMap snapshot);
