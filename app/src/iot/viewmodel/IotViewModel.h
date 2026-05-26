@@ -15,41 +15,56 @@ class IRobotGateway;
 class IotViewModel : public QObject
 {
     Q_OBJECT
-    // Q_PROPERTY는 QML에서 바인딩과 알림을 위해 사용됩니다. 각 프로퍼티는 getter 메서드와 변경 알림 시그널을 정의합니다.
-    // robotModels는 로봇별 상태와 예측 정보를 포함하는 모델 리스트입니다. QML에서는 이 리스트를 바인딩하여 대시보드에 표시합니다.
+    // ============================================================
+    // QML-exposed properties
+    // ============================================================
+    // Q_PROPERTY는 QML 바인딩을 위한 공개 상태입니다.
+    // 각 프로퍼티는 getter와 NOTIFY signal을 통해 QML 화면에 상태 변화를 전달합니다.
+
+    // 로봇별 실시간 상태, 온도/부하 그래프, 알람 정보를 포함하는 모델 리스트입니다.
+    // RobotPanel / IoTPanel 등 QML 화면에서 로봇 상태 표시용으로 사용합니다.
     Q_PROPERTY(QVariantList robotModels
                     READ robotModels
                     NOTIFY robotModelsChanged)
-    // 임계값은 robotId별로 저장되며, QML에서는 리스트 형태로 전체 임계값을 관리합니다. 실제로는 robotId를 키로 하는 맵이 내부적으로 관리됩니다.
+    // 로봇별 온도/부하 임계값 리스트입니다.
+    // 내부적으로는 robotId 기준으로 관리되며, QML에서는 임계값 설정 화면에 바인딩합니다.
     Q_PROPERTY(QVariantList robotThresholds
                     READ robotThresholds
                     NOTIFY robotThresholdsChanged)
-    // historyRows는 알람과 조치 이력을 포함하는 리스트입니다. QML에서는 이 리스트를 바인딩하여 히스토리 테이블에 표시합니다.
+    // 알람 및 작업자 조치 이력 조회 결과입니다.
+    // QML의 이력 조회 테이블에 표시됩니다.
     Q_PROPERTY(QVariantList historyRows
                     READ historyRows
                     NOTIFY historyRowsChanged)
-    // lastExportPath는 CSV 내보내기 기능에서 마지막으로 사용된 파일 경로를 저장합니다. QML에서는 이 값을 바인딩하여 내보내기 후 사용자에게 경로를 표시할 수 있습니다.
+    // CSV 내보내기 후 마지막으로 생성된 파일 경로입니다.
+    // QML에서 내보내기 완료 메시지 또는 파일 경로 표시용으로 사용합니다.
     Q_PROPERTY(QString lastExportPath
                     READ lastExportPath
                     NOTIFY lastExportPathChanged)
-    // lastError는 데이터베이스 작업이나 기타 오류 발생 시 마지막 에러 메시지를 저장합니다. QML에서는 이 값을 바인딩하여 오류 메시지를 사용자에게 표시할 수 있습니다.
+    // 최근 오류 메시지입니다.
+    // DB 처리 실패, command 실패 등 사용자에게 표시할 마지막 오류 상태를 저장합니다.
     Q_PROPERTY(QString lastError
                     READ lastError
                     NOTIFY lastErrorChanged)
-    // lastCleanupSummary는 오래된 히스토리 삭제 작업 후 요약 정보를 저장합니다. QML에서는 이 값을 바인딩하여 삭제 결과를 사용자에게 표시할 수 있습니다.
+    // 마지막 원격 명령 실행 결과입니다.
+    // RobotPanel의 "최근 명령 결과" 영역에 바인딩됩니다.
+    // 예: robotId, command, ok, code, message, timestamp
     Q_PROPERTY(QVariantMap lastCommandResult
                     READ lastCommandResult
                     NOTIFY lastCommandResultChanged)
-    // alarmHistoryInsertEnabled는 알람 발생 시 DB 이력 저장 여부를 제어하는 플래그입니다. QML에서는 이 값을 바인딩하여 사용자가 설정을 토글할 수 있습니다.
+    // 오래된 히스토리 삭제 작업의 마지막 결과 요약입니다.
+    // 예: 삭제 대상 기간, 삭제 건수, 성공 여부 등을 QML에 표시할 때 사용합니다.
     Q_PROPERTY(QVariantMap lastCleanupSummary
                     READ lastCleanupSummary
                     NOTIFY lastCleanupSummaryChanged)
-    // alarmCooldownSec는 동일한 알람의 반복 저장/표시 억제 시간을 초 단위로 설정하는 프로퍼티입니다. QML에서는 이 값을 바인딩하여 사용자가 조정할 수 있습니다.
+    // 알람 발생 시 DB 이력 자동 저장 여부입니다.
+    // false이면 화면에는 알람을 표시하지만 DB에는 자동 저장하지 않습니다.
     Q_PROPERTY(bool alarmHistoryInsertEnabled
                     READ alarmHistoryInsertEnabled
                     WRITE setAlarmHistoryInsertEnabled
                     NOTIFY alarmHistoryInsertEnabledChanged)
-    // alarmCooldownSec는 동일한 알람의 반복 저장/표시 억제 시간을 초 단위로 설정하는 프로퍼티입니다. QML에서는 이 값을 바인딩하여 사용자가 조정할 수 있습니다.
+    // 동일 알람의 반복 저장/표시 억제 시간입니다.
+    // robotId + axis + metric + level 기준으로 cooldown 시간 내 중복 알람을 억제합니다.
     Q_PROPERTY(int alarmCooldownSec
                     READ alarmCooldownSec
                     WRITE setAlarmCooldownSec
@@ -79,8 +94,6 @@ public:
     Q_INVOKABLE bool confirmAlarmAction(const QVariantMap& alarmRow);
     Q_INVOKABLE bool saveAction(const QVariantMap& actionData);
     Q_INVOKABLE bool deleteOldHistoryDays(int retentionDays);
-
-
 
     bool alarmHistoryInsertEnabled() const;
     void setAlarmHistoryInsertEnabled(bool enabled);
@@ -127,9 +140,9 @@ private:
     // ============================================================
     // Alarm evaluation
     // ============================================================
-    // temperature/torque  임계값 비교
+    // snapshot에 포함된 온도/부하 값을 임계값과 비교하여 알람을 평가합니다.
     void evaluateAlarms(int robotId, const QVariantMap& snapshot);
-    // 온도와 부하/토크를 공통 처리
+    // temperature, torque 등 축별 metric 값을 공통 로직으로 평가합니다.
     void evaluateMetricAlarms(int robotId,
                               const QString& metric,
                               const QVariantList& values,
