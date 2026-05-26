@@ -113,6 +113,11 @@ void IotViewModel::setRobotGateway(IRobotGateway* gateway)
             &IRobotGateway::snapshotUpdated,
             this,
             &IotViewModel::onSnapshotUpdated);
+
+    connect(m_gateway,
+            &IRobotGateway::commandFinished,
+            this,
+            &IotViewModel::onCommandFinished);
 }
 
 QVariantList IotViewModel::robotModels() const
@@ -128,6 +133,11 @@ QVariantList IotViewModel::robotThresholds() const
 QString IotViewModel::lastError() const
 {
     return m_lastError;
+}
+
+QVariantMap IotViewModel::lastCommandResult() const
+{
+    return m_lastCommandResult;
 }
 
 QVariantMap IotViewModel::lastCleanupSummary() const
@@ -800,6 +810,49 @@ void IotViewModel::onSnapshotUpdated(int robotId, QVariantMap snapshot)
     qDebug() << "[IoTViewModel] snapshot received robot =" << robotId
              << "seq =" << snapshot.value("sequenceNumber").toULongLong();
 #endif
+}
+
+void IotViewModel::onCommandFinished(int robotId,
+                                     QString command,
+                                     bool ok,
+                                     int code,
+                                     QString message)
+{
+    QVariantMap result;
+    result["timestamp"] =
+        QDateTime::currentDateTime().toString(Qt::ISODateWithMs);
+    result["robotId"] = robotId;
+    result["command"] = command;
+    result["ok"] = ok;
+    result["code"] = code;
+    result["message"] = message;
+
+    m_lastCommandResult = result;
+
+    if (!ok) {
+        m_lastError =
+            QStringLiteral("Robot %1 command failed: %2, code=%3, message=%4")
+                .arg(robotId)
+                .arg(command)
+                .arg(code)
+                .arg(message);
+
+        emit lastErrorChanged();
+
+        qWarning() << "[IoTViewModel] command failed"
+                   << "robotId =" << robotId
+                   << "command =" << command
+                   << "code =" << code
+                   << "message =" << message;
+    } else {
+        qDebug() << "[IoTViewModel] command finished"
+                 << "robotId =" << robotId
+                 << "command =" << command
+                 << "code =" << code
+                 << "message =" << message;
+    }
+
+    emit lastCommandResultChanged();
 }
 
 QVariantMap IotViewModel::defaultThreshold() const

@@ -542,7 +542,7 @@ Rectangle {
                 onConnectClicked: console.log("[QML] Robot" + robotColumn.robotId + " communication toggle")
                 onAlarmResetClicked: console.log("[QML] Robot" + robotColumn.robotId + " alarm reset")
             }
-
+            // 섹션1: 초기화 / 대기
             SectionLabel { text: "초기화 / 대기" }
 
             Rectangle {
@@ -568,7 +568,7 @@ Rectangle {
                     }
                 }
             }
-
+            // 섹션2: 기준점 확인
             SectionLabel { text: "기준점 확인" }
 
             Rectangle {
@@ -595,7 +595,7 @@ Rectangle {
                     }
                 }
             }
-
+            // 섹션3: 조그
             SectionLabel { text: "조그" }
 
             RobotJogPanel {
@@ -603,7 +603,7 @@ Rectangle {
                 jogMode: robotColumn.jogMode
                 jogModel: robotColumn.jogModel
             }
-
+            // 섹션4: 로봇 I/O
             SectionLabel { text: "로봇 I/O" }
 
             Rectangle {
@@ -629,7 +629,7 @@ Rectangle {
                         }
                     }
                 }
-            }
+            } //
         }
     }
 
@@ -658,8 +658,8 @@ Rectangle {
                 jogMode: root.robot1JogMode
                 jogModel: root.robot1JogMode === "joint" ? root.robot1JointModel : root.robot1BaseModel
                 ioModel: root.robot1IoModel
-            }
-        }
+            }   // end of Column 1
+        }   // end of ScrollView 1
 
         // --------------------------------------------------------
         // Column 2: 로봇 2
@@ -680,8 +680,8 @@ Rectangle {
                 jogMode: root.robot2JogMode
                 jogModel: root.robot2JogMode === "joint" ? root.robot2JointModel : root.robot2BaseModel
                 ioModel: root.robot2IoModel
-            }
-        }
+            }   // end of Column 2
+        }   // end of ScrollView 2
 
         // --------------------------------------------------------
         // Column 3: 전체 제어 / 정상확인
@@ -710,15 +710,15 @@ Rectangle {
                     anchors.top: parent.top
                     anchors.margins: 10
                     spacing: 6
-
+                    // 섹션1: 전체 제어 / 정상확인
                     Text {
                         text: "전체 제어 / 정상확인"
                         color: "#2563eb"
                         font.pixelSize: 16
                         font.bold: true
                         font.family: "Asta Sans"
-                    }
-
+                    }   // end of section1
+                    // 섹션2: 로봇 제어 모드
                     SectionLabel { text: "로봇 제어 모드" }
 
                     Rectangle {
@@ -757,8 +757,8 @@ Rectangle {
                                 }
                             }
                         }
-                    }
-
+                    }   // end of section2
+                    // 섹션3: 복구 / 초기화
                     SectionLabel { text: "복구 / 초기화" }
 
                     Rectangle {
@@ -796,8 +796,8 @@ Rectangle {
                                 onClicked: console.log("[QML] Move all standby position")
                             }
                         }
-                    }
-
+                    }   // end of section3
+                    // 섹션4: 로봇 동작 확인
                     SectionLabel { text: "로봇 동작 확인" }
 
                     Rectangle {
@@ -817,8 +817,8 @@ Rectangle {
                             PlainButton { text: "로봇 1 확인"; onClicked: console.log("[QML] Check Robot1") }
                             PlainButton { text: "로봇 2 확인"; onClicked: console.log("[QML] Check Robot2") }
                         }
-                    }
-
+                    }   // end of section4
+                    // 섹션5: 공정 단위 동작
                     SectionLabel { text: "공정 단위 동작" }
 
                     Rectangle {
@@ -849,8 +849,8 @@ Rectangle {
                                 }
                             }
                         }
-                    }
-
+                    }   // end of section5
+                    // 섹션6: 툴 교체
                     SectionLabel { text: "툴 교체" }
 
                     Rectangle {
@@ -876,10 +876,74 @@ Rectangle {
                                 }
                             }
                         }
-                    }
-                }
-            }
-        }
+                    }   // end of section6
+                    // 섹션7: 최근 명령 결과
+                    SectionLabel { text: "최근 명령 결과" }
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 58
+                        radius: 6
+                        color: {
+                            if (!iotViewModel.lastCommandResult ||
+                                iotViewModel.lastCommandResult.command === undefined)
+                                return "#f8fafc"
+
+                            return iotViewModel.lastCommandResult.ok ? "#ecfdf5" : "#fef2f2"
+                        }
+                        border.color: {
+                            if (!iotViewModel.lastCommandResult ||
+                                iotViewModel.lastCommandResult.command === undefined)
+                                return "#e2e8f0"
+
+                            return iotViewModel.lastCommandResult.ok ? "#86efac" : "#fca5a5"
+                        }
+
+                        ColumnLayout {
+                            anchors.fill: parent
+                            anchors.margins: 8
+                            spacing: 2
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: "최근 명령 결과"
+                                color: "#334155"
+                                font.pixelSize: 12
+                                font.bold: true
+                                font.family: "Asta Sans"
+                            }
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: {
+                                    var r = iotViewModel.lastCommandResult
+
+                                    if (!r || r.command === undefined)
+                                        return "명령 이력 없음"
+
+                                    var state = r.ok ? "OK" : "FAIL"
+                                    return "Robot " + r.robotId
+                                           + " / " + r.command
+                                           + " / " + state
+                                           + " / code=" + r.code
+                                           + " / " + r.message
+                                }
+                                color: {
+                                    var r = iotViewModel.lastCommandResult
+
+                                    if (!r || r.command === undefined)
+                                        return "#64748b"
+
+                                    return r.ok ? "#047857" : "#dc2626"
+                                }
+                                font.pixelSize: 12
+                                font.family: "Asta Sans"
+                                elide: Text.ElideRight
+                            }
+                        }
+                    }   // end of section7
+                }   // end of column layout
+            }   // end of column 3
+        }   // end of scroll 3
 
         // --------------------------------------------------------
         // Column 4: 갠트리/피커
