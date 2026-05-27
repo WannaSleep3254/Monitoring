@@ -983,7 +983,7 @@ void IotViewModel::updateRobotModelFromSnapshot(int robotId, const QVariantMap& 
             QVariantMap axis = series[i].toMap();
             QVariantList history = axis.value("values").toList();
 
-            while (history.size() >= 6) {
+            while (history.size() >= 60) {
                 history.removeFirst();
             }
 
@@ -1001,7 +1001,7 @@ void IotViewModel::updateRobotModelFromSnapshot(int robotId, const QVariantMap& 
             QVariantMap axis = series[i].toMap();
             QVariantList history = axis.value("values").toList();
 
-            while (history.size() >= 6) {
+            while (history.size() >= 60) {
                 history.removeFirst();
             }
 

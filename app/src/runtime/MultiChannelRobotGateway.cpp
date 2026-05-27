@@ -287,12 +287,12 @@ void MultiChannelRobotGateway::configureRemoteTransport()
     if (transportType == QStringLiteral("zeromq")) {
         config.snapshotEndpoint =
             settings.value(QStringLiteral("runtime/snapshotEndpoint"),
-                           QStringLiteral("tcp://127.0.0.1:5556"))
+                           QStringLiteral("tcp://192.168.57.200:5556"))//QStringLiteral("tcp://127.0.0.1:5556"))
                 .toString();
 
         config.commandEndpoint =
             settings.value(QStringLiteral("runtime/commandEndpoint"),
-                           QStringLiteral("tcp://127.0.0.1:5557"))
+                           QStringLiteral("tcp://192.168.57.200:5557"))//QStringLiteral("tcp://127.0.0.1:5557"))
                 .toString();
 
         config.snapshotTopic =

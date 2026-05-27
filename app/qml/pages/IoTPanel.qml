@@ -39,6 +39,90 @@ Rectangle {
         "#e85d04",  // J5
         "#64748b"   // J6
     ]
+    // ── 그래프 표시 설정 ─────────────────────────────────────────
+    // 축별 현재값 블록 순서: Robot 1 / Robot 2 동시 적용
+    property bool axisLegendReverseOrder: false
+
+    // Robot 1 - 온도 그래프
+    property real robot1TemperatureYMin: 30
+    property real robot1TemperatureYMax: 80
+    property int  robot1TemperatureDecimals: 0
+    property int  robot1TemperatureXPointCount: 60
+
+    // Robot 1 - 부하 그래프
+    property real robot1TorqueYMin: 0
+    property real robot1TorqueYMax: 2
+    property int  robot1TorqueDecimals: 1
+    property int  robot1TorqueXPointCount: 60
+
+    // Robot 2 - 온도 그래프
+    property real robot2TemperatureYMin: 30
+    property real robot2TemperatureYMax: 80
+    property int  robot2TemperatureDecimals: 0
+    property int  robot2TemperatureXPointCount: 60
+
+    // Robot 2 - 부하 그래프
+    property real robot2TorqueYMin: 0
+    property real robot2TorqueYMax: 2
+    property int  robot2TorqueDecimals: 1
+    property int  robot2TorqueXPointCount: 60
+
+    function temperatureYMin(robotIndex) {
+        return robotIndex === 0 ? robot1TemperatureYMin : robot2TemperatureYMin
+    }
+
+    function temperatureYMax(robotIndex) {
+        return robotIndex === 0 ? robot1TemperatureYMax : robot2TemperatureYMax
+    }
+
+    function temperatureDecimals(robotIndex) {
+        return robotIndex === 0 ? robot1TemperatureDecimals : robot2TemperatureDecimals
+    }
+
+    function temperatureXPointCount(robotIndex) {
+        return robotIndex === 0 ? robot1TemperatureXPointCount : robot2TemperatureXPointCount
+    }
+
+    function torqueYMin(robotIndex) {
+        return robotIndex === 0 ? robot1TorqueYMin : robot2TorqueYMin
+    }
+
+    function torqueYMax(robotIndex) {
+        return robotIndex === 0 ? robot1TorqueYMax : robot2TorqueYMax
+    }
+
+    function torqueDecimals(robotIndex) {
+        return robotIndex === 0 ? robot1TorqueDecimals : robot2TorqueDecimals
+    }
+
+    function torqueXPointCount(robotIndex) {
+        return robotIndex === 0 ? robot1TorqueXPointCount : robot2TorqueXPointCount
+    }
+
+    function resetGraphDisplaySettings() {
+        axisLegendReverseOrder = false
+
+        robot1TemperatureYMin = 30
+        robot1TemperatureYMax = 80
+        robot1TemperatureDecimals = 0
+        robot1TemperatureXPointCount = 60
+
+        robot1TorqueYMin = 0
+        robot1TorqueYMax = 2
+        robot1TorqueDecimals = 1
+        robot1TorqueXPointCount = 60
+
+        robot2TemperatureYMin = 30
+        robot2TemperatureYMax = 80
+        robot2TemperatureDecimals = 0
+        robot2TemperatureXPointCount = 60
+
+        robot2TorqueYMin = 0
+        robot2TorqueYMax = 2
+        robot2TorqueDecimals = 1
+        robot2TorqueXPointCount = 60
+    }
+
     property var timeLabels: ["-50s", "-40s", "-30s", "-20s", "-10s", "Now"]
 
     property bool hasIotViewModel: typeof iotViewModel !== "undefined" && iotViewModel !== null
@@ -342,6 +426,143 @@ Rectangle {
         }
     }
     // ── 다이얼로그 ────────────────────────────────────────────
+    Popup {
+        id: graphDisplaySettingsDialog
+
+        modal: true
+        focus: true
+        width: 760
+        height: 620
+        anchors.centerIn: parent
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+        background: Rectangle {
+            radius: 8
+            color: "#ffffff"
+            border.color: "#e0e4ea"
+            border.width: 1
+        }
+
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 18
+            spacing: 12
+
+            RowLayout {
+                Layout.fillWidth: true
+
+                Text {
+                    Layout.fillWidth: true
+                    text: "그래프 표시 설정"
+                    font.family: "Asta Sans"
+                    font.pixelSize: 20
+                    font.bold: true
+                    color: "#212121"
+                }
+
+                IoTToolButton {
+                    text: "닫기"
+                    Layout.preferredWidth: 80
+                    onClicked: graphDisplaySettingsDialog.close()
+                }
+            }
+
+            CheckBox {
+                text: "축별 현재값 순서 반전 표시 (J6 → J1)"
+                checked: root.axisLegendReverseOrder
+                onCheckedChanged: root.axisLegendReverseOrder = checked
+            }
+
+            GridLayout {
+                Layout.fillWidth: true
+                columns: 2
+                columnSpacing: 12
+                rowSpacing: 12
+
+                GraphScaleSettingBlock {
+                    title: "Robot 1 - 온도 그래프"
+                    yMinText: String(root.robot1TemperatureYMin)
+                    yMaxText: String(root.robot1TemperatureYMax)
+                    decimalsText: String(root.robot1TemperatureDecimals)
+                    xPointCountText: String(root.robot1TemperatureXPointCount)
+
+                    onApplyRequested: function(yMin, yMax, decimals, xPointCount) {
+                        root.robot1TemperatureYMin = yMin
+                        root.robot1TemperatureYMax = yMax
+                        root.robot1TemperatureDecimals = decimals
+                        root.robot1TemperatureXPointCount = xPointCount
+                    }
+                }
+
+                GraphScaleSettingBlock {
+                    title: "Robot 1 - 부하 그래프"
+                    yMinText: String(root.robot1TorqueYMin)
+                    yMaxText: String(root.robot1TorqueYMax)
+                    decimalsText: String(root.robot1TorqueDecimals)
+                    xPointCountText: String(root.robot1TorqueXPointCount)
+
+                    onApplyRequested: function(yMin, yMax, decimals, xPointCount) {
+                        root.robot1TorqueYMin = yMin
+                        root.robot1TorqueYMax = yMax
+                        root.robot1TorqueDecimals = decimals
+                        root.robot1TorqueXPointCount = xPointCount
+                    }
+                }
+
+                GraphScaleSettingBlock {
+                    title: "Robot 2 - 온도 그래프"
+                    yMinText: String(root.robot2TemperatureYMin)
+                    yMaxText: String(root.robot2TemperatureYMax)
+                    decimalsText: String(root.robot2TemperatureDecimals)
+                    xPointCountText: String(root.robot2TemperatureXPointCount)
+
+                    onApplyRequested: function(yMin, yMax, decimals, xPointCount) {
+                        root.robot2TemperatureYMin = yMin
+                        root.robot2TemperatureYMax = yMax
+                        root.robot2TemperatureDecimals = decimals
+                        root.robot2TemperatureXPointCount = xPointCount
+                    }
+                }
+
+                GraphScaleSettingBlock {
+                    title: "Robot 2 - 부하 그래프"
+                    yMinText: String(root.robot2TorqueYMin)
+                    yMaxText: String(root.robot2TorqueYMax)
+                    decimalsText: String(root.robot2TorqueDecimals)
+                    xPointCountText: String(root.robot2TorqueXPointCount)
+
+                    onApplyRequested: function(yMin, yMax, decimals, xPointCount) {
+                        root.robot2TorqueYMin = yMin
+                        root.robot2TorqueYMax = yMax
+                        root.robot2TorqueDecimals = decimals
+                        root.robot2TorqueXPointCount = xPointCount
+                    }
+                }
+            }
+
+            Item { Layout.fillHeight: true }
+
+            RowLayout {
+                Layout.fillWidth: true
+
+                Item { Layout.fillWidth: true }
+
+                IoTToolButton {
+                    text: "기본값 복원"
+                    Layout.preferredWidth: 120
+                    onClicked: root.resetGraphDisplaySettings()
+                }
+
+                IoTToolButton {
+                    text: "닫기"
+                    Layout.preferredWidth: 90
+                    onClicked: graphDisplaySettingsDialog.close()
+                }
+            }
+        }
+    }
+
+    // 임계값 설정 다이얼로그, robotIndex는 1-based로 전달 (1 또는 2)
     ThresholdSettingDialog {
         id: thresholdDialog
         hostWidth:  root.width
@@ -358,7 +579,7 @@ Rectangle {
             root.applyThreshold(robotIndex, thresholdData)
         }
     }
-
+    // 알람 이력 조회 및 CSV 내보내기 포함
     HistoryQueryDialog {
         id: historyDialog
         hostWidth:  root.width
@@ -431,6 +652,11 @@ Rectangle {
             }
 
             Item { Layout.fillWidth: true }
+
+            IoTToolButton {
+                text: "그래프 설정"
+                onClicked: graphDisplaySettingsDialog.open()
+            }
 
             IoTToolButton {
                 text:                 "임계값 설정"
@@ -623,11 +849,22 @@ Rectangle {
                                     Layout.preferredHeight: root.chartPreferredHeight
                                     chartTitle:   "축별 온도 추세"
                                     unit:         "°C"
+/*
                                     minValue:     30
                                     maxValue:     80
                                     normalValue:  root.thresholdFor(robotCard.robotIndex).temperature.normalMax
                                     warningValue: root.thresholdFor(robotCard.robotIndex).temperature.warningMax
                                     alarmValue:   root.thresholdFor(robotCard.robotIndex).temperature.alarmMax
+*/
+                                    minValue:      root.temperatureYMin(robotCard.robotIndex)
+                                    maxValue:      root.temperatureYMax(robotCard.robotIndex)
+                                    valueDecimals: root.temperatureDecimals(robotCard.robotIndex)
+                                    visiblePointCount: root.temperatureXPointCount(robotCard.robotIndex)
+
+                                    normalValue:  root.thresholdFor(robotCard.robotIndex).temperature.normalMax
+                                    warningValue: root.thresholdFor(robotCard.robotIndex).temperature.warningMax
+                                    alarmValue:   root.thresholdFor(robotCard.robotIndex).temperature.alarmMax
+
                                     timeLabels:   root.timeLabels
                                     series:       robotCard.robotData.tempSeries
                                     lineColors:   root.axisColors
@@ -641,9 +878,16 @@ Rectangle {
                                     Layout.preferredHeight: root.chartPreferredHeight
                                     chartTitle:   "축별 부하 추세"
                                     unit:         "raw"
+/*
                                     minValue:     0
                                     maxValue:     2//20
                                     valueDecimals: 1
+*/
+                                    minValue:      root.torqueYMin(robotCard.robotIndex)
+                                    maxValue:      root.torqueYMax(robotCard.robotIndex)
+                                    valueDecimals: root.torqueDecimals(robotCard.robotIndex)
+                                    visiblePointCount: root.torqueXPointCount(robotCard.robotIndex)
+
                                     normalValue:  root.thresholdFor(robotCard.robotIndex).torque.normalMax
                                     warningValue: root.thresholdFor(robotCard.robotIndex).torque.warningMax
                                     alarmValue:   root.thresholdFor(robotCard.robotIndex).torque.alarmMax
@@ -664,7 +908,7 @@ Rectangle {
 
                                     // true: J6 → J1 표시
                                     // false: J1 → J6 표시
-                                    reverseOrder: false
+                                    reverseOrder: root.axisLegendReverseOrder
                                 }
                         }   // end: 온도/부하 그래프 + 축별 현재값 블록
                         // 하단: 알람 이력 + 위험도 패널
@@ -1152,6 +1396,110 @@ Rectangle {
             }
         }
     }
+    // ═══════════════════════════════════════════════════════════
+    // [컴포넌트] GraphScaleSettingBlock
+    // ═══════════════════════════════════════════════════════════
+    component GraphScaleSettingBlock: Rectangle {
+        id: block
+
+        property string title: ""
+        property string yMinText: "0"
+        property string yMaxText: "100"
+        property string decimalsText: "0"
+        property string xPointCountText: "60"
+
+        signal applyRequested(real yMin, real yMax, int decimals, int xPointCount)
+
+        Layout.fillWidth: true
+        Layout.preferredHeight: 180
+
+        radius: 6
+        color: "#f8fafc"
+        border.color: "#e0e4ea"
+        border.width: 1
+
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 10
+            spacing: 8
+
+            Text {
+                Layout.fillWidth: true
+                text: block.title
+                font.family: "Asta Sans"
+                font.pixelSize: 14
+                font.bold: true
+                color: "#212121"
+            }
+
+            GridLayout {
+                Layout.fillWidth: true
+                columns: 2
+                columnSpacing: 8
+                rowSpacing: 6
+
+                Text { text: "Y 최소값"; font.pixelSize: 12; color: "#64748b" }
+                TextField {
+                    id: yMinField
+                    Layout.fillWidth: true
+                    text: block.yMinText
+                    selectByMouse: true
+                }
+
+                Text { text: "Y 최대값"; font.pixelSize: 12; color: "#64748b" }
+                TextField {
+                    id: yMaxField
+                    Layout.fillWidth: true
+                    text: block.yMaxText
+                    selectByMouse: true
+                }
+
+                Text { text: "소수점"; font.pixelSize: 12; color: "#64748b" }
+                TextField {
+                    id: decimalsField
+                    Layout.fillWidth: true
+                    text: block.decimalsText
+                    selectByMouse: true
+                }
+
+                Text { text: "X 표시 개수"; font.pixelSize: 12; color: "#64748b" }
+                TextField {
+                    id: xPointCountField
+                    Layout.fillWidth: true
+                    text: block.xPointCountText
+                    selectByMouse: true
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+
+                Item { Layout.fillWidth: true }
+
+                IoTToolButton {
+                    text: "적용"
+                    Layout.preferredWidth: 70
+                    onClicked: {
+                        var yMin = Number(yMinField.text)
+                        var yMax = Number(yMaxField.text)
+                        var decimals = Math.max(0, Math.round(Number(decimalsField.text)))
+                        var xCount = Math.max(2, Math.round(Number(xPointCountField.text)))
+
+                        if (isNaN(yMin) || isNaN(yMax) || yMax <= yMin)
+                            return
+
+                        if (isNaN(decimals))
+                            decimals = 0
+
+                        if (isNaN(xCount))
+                            xCount = 60
+
+                        block.applyRequested(yMin, yMax, decimals, xCount)
+                    }
+                }
+            }
+        }
+    }
 
     // ═══════════════════════════════════════════════════════════
     // [컴포넌트] AxisLineChart
@@ -1169,6 +1517,7 @@ Rectangle {
         property real   warningValue:  0
         property int    valueDecimals: 0
         property real   alarmValue:    0
+        property int visiblePointCount: 60
         property var    timeLabels:   []
         property var    series:       []
         property var    lineColors:   []
@@ -1305,11 +1654,21 @@ Rectangle {
 
                         // 임계값 라인
                         function drawLine(val, col) {
-                            if (val <= 0) return
+                            if (val <= 0)
+                                return
+
+                            if (val < chart.minValue || val > chart.maxValue)
+                                return
+
                             var ty = valueToY(val)
-                            ctx.strokeStyle = col; ctx.lineWidth = 1
+
+                            ctx.strokeStyle = col
+                            ctx.lineWidth = 1
                             ctx.setLineDash([5, 4])
-                            ctx.beginPath(); ctx.moveTo(left, ty); ctx.lineTo(left + plotW, ty); ctx.stroke()
+                            ctx.beginPath()
+                            ctx.moveTo(left, ty)
+                            ctx.lineTo(left + plotW, ty)
+                            ctx.stroke()
                             ctx.setLineDash([])
                         }
                         drawLine(chart.normalValue,  "#9e9e9e")
@@ -1325,7 +1684,12 @@ Rectangle {
                             var item   = chart.series[si]
                             var vals   = item.values
                             var col    = chart.lineColors[si % chart.lineColors.length]
+
                             if (!vals || vals.length === 0) continue
+
+                            var pointCount = Math.max(2, chart.visiblePointCount)
+                            if (vals.length > pointCount)
+                                vals = vals.slice(vals.length - pointCount)
 
                             ctx.strokeStyle = col; ctx.fillStyle = col
                             ctx.lineWidth   = 1.8; ctx.setLineDash([])
