@@ -605,44 +605,68 @@ Rectangle {
                                                : "#2e7d32"
                             }
                         }
+                        // 온도/부하 그래프 + 축별 현재값 블록
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            spacing: 8
 
-                        // 온도 그래프
-                        AxisLineChart {
-                            Layout.fillWidth:       true
-                            Layout.fillHeight:      true
-                            Layout.minimumHeight:   root.chartMinHeight
-                            Layout.preferredHeight: root.chartPreferredHeight
-                            chartTitle:   "축별 온도 추세"
-                            unit:         "°C"
-                            minValue:     30
-                            maxValue:     80
-                            normalValue:  root.thresholdFor(robotCard.robotIndex).temperature.normalMax
-                            warningValue: root.thresholdFor(robotCard.robotIndex).temperature.warningMax
-                            alarmValue:   root.thresholdFor(robotCard.robotIndex).temperature.alarmMax
-                            timeLabels:   root.timeLabels
-                            series:       robotCard.robotData.tempSeries
-                            lineColors:   root.axisColors
-                        }
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                spacing: root.sectionSpacing
+                                // 온도 그래프
+                                AxisLineChart {
+                                    Layout.fillWidth:       true
+                                    Layout.fillHeight:      true
+                                    Layout.minimumHeight:   root.chartMinHeight
+                                    Layout.preferredHeight: root.chartPreferredHeight
+                                    chartTitle:   "축별 온도 추세"
+                                    unit:         "°C"
+                                    minValue:     30
+                                    maxValue:     80
+                                    normalValue:  root.thresholdFor(robotCard.robotIndex).temperature.normalMax
+                                    warningValue: root.thresholdFor(robotCard.robotIndex).temperature.warningMax
+                                    alarmValue:   root.thresholdFor(robotCard.robotIndex).temperature.alarmMax
+                                    timeLabels:   root.timeLabels
+                                    series:       robotCard.robotData.tempSeries
+                                    lineColors:   root.axisColors
+                                }
 
-                        // 부하 그래프
-                        AxisLineChart {
-                            Layout.fillWidth:       true
-                            Layout.fillHeight:      true
-                            Layout.minimumHeight:   root.chartMinHeight
-                            Layout.preferredHeight: root.chartPreferredHeight
-                            chartTitle:   "축별 부하 추세"
-                            unit:         "raw"
-                            minValue:     0
-                            maxValue:     2//20
-                            valueDecimals: 1
-                            normalValue:  root.thresholdFor(robotCard.robotIndex).torque.normalMax
-                            warningValue: root.thresholdFor(robotCard.robotIndex).torque.warningMax
-                            alarmValue:   root.thresholdFor(robotCard.robotIndex).torque.alarmMax
-                            timeLabels:   root.timeLabels
-                            series:       robotCard.robotData.torqueSeries
-                            lineColors:   root.axisColors
-                        }
+                                // 부하 그래프
+                                AxisLineChart {
+                                    Layout.fillWidth:       true
+                                    Layout.fillHeight:      true
+                                    Layout.minimumHeight:   root.chartMinHeight
+                                    Layout.preferredHeight: root.chartPreferredHeight
+                                    chartTitle:   "축별 부하 추세"
+                                    unit:         "raw"
+                                    minValue:     0
+                                    maxValue:     2//20
+                                    valueDecimals: 1
+                                    normalValue:  root.thresholdFor(robotCard.robotIndex).torque.normalMax
+                                    warningValue: root.thresholdFor(robotCard.robotIndex).torque.warningMax
+                                    alarmValue:   root.thresholdFor(robotCard.robotIndex).torque.alarmMax
+                                    timeLabels:   root.timeLabels
+                                    series:       robotCard.robotData.torqueSeries
+                                    lineColors:   root.axisColors
+                                }
+                            }   // end: 온도/부하 그래프
+                            AxisMetricLegend {
+                                    Layout.preferredWidth: 96
+                                    Layout.minimumWidth:   90
+                                    Layout.maximumWidth:   110
+                                    Layout.fillHeight:     true
 
+                                    tempSeries:   robotCard.robotData.tempSeries
+                                    torqueSeries: robotCard.robotData.torqueSeries
+                                    lineColors:   root.axisColors
+
+                                    // true: J6 → J1 표시
+                                    // false: J1 → J6 표시
+//                                    reverseOrder: false
+                                }
+                        }   // end: 온도/부하 그래프 + 축별 현재값 블록
                         // 하단: 알람 이력 + 위험도 패널
                         RowLayout {
                             Layout.fillWidth:       true
@@ -991,6 +1015,105 @@ Rectangle {
                         :              "#f1f5f9"
             border.color: "#d1d5db"
             border.width: 1
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // [컴포넌트] AxisMetricLegend
+    // 그래프 선 색상과 축별 현재 온도/부하 값을 매칭해서 표시
+    // ═══════════════════════════════════════════════════════════
+    component AxisMetricLegend: Rectangle {
+        id: legend
+
+        property var tempSeries: []
+        property var torqueSeries: []
+        property var lineColors: []
+
+        radius: 6
+        color: "#ffffff"
+        border.color: "#e0e4ea"
+        border.width: 1
+        clip: true
+
+        function latest(series, index) {
+            if (!series || index < 0 || index >= series.length)
+                return 0
+
+            var item = series[index]
+
+            if (!item || !item.values || item.values.length === 0)
+                return 0
+
+            return Number(item.values[item.values.length - 1])
+        }
+
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 4
+            spacing: 4
+
+            Repeater {
+                model: 6
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    Layout.minimumHeight: 46
+
+                    radius: 5
+                    color: "#f8fafc"
+                    border.color: legend.lineColors[index % legend.lineColors.length]
+                    border.width: 1
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.margins: 5
+                        spacing: 5
+
+                        Rectangle {
+                            Layout.preferredWidth: 5
+                            Layout.fillHeight: true
+                            radius: 2
+                            color: legend.lineColors[index % legend.lineColors.length]
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            spacing: 0
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: "J" + (index + 1)
+                                font.family: "Asta Sans"
+                                font.pixelSize: 13
+                                font.bold: true
+                                color: legend.lineColors[index % legend.lineColors.length]
+                                horizontalAlignment: Text.AlignLeft
+                                elide: Text.ElideRight
+                            }
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: "T " + legend.latest(legend.tempSeries, index).toFixed(1) + "°C"
+                                font.family: "Asta Sans"
+                                font.pixelSize: 10
+                                color: "#334155"
+                                elide: Text.ElideRight
+                            }
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: "L " + legend.latest(legend.torqueSeries, index).toFixed(1)
+                                font.family: "Asta Sans"
+                                font.pixelSize: 10
+                                color: "#334155"
+                                elide: Text.ElideRight
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
