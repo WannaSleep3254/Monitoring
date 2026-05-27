@@ -1,7 +1,7 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
-
+import "../components"  // MetricCard, ThresholdSettingDialog, HistoryQueryDialog, GraphDisplaySettingsDialog
 // =============================================================
 // IoTPanel.qml — 로봇 2대 실시간 IoT 모니터링 패널
 // 스타일: RobotPanel / VisionPanel / MainPanel 디자인 언어 통일
@@ -426,142 +426,6 @@ Rectangle {
         }
     }
     // ── 다이얼로그 ────────────────────────────────────────────
-    Popup {
-        id: graphDisplaySettingsDialog
-
-        modal: true
-        focus: true
-        width: 760
-        height: 620
-        anchors.centerIn: parent
-        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-
-        background: Rectangle {
-            radius: 8
-            color: "#ffffff"
-            border.color: "#e0e4ea"
-            border.width: 1
-        }
-
-        ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 18
-            spacing: 12
-
-            RowLayout {
-                Layout.fillWidth: true
-
-                Text {
-                    Layout.fillWidth: true
-                    text: "그래프 표시 설정"
-                    font.family: "Asta Sans"
-                    font.pixelSize: 20
-                    font.bold: true
-                    color: "#212121"
-                }
-
-                IoTToolButton {
-                    text: "닫기"
-                    Layout.preferredWidth: 80
-                    onClicked: graphDisplaySettingsDialog.close()
-                }
-            }
-
-            CheckBox {
-                text: "축별 현재값 순서 반전 표시 (J6 → J1)"
-                checked: root.axisLegendReverseOrder
-                onCheckedChanged: root.axisLegendReverseOrder = checked
-            }
-
-            GridLayout {
-                Layout.fillWidth: true
-                columns: 2
-                columnSpacing: 12
-                rowSpacing: 12
-
-                GraphScaleSettingBlock {
-                    title: "Robot 1 - 온도 그래프"
-                    yMinText: String(root.robot1TemperatureYMin)
-                    yMaxText: String(root.robot1TemperatureYMax)
-                    decimalsText: String(root.robot1TemperatureDecimals)
-                    xPointCountText: String(root.robot1TemperatureXPointCount)
-
-                    onApplyRequested: function(yMin, yMax, decimals, xPointCount) {
-                        root.robot1TemperatureYMin = yMin
-                        root.robot1TemperatureYMax = yMax
-                        root.robot1TemperatureDecimals = decimals
-                        root.robot1TemperatureXPointCount = xPointCount
-                    }
-                }
-
-                GraphScaleSettingBlock {
-                    title: "Robot 1 - 부하 그래프"
-                    yMinText: String(root.robot1TorqueYMin)
-                    yMaxText: String(root.robot1TorqueYMax)
-                    decimalsText: String(root.robot1TorqueDecimals)
-                    xPointCountText: String(root.robot1TorqueXPointCount)
-
-                    onApplyRequested: function(yMin, yMax, decimals, xPointCount) {
-                        root.robot1TorqueYMin = yMin
-                        root.robot1TorqueYMax = yMax
-                        root.robot1TorqueDecimals = decimals
-                        root.robot1TorqueXPointCount = xPointCount
-                    }
-                }
-
-                GraphScaleSettingBlock {
-                    title: "Robot 2 - 온도 그래프"
-                    yMinText: String(root.robot2TemperatureYMin)
-                    yMaxText: String(root.robot2TemperatureYMax)
-                    decimalsText: String(root.robot2TemperatureDecimals)
-                    xPointCountText: String(root.robot2TemperatureXPointCount)
-
-                    onApplyRequested: function(yMin, yMax, decimals, xPointCount) {
-                        root.robot2TemperatureYMin = yMin
-                        root.robot2TemperatureYMax = yMax
-                        root.robot2TemperatureDecimals = decimals
-                        root.robot2TemperatureXPointCount = xPointCount
-                    }
-                }
-
-                GraphScaleSettingBlock {
-                    title: "Robot 2 - 부하 그래프"
-                    yMinText: String(root.robot2TorqueYMin)
-                    yMaxText: String(root.robot2TorqueYMax)
-                    decimalsText: String(root.robot2TorqueDecimals)
-                    xPointCountText: String(root.robot2TorqueXPointCount)
-
-                    onApplyRequested: function(yMin, yMax, decimals, xPointCount) {
-                        root.robot2TorqueYMin = yMin
-                        root.robot2TorqueYMax = yMax
-                        root.robot2TorqueDecimals = decimals
-                        root.robot2TorqueXPointCount = xPointCount
-                    }
-                }
-            }
-
-            Item { Layout.fillHeight: true }
-
-            RowLayout {
-                Layout.fillWidth: true
-
-                Item { Layout.fillWidth: true }
-
-                IoTToolButton {
-                    text: "기본값 복원"
-                    Layout.preferredWidth: 120
-                    onClicked: root.resetGraphDisplaySettings()
-                }
-
-                IoTToolButton {
-                    text: "닫기"
-                    Layout.preferredWidth: 90
-                    onClicked: graphDisplaySettingsDialog.close()
-                }
-            }
-        }
-    }
-
     // 임계값 설정 다이얼로그, robotIndex는 1-based로 전달 (1 또는 2)
     ThresholdSettingDialog {
         id: thresholdDialog
@@ -623,6 +487,63 @@ Rectangle {
                         alarmRow.id,
                         alarmRow.robot,
                         alarmRow.axis)
+        }
+    }
+    // 그래프 표시 설정 다이얼로그
+    GraphDisplaySettingsDialog {
+        id: graphDisplaySettingsDialog
+
+        hostWidth: root.width
+        hostHeight: root.height
+
+        axisLegendReverseOrder: root.axisLegendReverseOrder
+
+        robot1TemperatureYMin: root.robot1TemperatureYMin
+        robot1TemperatureYMax: root.robot1TemperatureYMax
+        robot1TemperatureDecimals: root.robot1TemperatureDecimals
+        robot1TemperatureXPointCount: root.robot1TemperatureXPointCount
+
+        robot1TorqueYMin: root.robot1TorqueYMin
+        robot1TorqueYMax: root.robot1TorqueYMax
+        robot1TorqueDecimals: root.robot1TorqueDecimals
+        robot1TorqueXPointCount: root.robot1TorqueXPointCount
+
+        robot2TemperatureYMin: root.robot2TemperatureYMin
+        robot2TemperatureYMax: root.robot2TemperatureYMax
+        robot2TemperatureDecimals: root.robot2TemperatureDecimals
+        robot2TemperatureXPointCount: root.robot2TemperatureXPointCount
+
+        robot2TorqueYMin: root.robot2TorqueYMin
+        robot2TorqueYMax: root.robot2TorqueYMax
+        robot2TorqueDecimals: root.robot2TorqueDecimals
+        robot2TorqueXPointCount: root.robot2TorqueXPointCount
+
+        onApplyRequested: function(settings) {
+            root.axisLegendReverseOrder = settings.axisLegendReverseOrder
+
+            root.robot1TemperatureYMin = settings.robot1TemperatureYMin
+            root.robot1TemperatureYMax = settings.robot1TemperatureYMax
+            root.robot1TemperatureDecimals = settings.robot1TemperatureDecimals
+            root.robot1TemperatureXPointCount = settings.robot1TemperatureXPointCount
+
+            root.robot1TorqueYMin = settings.robot1TorqueYMin
+            root.robot1TorqueYMax = settings.robot1TorqueYMax
+            root.robot1TorqueDecimals = settings.robot1TorqueDecimals
+            root.robot1TorqueXPointCount = settings.robot1TorqueXPointCount
+
+            root.robot2TemperatureYMin = settings.robot2TemperatureYMin
+            root.robot2TemperatureYMax = settings.robot2TemperatureYMax
+            root.robot2TemperatureDecimals = settings.robot2TemperatureDecimals
+            root.robot2TemperatureXPointCount = settings.robot2TemperatureXPointCount
+
+            root.robot2TorqueYMin = settings.robot2TorqueYMin
+            root.robot2TorqueYMax = settings.robot2TorqueYMax
+            root.robot2TorqueDecimals = settings.robot2TorqueDecimals
+            root.robot2TorqueXPointCount = settings.robot2TorqueXPointCount
+        }
+
+        onResetRequested: {
+            root.resetGraphDisplaySettings()
         }
     }
 
