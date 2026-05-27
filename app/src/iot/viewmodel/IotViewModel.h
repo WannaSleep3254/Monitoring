@@ -206,5 +206,5 @@ private:
 
     // false: 대시보드에는 알람을 표시하지만 DB 이력에는 자동 저장하지 않음
     // true : 임계값 초과 알람을 DB 이력에도 저장
-    bool m_alarmHistoryInsertEnabled = false;
+    bool m_alarmHistoryInsertEnabled = true;
 };

@@ -133,9 +133,9 @@ Rectangle {
     // ── 임계값 상태 ───────────────────────────────────────────
     property var sampleRobotThresholds: [
         { temperature: { normalMax: 55, warningMax: 60, alarmMax: 70 },
-          torque:     { normalMax: 12, warningMax: 14, alarmMax: 16 } },
+          torque:     { normalMax: 0.6, warningMax: 0.8, alarmMax: 1.2 }},//{ normalMax: 12, warningMax: 14, alarmMax: 16 } },
         { temperature: { normalMax: 55, warningMax: 60, alarmMax: 70 },
-          torque:     { normalMax: 12, warningMax: 14, alarmMax: 16 } }
+          torque:     { normalMax: 0.6, warningMax: 0.8, alarmMax: 1.2 }}//{ normalMax: 12, warningMax: 14, alarmMax: 16 } }
     ]
     // 실제 모델 바인딩 (iotViewModel이 있을 때만)
     property var robotThresholds: root.hasIotViewModel
@@ -145,7 +145,7 @@ Rectangle {
     function defaultThreshold() {
         return {
             temperature: { normalMax: 55, warningMax: 60, alarmMax: 70 },
-            torque:     { normalMax: 12, warningMax: 14, alarmMax: 16 }
+            torque:     { normalMax: 0.5, warningMax: 0.8, alarmMax: 1.2 }//{ normalMax: 12, warningMax: 14, alarmMax: 16 }
         }
     }
     // 임계값 데이터 정규화: 누락된 값은 기본값으로 채우고, 숫자 타입으로 변환
@@ -633,7 +633,8 @@ Rectangle {
                             chartTitle:   "축별 부하 추세"
                             unit:         "raw"
                             minValue:     0
-                            maxValue:     20
+                            maxValue:     2//20
+                            valueDecimals: 1
                             normalValue:  root.thresholdFor(robotCard.robotIndex).torque.normalMax
                             warningValue: root.thresholdFor(robotCard.robotIndex).torque.warningMax
                             alarmValue:   root.thresholdFor(robotCard.robotIndex).torque.alarmMax
@@ -1007,6 +1008,7 @@ Rectangle {
         property real   maxValue:    100
         property real   normalValue:   0
         property real   warningValue:  0
+        property int    valueDecimals: 0
         property real   alarmValue:    0
         property var    timeLabels:   []
         property var    series:       []
@@ -1122,7 +1124,8 @@ Rectangle {
                             var lv = chart.maxValue - (chart.maxValue - chart.minValue) * gy / gridCount
                             ctx.fillStyle = "#9e9e9e"
                             ctx.textAlign = "right"
-                            ctx.fillText(lv.toFixed(0), left - 4, gy_y)
+                            //ctx.fillText(lv.toFixed(0), left - 4, gy_y)
+                            ctx.fillText(lv.toFixed(chart.valueDecimals), left - 4, gy_y)
                         }
 
                         // 수직 그리드 + X 레이블
