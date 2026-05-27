@@ -654,8 +654,8 @@ Rectangle {
                             }   // end: 온도/부하 그래프
                             AxisMetricLegend {
                                     Layout.preferredWidth: 96
-                                    Layout.minimumWidth:   90
-                                    Layout.maximumWidth:   110
+                                    Layout.minimumWidth:   130
+                                    Layout.maximumWidth:   160
                                     Layout.fillHeight:     true
 
                                     tempSeries:   robotCard.robotData.tempSeries
@@ -1086,7 +1086,7 @@ Rectangle {
                                 Layout.fillWidth: true
                                 text: "J" + (index + 1)
                                 font.family: "Asta Sans"
-                                font.pixelSize: 13
+                                font.pixelSize: 17
                                 font.bold: true
                                 color: legend.lineColors[index % legend.lineColors.length]
                                 horizontalAlignment: Text.AlignLeft
@@ -1097,16 +1097,16 @@ Rectangle {
                                 Layout.fillWidth: true
                                 text: "T " + legend.latest(legend.tempSeries, index).toFixed(1) + "°C"
                                 font.family: "Asta Sans"
-                                font.pixelSize: 10
+                                font.pixelSize: 15
                                 color: "#334155"
                                 elide: Text.ElideRight
                             }
 
                             Text {
                                 Layout.fillWidth: true
-                                text: "L " + legend.latest(legend.torqueSeries, index).toFixed(1)
+                                text: "L " + legend.latest(legend.torqueSeries, index).toFixed(1) + " raw"
                                 font.family: "Asta Sans"
-                                font.pixelSize: 10
+                                font.pixelSize: 15
                                 color: "#334155"
                                 elide: Text.ElideRight
                             }
