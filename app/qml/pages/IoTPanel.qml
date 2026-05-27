@@ -664,7 +664,7 @@ Rectangle {
 
                                     // true: J6 → J1 표시
                                     // false: J1 → J6 표시
-//                                    reverseOrder: false
+                                    reverseOrder: false
                                 }
                         }   // end: 온도/부하 그래프 + 축별 현재값 블록
                         // 하단: 알람 이력 + 위험도 패널
@@ -1028,6 +1028,7 @@ Rectangle {
         property var tempSeries: []
         property var torqueSeries: []
         property var lineColors: []
+        property bool reverseOrder: false
 
         radius: 6
         color: "#ffffff"
@@ -1035,11 +1036,22 @@ Rectangle {
         border.width: 1
         clip: true
 
-        function latest(series, index) {
-            if (!series || index < 0 || index >= series.length)
+        function axisIndexFromRepeater(repeaterIndex) {
+            return reverseOrder ? (5 - repeaterIndex) : repeaterIndex
+        }
+
+        function colorAt(axisIndex) {
+            if (!lineColors || lineColors.length === 0)
+                return "#64748b"
+
+            return lineColors[axisIndex % lineColors.length]
+        }
+
+        function latest(series, axisIndex) {
+            if (!series || axisIndex < 0 || axisIndex >= series.length)
                 return 0
 
-            var item = series[index]
+            var item = series[axisIndex]
 
             if (!item || !item.values || item.values.length === 0)
                 return 0
@@ -1052,17 +1064,41 @@ Rectangle {
             anchors.margins: 4
             spacing: 4
 
+            Text {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 20
+                Layout.minimumHeight: 20
+                Layout.maximumHeight: 20
+                Layout.fillHeight: false
+
+                text: "축별 현재값"
+                font.family: "Asta Sans"
+                font.pixelSize: 12
+                font.bold: true
+                color: "#212121"
+                verticalAlignment: Text.AlignVCenter
+                horizontalAlignment: Text.AlignLeft
+                elide: Text.ElideRight
+            }
+
             Repeater {
                 model: 6
 
                 Rectangle {
+                    id: axisBlock
+
+                    property int axisIndex: legend.axisIndexFromRepeater(index)
+                    property color axisColor: legend.colorAt(axisIndex)
+                    property real currentTemp: legend.latest(legend.tempSeries, axisIndex)
+                    property real currentTorque: legend.latest(legend.torqueSeries, axisIndex)
+
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    Layout.minimumHeight: 46
+                    Layout.minimumHeight: 40
 
                     radius: 5
                     color: "#f8fafc"
-                    border.color: legend.lineColors[index % legend.lineColors.length]
+                    border.color: axisColor
                     border.width: 1
 
                     RowLayout {
@@ -1074,7 +1110,7 @@ Rectangle {
                             Layout.preferredWidth: 5
                             Layout.fillHeight: true
                             radius: 2
-                            color: legend.lineColors[index % legend.lineColors.length]
+                            color: axisBlock.axisColor
                         }
 
                         ColumnLayout {
@@ -1084,18 +1120,18 @@ Rectangle {
 
                             Text {
                                 Layout.fillWidth: true
-                                text: "J" + (index + 1)
+                                text: "J" + (axisBlock.axisIndex + 1)
                                 font.family: "Asta Sans"
                                 font.pixelSize: 17
                                 font.bold: true
-                                color: legend.lineColors[index % legend.lineColors.length]
+                                color: axisBlock.axisColor
                                 horizontalAlignment: Text.AlignLeft
                                 elide: Text.ElideRight
                             }
 
                             Text {
                                 Layout.fillWidth: true
-                                text: "T " + legend.latest(legend.tempSeries, index).toFixed(1) + "°C"
+                                text: "T " + axisBlock.currentTemp.toFixed(1) + "°C"
                                 font.family: "Asta Sans"
                                 font.pixelSize: 15
                                 color: "#334155"
@@ -1104,7 +1140,7 @@ Rectangle {
 
                             Text {
                                 Layout.fillWidth: true
-                                text: "L " + legend.latest(legend.torqueSeries, index).toFixed(1) + " raw"
+                                text: "L " + axisBlock.currentTorque.toFixed(1) + " raw"
                                 font.family: "Asta Sans"
                                 font.pixelSize: 15
                                 color: "#334155"
