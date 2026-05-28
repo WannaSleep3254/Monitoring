@@ -122,7 +122,7 @@ Rectangle {
         robot2TorqueDecimals = 1
         robot2TorqueXPointCount = 60
     }
-
+    // 타임 라벨 (X축): 고정 6개, -50s ~ Now
     property var timeLabels: ["-50s", "-40s", "-30s", "-20s", "-10s", "Now"]
 
     property bool hasIotViewModel: typeof iotViewModel !== "undefined" && iotViewModel !== null

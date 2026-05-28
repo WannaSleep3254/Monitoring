@@ -242,7 +242,7 @@ Popup {
                 variant: "default"
                 onClicked: {
                     dlg.resetRequested()
-                    dlg.close()
+//                    dlg.close()
                 }
             }
 
