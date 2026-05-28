@@ -6,16 +6,55 @@
 
 #include <QApplication>
 #include <QQmlApplicationEngine>
+#include <QQmlContext>
 #include <QUrl>
 #include <QDebug>
 #include <QCoreApplication>
+#include <QSettings>
+
+#include "runtime/MultiChannelRobotGateway.h"
+#include "iot/viewmodel/IotViewModel.h"
 
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
 
-    QQmlApplicationEngine engine;
+    QCoreApplication::setOrganizationName("Gachisoft");
+    QCoreApplication::setOrganizationDomain("gachisoft.co.kr");
+    QCoreApplication::setApplicationName("MonitoringApp");
 
+    QQmlApplicationEngine engine;
+    // ============================================================
+    // Runtime / Gateway
+    // ============================================================
+    auto* robotGateway = new MultiChannelRobotGateway(&engine);
+    auto* iotViewModel = new IotViewModel(&engine);
+    // ============================================================
+    // Runtime / Gateway source mode 설정 (dummy, remote)
+    // ============================================================
+    QSettings settings;
+    const QString gatewaySourceMode =
+        settings.value(QStringLiteral("runtime/gatewaySourceMode"),
+                       QStringLiteral("dummy")).toString();
+
+    if (!robotGateway->setSourceModeName(gatewaySourceMode)) {
+        qWarning() << "[Gateway] invalid configured source mode:"
+                   << gatewaySourceMode
+                   << "fallback to dummy";
+
+        robotGateway->setSourceModeName(QStringLiteral("dummy"));
+    }
+    // ============================================================
+    iotViewModel->setRobotGateway(robotGateway);
+    if (!iotViewModel->initialize()) {
+        qWarning() << "[IoTViewModel] initialize failed:"
+                   << iotViewModel->lastError();
+    }
+
+    engine.rootContext()->setContextProperty("iotViewModel", iotViewModel);
+    if (!robotGateway->start()) {
+        qWarning() << "[Gateway] Failed to start MultiChannelRobotGateway";
+    }
     const QUrl url(QStringLiteral("qrc:/qml/Main.qml"));
 
     QObject::connect(

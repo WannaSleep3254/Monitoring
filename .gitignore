@@ -12,6 +12,8 @@ CMakeFiles/
 
 # Qt
 *.pro.user
+*.user
+*.user.*
 moc_*.cpp
 ui_*.h
 
@@ -28,3 +30,10 @@ ui_*.h
 
 # Dependencies (3rdparty는 필요시만 포함)
 3rdparty/fairino/lib/  # ← SDK DLL/LIB 제외 (크기 때문)
+
+# Allow bundled ZeroMQ runtime DLL
+!3rdparty/zeromq/bin/
+!3rdparty/zeromq/bin/msvc2022_x64/
+!3rdparty/zeromq/bin/msvc2022_x64/libzmq-mt-4_3_5.dll
+!3rdparty/zeromq/bin/msvc2019_x64/
+!3rdparty/zeromq/bin/msvc2019_x64/libzmq-mt-4_3_5.dll

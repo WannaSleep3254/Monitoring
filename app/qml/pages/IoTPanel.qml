@@ -1,65 +1,152 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
-
-Item {
+import "../components"  // MetricCard, ThresholdSettingDialog, HistoryQueryDialog, GraphDisplaySettingsDialog
+// =============================================================
+// IoTPanel.qml — 로봇 2대 실시간 IoT 모니터링 패널
+// 스타일: RobotPanel / VisionPanel / MainPanel 디자인 언어 통일
+//   - 배경: #f0f2f5
+//   - 카드:  white / #e0e4ea border / radius 8
+//   - 폰트: "Asta Sans"
+//   - 값 색상: #212121 (강조), 라벨: #9e9e9e
+//   - 액센트: #1976d2
+// =============================================================
+// 최근 알람:
+// - DB 이력 조회 결과가 아니라 현재 실행 중 감지된 실시간 알람 캐시
+// - 실제 저장 이력은 HistoryQueryDialog에서 조회
+Rectangle {
     id: root
-    anchors.fill: parent
+    color: "#f0f2f5"
 
-    // ============================================================
-    // [레이아웃 높이 튜닝]
-    // summaryCardHeight     : 각 Robot 카드 상단의 요약 카드 높이
-    // bottomPanelHeight     : 각 Robot 카드 하단의 알람/예지보전 영역 높이
-    // chartMinHeight        : 온도/전류 그래프의 최소 높이
-    // chartPreferredHeight  : 온도/전류 그래프의 권장 높이
-    //
-    // 목표:
-    // - 요약 카드와 하단 알람/예지보전은 고정 높이 유지
-    // - 온도/전류 그래프만 남는 세로 공간을 가져가도록 구성
-    // ============================================================
-    property int summaryCardHeight: 68
-    property int bottomPanelHeight: 200
-    property int chartMinHeight: 160
-    property int chartPreferredHeight: 215
-    property int sectionSpacing: 8
-    property int sectionRadius: 6
-    property int toolBarHeight: 34
+    // ── 레이아웃 튜닝 ──────────────────────────────────────────
+    property int summaryCardHeight:     76
+    property int bottomPanelHeight:    180 //158
+    property int chartMinHeight:       110
+    property int chartPreferredHeight: 180
+    property int sectionSpacing:         8
+    property int toolBarHeight:         34
 
-    // ============================================================
-    // [IoT 패널 상단 기능 버튼 시그널]
-    // 실제 로직 연동 시 C++ ViewModel 또는 상위 QML에서 연결
-    // ============================================================
+    // ── 시그널 ────────────────────────────────────────────────
     signal thresholdSettingRequested()
     signal historyQueryRequested()
 
-    // ===== 샘플 데이터 =====
-    property int refreshIntervalMs: 1000
-    property string lastUpdateText: "17:05:01"
-    property real alarmLatencySec: 0.4
-    property real predictionAccuracy: 92.4
-    // =====================
-
-    // ===== 임계치 튜닝용 =====
-    property real tempWarningThreshold: 65
-    property real currentWarningThreshold: 14
-    // =====================
-
+    // ── 축 색상 ───────────────────────────────────────────────
     property var axisColors: [
-        "#2563eb",   // J1
-        "#059669",   // J2
-        "#7c3aed",   // J3
-        "#0891b2",   // J4
-        "#4f46e5",   // J5
-        "#475569"    // J6
+        "#2563eb",  // J1
+        "#059669",  // J2
+        "#7c3aed",  // J3
+        "#0891b2",  // J4
+        "#e85d04",  // J5
+        "#64748b"   // J6
     ]
+    // ── 그래프 표시 설정 ─────────────────────────────────────────
+    // 축별 현재값 블록 순서: Robot 1 / Robot 2 동시 적용
+    property bool axisLegendReverseOrder: false
 
-    // 시간 레이블은 고정으로 6개, 10초 간격으로 -50s ~ Now
+    // Robot 1 - 온도 그래프
+    property real robot1TemperatureYMin: 30
+    property real robot1TemperatureYMax: 80
+    property int  robot1TemperatureDecimals: 0
+    property int  robot1TemperatureXPointCount: 60
+
+    // Robot 1 - 부하 그래프
+    property real robot1TorqueYMin: 0
+    property real robot1TorqueYMax: 2
+    property int  robot1TorqueDecimals: 1
+    property int  robot1TorqueXPointCount: 60
+
+    // Robot 2 - 온도 그래프
+    property real robot2TemperatureYMin: 30
+    property real robot2TemperatureYMax: 80
+    property int  robot2TemperatureDecimals: 0
+    property int  robot2TemperatureXPointCount: 60
+
+    // Robot 2 - 부하 그래프
+    property real robot2TorqueYMin: 0
+    property real robot2TorqueYMax: 2
+    property int  robot2TorqueDecimals: 1
+    property int  robot2TorqueXPointCount: 60
+
+    function temperatureYMin(robotIndex) {
+        return robotIndex === 0 ? robot1TemperatureYMin : robot2TemperatureYMin
+    }
+
+    function temperatureYMax(robotIndex) {
+        return robotIndex === 0 ? robot1TemperatureYMax : robot2TemperatureYMax
+    }
+
+    function temperatureDecimals(robotIndex) {
+        return robotIndex === 0 ? robot1TemperatureDecimals : robot2TemperatureDecimals
+    }
+
+    function temperatureXPointCount(robotIndex) {
+        return robotIndex === 0 ? robot1TemperatureXPointCount : robot2TemperatureXPointCount
+    }
+
+    function torqueYMin(robotIndex) {
+        return robotIndex === 0 ? robot1TorqueYMin : robot2TorqueYMin
+    }
+
+    function torqueYMax(robotIndex) {
+        return robotIndex === 0 ? robot1TorqueYMax : robot2TorqueYMax
+    }
+
+    function torqueDecimals(robotIndex) {
+        return robotIndex === 0 ? robot1TorqueDecimals : robot2TorqueDecimals
+    }
+
+    function torqueXPointCount(robotIndex) {
+        return robotIndex === 0 ? robot1TorqueXPointCount : robot2TorqueXPointCount
+    }
+
+    function resetGraphDisplaySettings() {
+        axisLegendReverseOrder = false
+
+        robot1TemperatureYMin = 30
+        robot1TemperatureYMax = 80
+        robot1TemperatureDecimals = 0
+        robot1TemperatureXPointCount = 60
+
+        robot1TorqueYMin = 0
+        robot1TorqueYMax = 2
+        robot1TorqueDecimals = 1
+        robot1TorqueXPointCount = 60
+
+        robot2TemperatureYMin = 30
+        robot2TemperatureYMax = 80
+        robot2TemperatureDecimals = 0
+        robot2TemperatureXPointCount = 60
+
+        robot2TorqueYMin = 0
+        robot2TorqueYMax = 2
+        robot2TorqueDecimals = 1
+        robot2TorqueXPointCount = 60
+    }
+    // 타임 라벨 (X축): 고정 6개, -50s ~ Now
     property var timeLabels: ["-50s", "-40s", "-30s", "-20s", "-10s", "Now"]
 
-    property var robotModels: [
+    property bool hasIotViewModel: typeof iotViewModel !== "undefined" && iotViewModel !== null
+
+    property double currentEpochMs: Date.now()
+
+    Timer {
+        interval: 1000
+        repeat: true
+        running: true
+
+        onTriggered: {
+            root.currentEpochMs = Date.now()
+        }
+    }
+    // ── 샘플 데이터 ───────────────────────────────────────────
+    property var sampleRobotModels: [
         {
             name: "Robot 1 (FR10)",
             running: true,
+            online: true,
+            lastUpdateTime: "16:42:11",
+            lastUpdateAt: "2026-05-20T16:42:11",
+            lastUpdateEpochMs: Date.now(),
             tempSeries: [
                 { axis: "J1", values: [40.1, 40.8, 41.5, 42.0, 42.3, 42.5] },
                 { axis: "J2", values: [41.2, 41.6, 42.1, 43.0, 43.6, 44.1] },
@@ -68,30 +155,32 @@ Item {
                 { axis: "J5", values: [40.5, 41.0, 41.8, 42.3, 42.8, 43.2] },
                 { axis: "J6", values: [38.9, 39.4, 39.8, 40.2, 40.5, 40.7] }
             ],
-            currentSeries: [
+            torqueSeries: [
                 { axis: "J1", values: [10.2, 10.8, 11.4, 11.7, 12.0, 12.3] },
-                { axis: "J2", values: [8.4, 8.7, 9.1, 9.4, 9.6, 9.8] },
+                { axis: "J2", values: [8.4,  8.7,  9.1,  9.4,  9.6,  9.8]  },
                 { axis: "J3", values: [13.1, 13.7, 14.4, 15.0, 15.3, 15.6] },
-                { axis: "J4", values: [9.8, 10.2, 10.7, 10.9, 11.0, 11.2] },
-                { axis: "J5", values: [7.2, 7.5, 7.9, 8.1, 8.3, 8.4] },
-                { axis: "J6", values: [9.1, 9.5, 10.0, 10.4, 10.7, 10.9] }
+                { axis: "J4", values: [9.8,  10.2, 10.7, 10.9, 11.0, 11.2] },
+                { axis: "J5", values: [7.2,  7.5,  7.9,  8.1,  8.3,  8.4]  },
+                { axis: "J6", values: [9.1,  9.5,  10.0, 10.4, 10.7, 10.9] }
             ],
             alarms: [
-                { time: "17:04:58", level: "WARN", message: "J3 전류 임계치 접근" },
-                { time: "17:04:41", level: "INFO", message: "실시간 갱신 정상" },
-                { time: "17:04:20", level: "INFO", message: "로봇 가동 상태 RUN" }
+                { time: "17:04:58", level: "WARN", message: "J3 부하 임계치 접근" },
+                { time: "17:04:41", level: "INFO", message: "실시간 갱신 정상" }
             ],
             prediction: {
-                modelStatus: "구현 완료",
                 riskLevel: "주의",
                 score: 82,
-                causeText: "J3 전류 상승",
-                recommendedAction: "J3 축 전류 추세 점검 권장"
+                causeText: "J3 부하 상승",
+                recommendedAction: "J3 축 부하 추세 점검 권장"
             }
         },
         {
             name: "Robot 2 (FR5)",
             running: true,
+            online: true,
+            lastUpdateTime: "16:42:11",
+            lastUpdateAt: "2026-05-20T16:42:11",
+            lastUpdateEpochMs: Date.now(),
             tempSeries: [
                 { axis: "J1", values: [41.5, 42.0, 42.8, 43.4, 43.8, 44.2] },
                 { axis: "J2", values: [42.0, 42.7, 43.3, 44.0, 44.5, 45.0] },
@@ -100,1066 +189,1458 @@ Item {
                 { axis: "J5", values: [41.0, 41.7, 42.2, 42.8, 43.4, 43.9] },
                 { axis: "J6", values: [39.7, 40.2, 40.7, 41.0, 41.3, 41.5] }
             ],
-            currentSeries: [
+            torqueSeries: [
                 { axis: "J1", values: [11.8, 12.4, 13.0, 13.5, 13.8, 14.1] },
-                { axis: "J2", values: [9.0, 9.4, 9.7, 10.0, 10.3, 10.6] },
+                { axis: "J2", values: [9.0,  9.4,  9.7,  10.0, 10.3, 10.6] },
                 { axis: "J3", values: [12.0, 12.5, 13.0, 13.3, 13.6, 13.8] },
                 { axis: "J4", values: [13.7, 14.2, 14.9, 15.4, 15.8, 16.2] },
-                { axis: "J5", values: [8.1, 8.5, 8.8, 9.0, 9.3, 9.5] },
+                { axis: "J5", values: [8.1,  8.5,  8.8,  9.0,  9.3,  9.5]  },
                 { axis: "J6", values: [10.2, 10.6, 10.9, 11.2, 11.5, 11.7] }
             ],
             alarms: [
-                { time: "17:04:57", level: "WARN", message: "J4 전류 초과 감지" },
-                { time: "17:04:32", level: "INFO", message: "알람 표시 정상" },
-                { time: "17:04:10", level: "INFO", message: "로봇 가동 상태 RUN" }
+                { time: "17:04:57", level: "WARN", message: "J4 부하 초과 감지" },
+                { time: "17:04:32", level: "INFO", message: "알람 표시 정상" }
             ],
             prediction: {
-                modelStatus: "구현 완료",
                 riskLevel: "경고",
                 score: 91,
-                causeText: "J4 전류 초과",
+                causeText: "J4 부하 초과",
                 recommendedAction: "J4 축 이상 징후 감지, 점검 요청"
             }
         }
     ]
+    // 실제 모델 바인딩 (iotViewModel이 있을 때만)
+    property var robotModels: root.hasIotViewModel
+                              ? iotViewModel.robotModels
+                              : root.sampleRobotModels
 
-    // ============================================================
-    // [로봇별 임계값 상태]
-    // Dialog에서 저장한 값이 여기에 반영되고,
-    // 각 AxisLineChart는 이 값을 binding으로 참조한다.
-    // ============================================================
-    property var robotThresholds: [
-        {
-            temperature: {
-                normalMax: 55,
-                warningMax: 60,
-                alarmMax: 70
-            },
-            current: {
-                normalMax: 12,
-                warningMax: 14,
-                alarmMax: 16
-            }
-        },
-        {
-            temperature: {
-                normalMax: 55,
-                warningMax: 60,
-                alarmMax: 70
-            },
-            current: {
-                normalMax: 12,
-                warningMax: 14,
-                alarmMax: 16
-            }
-        }
+    // ── 임계값 상태 ───────────────────────────────────────────
+    property var sampleRobotThresholds: [
+        { temperature: { normalMax: 55, warningMax: 60, alarmMax: 70 },
+          torque:     { normalMax: 0.6, warningMax: 0.8, alarmMax: 1.2 }},//{ normalMax: 12, warningMax: 14, alarmMax: 16 } },
+        { temperature: { normalMax: 55, warningMax: 60, alarmMax: 70 },
+          torque:     { normalMax: 0.6, warningMax: 0.8, alarmMax: 1.2 }}//{ normalMax: 12, warningMax: 14, alarmMax: 16 } }
     ]
-
+    // 실제 모델 바인딩 (iotViewModel이 있을 때만)
+    property var robotThresholds: root.hasIotViewModel
+                                  ? iotViewModel.robotThresholds
+                                  : root.sampleRobotThresholds
+    // 임계값 기본값 반환
     function defaultThreshold() {
         return {
-            temperature: {
-                normalMax: 55,
-                warningMax: 60,
-                alarmMax: 70
-            },
-            current: {
-                normalMax: 12,
-                warningMax: 14,
-                alarmMax: 16
-            }
+            temperature: { normalMax: 55, warningMax: 60, alarmMax: 70 },
+            torque:     { normalMax: 0.5, warningMax: 0.8, alarmMax: 1.2 }//{ normalMax: 12, warningMax: 14, alarmMax: 16 }
         }
     }
-
+    // 임계값 데이터 정규화: 누락된 값은 기본값으로 채우고, 숫자 타입으로 변환
     function normalizeThreshold(thresholdData) {
         var fallback = root.defaultThreshold()
-
-        if (!thresholdData)
-            return fallback
-
-        var temp = thresholdData.temperature || fallback.temperature
-        var current = thresholdData.current || thresholdData.torque || fallback.current
-
+        if (!thresholdData) return fallback
+        var temp    = thresholdData.temperature || fallback.temperature
+        var torque = thresholdData.torque || fallback.torque
         return {
-            temperature: {
-                normalMax: Number(temp.normalMax),
-                warningMax: Number(temp.warningMax),
-                alarmMax: Number(temp.alarmMax)
-            },
-            current: {
-                normalMax: Number(current.normalMax),
-                warningMax: Number(current.warningMax),
-                alarmMax: Number(current.alarmMax)
-            }
+            temperature: { normalMax: Number(temp.normalMax),    warningMax: Number(temp.warningMax),    alarmMax: Number(temp.alarmMax)    },
+            torque:     { normalMax: Number(torque.normalMax), warningMax: Number(torque.warningMax), alarmMax: Number(torque.alarmMax) }
         }
     }
-
+    // robotIndex는 1-based, 내부 저장은 0-based 배열로 관리
     function thresholdFor(robotIndex) {
-        // robotIndex: 0-based
         if (!root.robotThresholds || robotIndex < 0 || robotIndex >= root.robotThresholds.length)
             return root.defaultThreshold()
-
         return root.normalizeThreshold(root.robotThresholds[robotIndex])
     }
-
+    // 임계값 적용: robotIndex는 1-based, 내부 저장은 0-based 배열로 관리
     function applyThreshold(robotIndex, thresholdData) {
-        // robotIndex: 1-based from ThresholdSettingDialog
-        if (!thresholdData) {
-            console.warn("[QML] thresholdData is undefined. Check ThresholdSettingDialog.saveRequested signature.")
-            return
-        }
-
+        if (!thresholdData) return
         var targetIndex = robotIndex - 1
-        if (targetIndex < 0)
-            return
-
+        if (targetIndex < 0) return
         var copied = root.robotThresholds ? root.robotThresholds.slice() : []
-
-        while (copied.length <= targetIndex)
-            copied.push(root.defaultThreshold())
-
+        while (copied.length <= targetIndex) copied.push(root.defaultThreshold())
         copied[targetIndex] = root.normalizeThreshold(thresholdData)
-
-        // QML binding 갱신을 위해 배열 자체를 다시 대입
         root.robotThresholds = copied
-
-        console.log("[QML] threshold applied, robot =", robotIndex,
-                    "temp =", copied[targetIndex].temperature.normalMax,
-                    copied[targetIndex].temperature.warningMax,
-                    copied[targetIndex].temperature.alarmMax,
-                    "current =", copied[targetIndex].current.normalMax,
-                    copied[targetIndex].current.warningMax,
-                    copied[targetIndex].current.alarmMax)
     }
-
+    // 시리즈 아이템에서 최신값 반환, 값이 없으면 0 반환
     function latestValue(seriesItem) {
-        if (!seriesItem || !seriesItem.values || seriesItem.values.length === 0)
-            return 0
+        if (!seriesItem || !seriesItem.values || seriesItem.values.length === 0) return 0
         return seriesItem.values[seriesItem.values.length - 1]
     }
-
+    // 시리즈 배열에서 최신값이 가장 큰 축 정보 반환 (예: { axis: "J4", value: 46.3 })
     function maxLatestInfo(series) {
         var maxValue = -999999
-        var maxAxis = "-"
+        var maxAxis  = "-"
         for (var i = 0; i < series.length; ++i) {
             var v = latestValue(series[i])
-            if (v > maxValue) {
-                maxValue = v
-                maxAxis = series[i].axis
-            }
+            if (v > maxValue) { maxValue = v; maxAxis = series[i].axis }
         }
         return { axis: maxAxis, value: maxValue }
     }
+    // 값과 임계값의 비율에 따른 위험도 레벨 반환: ratio >= 1.15 -> "경고", ratio >= 1.0 -> "주의", else "정상"
+    function riskLevelFromRatio(ratio) {
+        if (ratio >= 1.15)
+            return "경고"
 
-    function monitoringCompletion() {
-        return "100%"
+        if (ratio >= 1.0)
+            return "주의"
+
+        return "정상"
     }
+    // 로봇 데이터와 임계값을 기반으로 워스트 축 정보 반환 (예: { axis: "J4", metric: "온도", value: 46.3, ratio: 1.15, level: "경고" })
+    function worstAxisInfo(robotData, threshold) {
+        var worst = {
+            axis: "-",
+            metric: "-",
+            value: 0,
+            ratio: 0,
+            level: "정상"
+        }
 
-    Rectangle {
-        anchors.fill: parent
-        radius: 8
-        color: "white"
-        border.color: "#d7dde6"
+        if (!robotData || !threshold)
+            return worst
 
-        ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 16
-            spacing: root.sectionSpacing
-/*
-            // 상단 요구사항 요약
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 10
+        function updateWorst(series, metric, warningMax) {
+            if (!series || warningMax <= 0)
+                return
 
-                MetricCard {
-                    Layout.fillWidth: true
-                    title: "모니터링 항목 완성도"
-                    valueText: root.monitoringCompletion()
-                    subText: "전류 / 온도 / 가동상태"
-                    valueColor: "#2563eb"
-                }
+            for (var i = 0; i < series.length; ++i) {
+                var v = root.latestValue(series[i])
+                var ratio = v / warningMax
 
-                MetricCard {
-                    Layout.fillWidth: true
-                    title: "실시간 갱신 주기"
-                    valueText: (root.refreshIntervalMs / 1000).toFixed(1) + " s"
-                    subText: "마지막 갱신 " + root.lastUpdateText
-                    valueColor: "#16a34a"
-                }
-
-                MetricCard {
-                    Layout.fillWidth: true
-                    title: "알람 발생 지연"
-                    valueText: root.alarmLatencySec.toFixed(1) + " s"
-                    subText: root.alarmLatencySec < 1.0 ? "Spec 만족" : "점검 필요"
-                    valueColor: root.alarmLatencySec < 1.0 ? "#16a34a" : "#dc2626"
-                }
-
-                MetricCard {
-                    Layout.fillWidth: true
-                    title: "예측 정확도"
-                    valueText: root.predictionAccuracy.toFixed(1) + " %"
-                    subText: root.predictionAccuracy > 90 ? "Spec 만족" : "점검 필요"
-                    valueColor: root.predictionAccuracy > 90 ? "#16a34a" : "#f97316"
-                }
-            }
-*/
-            // ============================================================
-            // [IoT 상단 툴바]
-            // 위치: Robot 1 / Robot 2 카드 영역 상단
-            // 용도:
-            // - 임계값 설정
-            // - 이력 조회
-            //
-            // 기존 CSV 저장 버튼은 직접 저장 기능이 아니라
-            // "이력 조회" 화면에서 기간 조회 후 CSV 저장까지 확장하는 구조로 변경
-            // ============================================================
-            RowLayout {
-                Layout.fillWidth: true
-                Layout.preferredHeight: root.toolBarHeight
-                Layout.minimumHeight: root.toolBarHeight
-                Layout.maximumHeight: root.toolBarHeight
-                Layout.fillHeight: false
-                spacing: 8
-
-                Item {
-                    Layout.fillWidth: true
-                }
-
-                IoTToolbarButton {
-                    text: "임계값 설정"
-                    Layout.preferredWidth: 112
-                    onClicked: {
-                        console.log("[QML] IoT threshold setting requested")
-                        root.thresholdSettingRequested()
-                        thresholdDialog.open()
-                        // TODO: iotViewModel.requestThresholdSetting()
-                    }
-                }
-
-                IoTToolbarButton {
-                    text: "이력 조회"
-                    Layout.preferredWidth: 96
-                    onClicked: {
-                        console.log("[QML] IoT history query requested")
-                        root.historyQueryRequested()
-                        historyDialog.open()
-                        // TODO: iotViewModel.requestHistoryQuery()
-                    }
-                }
-            }
-
-            // ============================================================
-            // [로봇 2대 동시 모니터링 영역]
-            // 위치: IoTPanel 전체 본문
-            // 구성: 좌측 Robot 1 카드 / 우측 Robot 2 카드
-            // ============================================================
-            GridLayout {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                columns: 2
-                rowSpacing: 12
-                columnSpacing: 12
-
-                Repeater {
-                    model: root.robotModels
-
-                    Rectangle {
-                        id: robotCard
-                        property var robotData: modelData
-                        property int robotIndex: index
-
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        radius: 8
-                        color: "#f8fafc"
-                        border.color: "#e2e8f0"
-
-                        ColumnLayout {
-                            anchors.fill: parent
-                            anchors.margins: 12
-                            spacing: root.sectionSpacing
-
-                            // ====================================================
-                            // [Robot 카드 제목 영역]
-                            // 위치: 각 Robot 카드 최상단
-                            // 예: Robot 1 (FR10), Robot 2 (FR5)
-                            // ====================================================
-                            Text {
-                                text: robotCard.robotData.name
-                                color: "#2563eb"
-                                font.pixelSize: 18
-                                font.bold: true
-                            }
-
-                            // ====================================================
-                            // [요약 카드 영역]
-                            // 위치: Robot 카드 상단, 제목 바로 아래
-                            // 구성:
-                            // - 가동 상태
-                            // - Max 온도
-                            // - Max 전류
-                            // - 워스트 축
-                            //
-                            // 높이 제어:
-                            // - root.summaryCardHeight로 고정
-                            // - Layout.fillHeight는 false로 유지
-                            // ====================================================
-                            RowLayout {
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: root.summaryCardHeight
-                                Layout.minimumHeight: root.summaryCardHeight
-                                Layout.maximumHeight: root.summaryCardHeight
-                                Layout.fillHeight: false
-                                spacing: 8
-
-                                MetricCard {
-                                    Layout.fillWidth: true
-                                    title: "가동 상태"
-                                    valueText: robotCard.robotData.running ? "RUN" : "STOP"
-                                    subText: robotCard.robotData.running ? "정상 운전" : "정지"
-                                    valueColor: robotCard.robotData.running ? "#16a34a" : "#dc2626"
-                                }
-
-                                MetricCard {
-                                    Layout.fillWidth: true
-                                    title: "Max 온도"
-                                    valueText: root.maxLatestInfo(robotCard.robotData.tempSeries).value.toFixed(1) + " °C"
-                                    subText: root.maxLatestInfo(robotCard.robotData.tempSeries).axis
-                                    valueColor: root.maxLatestInfo(robotCard.robotData.tempSeries).value >= root.thresholdFor(robotCard.robotIndex).temperature.warningMax ? "#dc2626" : "#334155"
-                                }
-
-                                MetricCard {
-                                    Layout.fillWidth: true
-                                    title: "Max 전류"
-                                    valueText: root.maxLatestInfo(robotCard.robotData.currentSeries).value.toFixed(1) + " A"
-                                    subText: root.maxLatestInfo(robotCard.robotData.currentSeries).axis
-                                    valueColor: root.maxLatestInfo(robotCard.robotData.currentSeries).value >= root.thresholdFor(robotCard.robotIndex).current.warningMax ? "#dc2626" : "#334155"
-                                }
-
-                                MetricCard {
-                                    Layout.fillWidth: true
-                                    title: "워스트 축"
-                                    valueText: root.maxLatestInfo(robotCard.robotData.tempSeries).axis
-                                    subText: "온도 기준"
-                                    valueColor: "#f97316"
-                                }
-                            }
-
-                            // ====================================================
-                            // [온도 그래프 영역]
-                            // 위치: 요약 카드 아래, 첫 번째 그래프
-                            // 목적:
-                            // - J1~J6 축별 온도 시계열 표시
-                            // - 임계값 초과 여부를 시각적으로 확인
-                            //
-                            // 높이 제어:
-                            // - Layout.fillHeight: true
-                            // - 남는 세로 공간을 전류 그래프와 함께 나눠 사용
-                            // ====================================================
-                            AxisLineChart {
-                                Layout.fillWidth: true
-                                Layout.fillHeight: true
-                                Layout.minimumHeight: root.chartMinHeight
-                                Layout.preferredHeight: root.chartPreferredHeight
-                                title: "축별 온도 추세"
-                                unit: "°C"
-                                minValue: 30
-                                maxValue: 80
-                                normalValue: root.thresholdFor(robotCard.robotIndex).temperature.normalMax
-                                warningValue: root.thresholdFor(robotCard.robotIndex).temperature.warningMax
-                                alarmValue: root.thresholdFor(robotCard.robotIndex).temperature.alarmMax
-                                timeLabels: root.timeLabels
-                                series: robotCard.robotData.tempSeries
-                                lineColors: root.axisColors
-                            }
-
-                            // ====================================================
-                            // [전류/토크 그래프 영역]
-                            // 위치: 온도 그래프 아래, 두 번째 그래프
-                            // 목적:
-                            // - J1~J6 축별 전류 또는 토크 시계열 표시
-                            // - 이상 부하/마찰 증가 추세 확인
-                            //
-                            // 현재 표기:
-                            // - 축별 전류 추세
-                            // - 토크 값을 사용할 경우 title/unit만 변경 가능
-                            // ====================================================
-                            AxisLineChart {
-                                Layout.fillWidth: true
-                                Layout.fillHeight: true
-                                Layout.minimumHeight: root.chartMinHeight
-                                Layout.preferredHeight: root.chartPreferredHeight
-                                title: "축별 전류 추세"
-                                unit: "A"
-                                minValue: 0
-                                maxValue: 20
-                                normalValue: root.thresholdFor(robotCard.robotIndex).current.normalMax
-                                warningValue: root.thresholdFor(robotCard.robotIndex).current.warningMax
-                                alarmValue: root.thresholdFor(robotCard.robotIndex).current.alarmMax
-                                timeLabels: root.timeLabels
-                                series: robotCard.robotData.currentSeries
-                                lineColors: root.axisColors
-                            }
-
-                            // ====================================================
-                            // [하단 알람 / 예지보전 영역]
-                            // 위치: Robot 카드 최하단
-                            // 좌측: 알람 이력 / 이상 징후
-                            // 우측: 예지 보전 / 조치 요청
-                            //
-                            // 높이 제어:
-                            // - root.bottomPanelHeight로 고정
-                            // - 그래프 시인성을 위해 낮은 높이로 유지
-                            // ====================================================
-                            RowLayout {
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: root.bottomPanelHeight
-                                Layout.minimumHeight: root.bottomPanelHeight
-                                Layout.maximumHeight: root.bottomPanelHeight
-                                Layout.fillHeight: false
-                                spacing: 8
-
-                                // ------------------------------------------------
-                                // [하단 좌측 패널] 알람 이력 / 이상 징후
-                                // - 임계값 초과, 이상 징후, 상태 이벤트를 표시
-                                // - 현재는 최근 2개만 표시하도록 제한
-                                // ------------------------------------------------
-                                Rectangle {
-                                    Layout.fillWidth: true
-                                    Layout.fillHeight: true
-                                    radius: 6
-                                    color: "white"
-                                    border.color: "#e2e8f0"
-
-                                    ColumnLayout {
-                                        anchors.fill: parent
-                                        anchors.margins: 8
-                                        spacing: 5
-
-                                        Text {
-                                            Layout.fillWidth: true
-                                            Layout.preferredHeight: 20
-                                            Layout.fillHeight: false
-
-                                            text: "알람 이력 / 이상 징후"
-                                            color: "#334155"
-                                            font.pixelSize: 15
-                                            font.bold: true
-                                            verticalAlignment: Text.AlignVCenter
-                                        }
-
-                                        Repeater {
-                                            model: robotCard.robotData.alarms.slice(0, 2)
-
-                                            Rectangle {
-                                                // 알람 1행은 고정 높이로 유지
-                                                // Layout.fillHeight를 false로 둬서 Row가 세로로 늘어나지 않게 함
-                                                Layout.fillWidth: true
-                                                Layout.preferredHeight: 28
-                                                Layout.minimumHeight: 28
-                                                Layout.maximumHeight: 28
-                                                Layout.fillHeight: false
-
-                                                radius: 4
-                                                color: modelData.level === "WARN" ? "#fff7ed" : "#f8fafc"
-                                                border.color: modelData.level === "WARN" ? "#fdba74" : "#e2e8f0"
-
-                                                RowLayout {
-                                                    anchors.fill: parent
-                                                    anchors.margins: 5
-                                                    spacing: 6
-
-                                                    Rectangle {
-                                                        width: 38
-                                                        height: 18
-                                                        radius: 9
-                                                        color: modelData.level === "WARN" ? "#f97316" : "#94a3b8"
-
-                                                        Text {
-                                                            anchors.centerIn: parent
-                                                            text: modelData.level
-                                                            color: "white"
-                                                            font.pixelSize: 9
-                                                            font.bold: true
-                                                        }
-                                                    }
-
-                                                    Text {
-                                                        text: modelData.time
-                                                        color: "#64748b"
-                                                        font.pixelSize: 11
-                                                        Layout.preferredWidth: 54
-                                                    }
-
-                                                    Text {
-                                                        text: modelData.message
-                                                        color: "#334155"
-                                                        font.pixelSize: 11
-                                                        Layout.fillWidth: true
-                                                        elide: Text.ElideRight
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        // 남는 세로 공간을 아래로 밀어
-                                        // 알람 목록이 제목 바로 아래부터 상단 정렬되도록 함
-                                        Item {
-                                            Layout.fillHeight: true
-                                        }
-                                    }
-                                }
-
-                                // ------------------------------------------------
-                                // [하단 우측 패널] 위험도 / 조치 요청
-                                // - 위험도
-                                // - 원인
-                                // - 조치 권장 메시지 표시
-                                // ------------------------------------------------
-                                Rectangle {
-                                    Layout.fillWidth: true
-                                    Layout.fillHeight: true
-                                    radius: 6
-                                    color: "white"
-                                    border.color: "#e2e8f0"
-
-                                    ColumnLayout {
-                                        anchors.fill: parent
-                                        anchors.margins: 8
-                                        spacing: 4
-
-                                        Text {
-                                            text: "위험도 / 조치 요청"
-                                            color: "#334155"
-                                            font.pixelSize: 14
-                                            font.bold: true
-                                        }
-
-                                        // ----------------------------------------
-                                        // [3분할 표시]
-                                        // 1) 위험도 : 등급 + 스코어
-                                        // 2) 원인   : 이상 판단 원인 축/항목
-                                        // 3) 조치   : 작업자 확인/점검 요청
-                                        // ----------------------------------------
-                                        RiskActionBlock {
-                                            title: "위험도"
-                                            valueText: robotCard.robotData.prediction.riskLevel
-                                                       + " (" + robotCard.robotData.prediction.score + ")"
-                                            detailText: robotCard.robotData.prediction.score >= 90
-                                                        ? "즉시 점검 필요"
-                                                        : "추세 관찰 필요"
-                                            valueColor: robotCard.robotData.prediction.score >= 90
-                                                        ? "#dc2626"
-                                                        : "#f97316"
-                                        }
-
-                                        RiskActionBlock {
-                                            title: "원인"
-                                            valueText: robotCard.robotData.prediction.causeText
-                                            detailText: "이상 판단 원인"
-                                            valueColor: "#334155"
-                                        }
-
-                                        RiskActionBlock {
-                                            title: "조치"
-                                            valueText: robotCard.robotData.prediction.recommendedAction
-                                            detailText: "작업자 확인 항목"
-                                            valueColor: "#334155"
-                                            wrapValue: true
-                                        }
-                                    }
-                                }
-                            }
-}
-                    }
+                if (ratio > worst.ratio) {
+                    worst.axis = series[i].axis
+                    worst.metric = metric
+                    worst.value = v
+                    worst.ratio = ratio
+                    worst.level = root.riskLevelFromRatio(ratio)
                 }
             }
         }
+
+        updateWorst(robotData.tempSeries, "온도", threshold.temperature.warningMax)
+        updateWorst(robotData.torqueSeries, "부하", threshold.torque.warningMax)
+
+        return worst
+    }
+    // 알람 시간 표시: time > occurredAt > occurred_at > "-"
+    function alarmDisplayTime(alarm) {
+        if (!alarm)
+            return "-"
+
+        if (alarm.time !== undefined && alarm.time !== "")
+            return alarm.time
+
+        if (alarm.occurredAt !== undefined && alarm.occurredAt.length >= 19)
+            return alarm.occurredAt.substr(11, 8)
+
+        if (alarm.occurred_at !== undefined && alarm.occurred_at.length >= 19)
+            return alarm.occurred_at.substr(11, 8)
+
+        return "-"
+    }
+    // 알람 레벨 표시: level > severity > "-"
+    function alarmLevelLabel(level) {
+        if (level === "ALARM")
+            return "ALARM"
+
+        if (level === "WARNING" || level === "WARN")
+            return "WARN"
+
+        if (level === "INFO")
+            return "INFO"
+
+        return level !== undefined && level !== "" ? level : "-"
+    }
+    // 알람 레벨별 색상: ALARM - 빨강, WARN - 노랑, INFO/기타 - 회색
+    function alarmBackground(level) {
+        if (level === "ALARM")
+            return "#ffebee"
+
+        if (level === "WARNING" || level === "WARN")
+            return "#fff8e1"
+
+        return "#f5f5f5"
+    }
+    // 알람 레벨별 테두리 색상: ALARM - 진한 빨강, WARN - 진한 노랑, INFO/기타 - 회색
+    function alarmBorder(level) {
+        if (level === "ALARM")
+            return "#ef9a9a"
+
+        if (level === "WARNING" || level === "WARN")
+            return "#ffe082"
+
+        return "#e0e4ea"
+    }
+    // 알람 레벨별 배지 색상: ALARM - 빨강, WARN - 노랑, INFO/기타 - 회색
+    function alarmBadgeColor(level) {
+        if (level === "ALARM")
+            return "#c62828"
+
+        if (level === "WARNING" || level === "WARN")
+            return "#f9a825"
+
+        return "#9e9e9e"
     }
 
-    // ============================================================
-    // [다이얼로그] 임계값 설정
-    // 호출 위치:
-    // - 상단 툴바 [임계값 설정] 버튼 클릭
-    //
-    // 구성:
-    // - Robot 1 임계값 설정
-    // - Robot 2 임계값 설정
-    // - 온도 / 전류 임계값 입력
-    // ============================================================
+    function dataFreshnessInfo(robotData) {
+        var lastMs = robotData && robotData.lastUpdateEpochMs !== undefined
+                ? Number(robotData.lastUpdateEpochMs)
+                : 0
 
+        if (lastMs <= 0) {
+            return {
+                state: "OFFLINE",
+                label: "OFFLINE",
+                color: "#f1f5f9",
+                borderColor: "#cbd5e1",
+                textColor: "#64748b"
+            }
+        }
 
-    // ============================================================
-    // [다이얼로그] 이력 조회
-    // 호출 위치:
-    // - 상단 툴바 [이력 조회] 버튼 클릭
-    //
-    // 구성:
-    // - 로봇 선택
-    // - 조회 기간 선택
-    // - CSV 내보내기
-    // - 시간 / 로봇 / 축 / 온도 / 토크 / 상태 / 설명 테이블
-    // ============================================================
-    // ============================================================
-    // [다이얼로그] 이력 조회
-    // 호출 위치:
-    // - 상단 툴바 [이력 조회] 버튼 클릭
-    //
-    // 구성:
-    // - 로봇 선택
-    // - 기간 선택
-    // - 이력 구분: 전체 / 알람 이력 / 조치 이력
-    // - 설명/조치내용 검색
-    // - CSV 내보내기
-    // - 좌측 이력 테이블
-    // - 우측 선택 이력 상세
-    // ============================================================
+        var ageSec = (root.currentEpochMs - lastMs) / 1000.0
 
+        if (ageSec <= 3.0) {
+            return {
+                state: "ONLINE",
+                label: "ONLINE",
+                color: "#e0f2fe",
+                borderColor: "#38bdf8",
+                textColor: "#0369a1"
+            }
+        }
 
+        if (ageSec <= 10.0) {
+            return {
+                state: "STALE",
+                label: "STALE",
+                color: "#fff7ed",
+                borderColor: "#fdba74",
+                textColor: "#c2410c"
+            }
+        }
 
-
-    // ============================================================
-    // [분리된 다이얼로그]
-    // 임계값 설정 / 이력 조회 화면은 별도 QML로 분리
-    //
-    // 배치 권장:
-    // - IoTPanel.qml
-    // - ThresholdSettingDialog.qml
-    // - HistoryQueryDialog.qml
-    //
-    // 주의:
-    // - 같은 폴더에 두면 별도 import 없이 타입 인식 가능
-    // - qrc/CMake 사용 시 새 QML 파일 등록 필요
-    // ============================================================
+        return {
+            state: "OFFLINE",
+            label: "OFFLINE",
+            color: "#f1f5f9",
+            borderColor: "#cbd5e1",
+            textColor: "#64748b"
+        }
+    }
+    // ── 다이얼로그 ────────────────────────────────────────────
+    // 임계값 설정 다이얼로그, robotIndex는 1-based로 전달 (1 또는 2)
     ThresholdSettingDialog {
         id: thresholdDialog
-        hostWidth: root.width
+        hostWidth:  root.width
         hostHeight: root.height
         thresholds: root.robotThresholds
-
         onSaveRequested: function(robotIndex, thresholdData) {
-            root.applyThreshold(robotIndex, thresholdData)
+            if (root.hasIotViewModel) {
+                if (!iotViewModel.saveThreshold(robotIndex, thresholdData)) {
+                    console.warn("[QML] Failed to save threshold:", robotIndex)
+                }
+                return
+            }
 
-            // 이후 실제 로직 붙일 때
-            // TODO: iotViewModel.saveThreshold(robotIndex, thresholdData)
+            root.applyThreshold(robotIndex, thresholdData)
         }
     }
-
+    // 알람 이력 조회 및 CSV 내보내기 포함
     HistoryQueryDialog {
         id: historyDialog
-        hostWidth: root.width
+        hostWidth:  root.width
         hostHeight: root.height
+        viewModel: root.hasIotViewModel ? iotViewModel : null
 
         onExportCsvRequested: function(rows, robotFilter, periodFilter, typeFilter, searchText) {
             console.log("[QML] CSV export requested, rows = " + rows.length)
-            // TODO: iotViewModel.exportHistoryCsv(rows, robotFilter, periodFilter, typeFilter, searchText)
+
+            if (root.hasIotViewModel) {
+                if (!iotViewModel.exportHistoryCsv(rows)) {
+                    console.warn("[QML] CSV export failed:", iotViewModel.lastError)
+                } else {
+                    console.log("[QML] CSV exported:", iotViewModel.lastExportPath)
+                }
+            }
+        }
+
+        onAlarmConfirmRequested: function(alarmRow) {
+            console.log("[QML] alarm confirm requested:",
+                        alarmRow.id,
+                        alarmRow.robot,
+                        alarmRow.axis)
+
+            if (!root.hasIotViewModel) {
+                console.warn("[QML] IoTViewModel is not available")
+                return
+            }
+
+            if (!iotViewModel.confirmAlarmAction(alarmRow)) {
+                console.warn("[QML] alarm confirm failed:",
+                             iotViewModel.lastError)
+                return
+            }
+
+            historyDialog.requestHistoryQuery()
+        }
+
+        onAlarmActionRequested: function(alarmRow) {
+            console.log("[QML] alarm action requested:",
+                        alarmRow.id,
+                        alarmRow.robot,
+                        alarmRow.axis)
+        }
+    }
+    // 그래프 표시 설정 다이얼로그
+    GraphDisplaySettingsDialog {
+        id: graphDisplaySettingsDialog
+
+        hostWidth: root.width
+        hostHeight: root.height
+
+        axisLegendReverseOrder: root.axisLegendReverseOrder
+
+        robot1TemperatureYMin: root.robot1TemperatureYMin
+        robot1TemperatureYMax: root.robot1TemperatureYMax
+        robot1TemperatureDecimals: root.robot1TemperatureDecimals
+        robot1TemperatureXPointCount: root.robot1TemperatureXPointCount
+
+        robot1TorqueYMin: root.robot1TorqueYMin
+        robot1TorqueYMax: root.robot1TorqueYMax
+        robot1TorqueDecimals: root.robot1TorqueDecimals
+        robot1TorqueXPointCount: root.robot1TorqueXPointCount
+
+        robot2TemperatureYMin: root.robot2TemperatureYMin
+        robot2TemperatureYMax: root.robot2TemperatureYMax
+        robot2TemperatureDecimals: root.robot2TemperatureDecimals
+        robot2TemperatureXPointCount: root.robot2TemperatureXPointCount
+
+        robot2TorqueYMin: root.robot2TorqueYMin
+        robot2TorqueYMax: root.robot2TorqueYMax
+        robot2TorqueDecimals: root.robot2TorqueDecimals
+        robot2TorqueXPointCount: root.robot2TorqueXPointCount
+
+        onApplyRequested: function(settings) {
+            root.axisLegendReverseOrder = settings.axisLegendReverseOrder
+
+            root.robot1TemperatureYMin = settings.robot1TemperatureYMin
+            root.robot1TemperatureYMax = settings.robot1TemperatureYMax
+            root.robot1TemperatureDecimals = settings.robot1TemperatureDecimals
+            root.robot1TemperatureXPointCount = settings.robot1TemperatureXPointCount
+
+            root.robot1TorqueYMin = settings.robot1TorqueYMin
+            root.robot1TorqueYMax = settings.robot1TorqueYMax
+            root.robot1TorqueDecimals = settings.robot1TorqueDecimals
+            root.robot1TorqueXPointCount = settings.robot1TorqueXPointCount
+
+            root.robot2TemperatureYMin = settings.robot2TemperatureYMin
+            root.robot2TemperatureYMax = settings.robot2TemperatureYMax
+            root.robot2TemperatureDecimals = settings.robot2TemperatureDecimals
+            root.robot2TemperatureXPointCount = settings.robot2TemperatureXPointCount
+
+            root.robot2TorqueYMin = settings.robot2TorqueYMin
+            root.robot2TorqueYMax = settings.robot2TorqueYMax
+            root.robot2TorqueDecimals = settings.robot2TorqueDecimals
+            root.robot2TorqueXPointCount = settings.robot2TorqueXPointCount
+        }
+
+        onResetRequested: {
+            root.resetGraphDisplaySettings()
         }
     }
 
-    // ============================================================
+    // ═══════════════════════════════════════════════════════════
+    // 메인 레이아웃
+    // ═══════════════════════════════════════════════════════════
+    ColumnLayout {
+        anchors.fill:    parent
+        anchors.margins: 12
+        spacing:         root.sectionSpacing
+
+        // ── 상단 툴바 ─────────────────────────────────────────
+        RowLayout {
+            Layout.fillWidth:       true
+            Layout.preferredHeight: root.toolBarHeight
+            Layout.minimumHeight:   root.toolBarHeight
+            Layout.maximumHeight:   root.toolBarHeight
+            Layout.fillHeight:      false
+            spacing: 8
+
+            Text {
+                text:           "IoT 모니터링"
+                font.family:    "Asta Sans"
+                font.pixelSize: 20
+                font.bold:      true
+                color:          "#212121"
+            }
+
+            Item { Layout.fillWidth: true }
+
+            IoTToolButton {
+                text: "그래프 설정"
+                onClicked: graphDisplaySettingsDialog.open()
+            }
+
+            IoTToolButton {
+                text:                 "임계값 설정"
+                Layout.preferredWidth: 112
+                onClicked: {
+                    root.thresholdSettingRequested()
+                    thresholdDialog.open()
+                }
+            }
+
+            IoTToolButton {
+                text:                 "이력 조회"
+                Layout.preferredWidth: 96
+                onClicked: {
+                    root.historyQueryRequested()
+                    historyDialog.open()
+                }
+            }
+        }
+
+        // ── 로봇 2대 카드 영역 ────────────────────────────────
+        RowLayout {
+            Layout.fillWidth:  true
+            Layout.fillHeight: true
+            spacing: 12
+
+            Repeater {
+                model: root.robotModels ? root.robotModels.length : 0
+
+                // ── 개별 Robot 카드 ───────────────────────────
+                Rectangle {
+                    id: robotCard
+                    property var robotData: root.robotModels && root.robotModels[index]
+                                            ? root.robotModels[index]
+                                            : {}
+                    property int robotIndex: index
+
+                    Layout.fillWidth:  true
+                    Layout.fillHeight: true
+
+                    radius:       8
+                    color:        "#ffffff"
+                    border.color: "#e0e4ea"
+                    border.width: 1
+
+                    ColumnLayout {
+                        anchors.fill:    parent
+                        anchors.margins: 14
+                        spacing:         root.sectionSpacing
+
+                        // 카드 제목 행
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+
+                            Rectangle {
+                                width:  4
+                                height: 22
+                                radius: 2
+                                color:  "#1976d2"
+                            }
+
+                            Text {
+                                text: robotCard.robotData.name
+                                font.family: "Asta Sans"
+                                font.pixelSize: 18
+                                font.bold: true
+                                color: "#212121"
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                            }
+
+                            Text {
+                                text: "Last " +
+                                      (robotCard.robotData.lastUpdateTime !== undefined
+                                       ? robotCard.robotData.lastUpdateTime
+                                       : "-")
+                                font.family: "Asta Sans"
+                                font.pixelSize: 10
+                                color: "#64748b"
+                                verticalAlignment: Text.AlignVCenter
+                                Layout.alignment: Qt.AlignVCenter
+                                Layout.preferredWidth: 78
+                                elide: Text.ElideRight
+                            }
+
+                            // 온라인 상태 표시
+                            Rectangle {
+                                property var freshness: root.dataFreshnessInfo(robotCard.robotData)
+
+                                width: 72
+                                height: 22
+                                radius: 11
+                                color: freshness.color
+                                border.color: freshness.borderColor
+                                border.width: 1
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: parent.freshness.label
+                                    font.family: "Asta Sans"
+                                    font.pixelSize: 10
+                                    font.bold: true
+                                    color: parent.freshness.textColor
+                                }
+                            }
+                            // 실행 상태 표시
+                            Rectangle {
+                                width:        58
+                                height:       22
+                                radius:       11
+                                color:        robotCard.robotData.running ? "#e8f5e9" : "#ffebee"
+                                border.color: robotCard.robotData.running ? "#66bb6a" : "#ef9a9a"
+                                border.width: 1
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text:           robotCard.robotData.running ? "RUN" : "STOP"
+                                    font.family:    "Asta Sans"
+                                    font.pixelSize: 11
+                                    font.bold:      true
+                                    color:          robotCard.robotData.running ? "#2e7d32" : "#c62828"
+                                }
+                            }
+                        }
+
+                        // 요약 카드 행
+                        RowLayout {
+                            Layout.fillWidth:       true
+                            Layout.preferredHeight: root.summaryCardHeight
+                            Layout.minimumHeight:   root.summaryCardHeight
+                            Layout.maximumHeight:   root.summaryCardHeight
+                            Layout.fillHeight:      false
+                            spacing: 8
+
+                            MetricCard {
+                                Layout.fillWidth: true
+                                cardLabel:    "Max 온도"
+                                cardValue:    root.maxLatestInfo(robotCard.robotData.tempSeries).value.toFixed(1)
+                                cardUnit:     "°C"
+                                cardSub:      root.maxLatestInfo(robotCard.robotData.tempSeries).axis
+                                accentColor:  root.maxLatestInfo(robotCard.robotData.tempSeries).value
+                                              >= root.thresholdFor(robotCard.robotIndex).temperature.warningMax
+                                              ? "#c62828" : "#1976d2"
+                            }
+
+                            MetricCard {
+                                Layout.fillWidth: true
+                                cardLabel:    "Max 부하"
+                                cardValue:    root.maxLatestInfo(robotCard.robotData.torqueSeries).value.toFixed(1)
+                                cardUnit:     "raw"
+                                cardSub:      root.maxLatestInfo(robotCard.robotData.torqueSeries).axis
+                                accentColor:  root.maxLatestInfo(robotCard.robotData.torqueSeries).value
+                                              >= root.thresholdFor(robotCard.robotIndex).torque.warningMax
+                                              ? "#c62828" : "#2e7d32"
+                            }
+
+                            MetricCard {
+                                Layout.fillWidth: true
+
+                                property var threshold: root.thresholdFor(robotCard.robotIndex)
+                                property var worst: root.worstAxisInfo(robotCard.robotData, threshold)
+
+                                cardLabel: "종합 위험축"
+                                cardValue: worst.axis
+                                cardUnit: ""
+                                cardSub: worst.metric + " 기준 / " + worst.level
+                                accentColor: worst.level === "경고"
+                                             ? "#c62828"
+                                             : worst.level === "주의"
+                                               ? "#f9a825"
+                                               : "#2e7d32"
+                            }
+                        }
+                        // 온도/부하 그래프 + 축별 현재값 블록
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            spacing: 8
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                spacing: root.sectionSpacing
+                                // 온도 그래프
+                                AxisLineChart {
+                                    Layout.fillWidth:       true
+                                    Layout.fillHeight:      true
+                                    Layout.minimumHeight:   root.chartMinHeight
+                                    Layout.preferredHeight: root.chartPreferredHeight
+                                    chartTitle:   "축별 온도 추세"
+                                    unit:         "°C"
+/*
+                                    minValue:     30
+                                    maxValue:     80
+                                    normalValue:  root.thresholdFor(robotCard.robotIndex).temperature.normalMax
+                                    warningValue: root.thresholdFor(robotCard.robotIndex).temperature.warningMax
+                                    alarmValue:   root.thresholdFor(robotCard.robotIndex).temperature.alarmMax
+*/
+                                    minValue:      root.temperatureYMin(robotCard.robotIndex)
+                                    maxValue:      root.temperatureYMax(robotCard.robotIndex)
+                                    valueDecimals: root.temperatureDecimals(robotCard.robotIndex)
+                                    visiblePointCount: root.temperatureXPointCount(robotCard.robotIndex)
+
+                                    normalValue:  root.thresholdFor(robotCard.robotIndex).temperature.normalMax
+                                    warningValue: root.thresholdFor(robotCard.robotIndex).temperature.warningMax
+                                    alarmValue:   root.thresholdFor(robotCard.robotIndex).temperature.alarmMax
+
+                                    timeLabels:   root.timeLabels
+                                    series:       robotCard.robotData.tempSeries
+                                    lineColors:   root.axisColors
+                                }
+
+                                // 부하 그래프
+                                AxisLineChart {
+                                    Layout.fillWidth:       true
+                                    Layout.fillHeight:      true
+                                    Layout.minimumHeight:   root.chartMinHeight
+                                    Layout.preferredHeight: root.chartPreferredHeight
+                                    chartTitle:   "축별 부하 추세"
+                                    unit:         "raw"
+/*
+                                    minValue:     0
+                                    maxValue:     2//20
+                                    valueDecimals: 1
+*/
+                                    minValue:      root.torqueYMin(robotCard.robotIndex)
+                                    maxValue:      root.torqueYMax(robotCard.robotIndex)
+                                    valueDecimals: root.torqueDecimals(robotCard.robotIndex)
+                                    visiblePointCount: root.torqueXPointCount(robotCard.robotIndex)
+
+                                    normalValue:  root.thresholdFor(robotCard.robotIndex).torque.normalMax
+                                    warningValue: root.thresholdFor(robotCard.robotIndex).torque.warningMax
+                                    alarmValue:   root.thresholdFor(robotCard.robotIndex).torque.alarmMax
+                                    timeLabels:   root.timeLabels
+                                    series:       robotCard.robotData.torqueSeries
+                                    lineColors:   root.axisColors
+                                }
+                            }   // end: 온도/부하 그래프
+                            AxisMetricLegend {
+                                    Layout.preferredWidth: 96
+                                    Layout.minimumWidth:   130
+                                    Layout.maximumWidth:   160
+                                    Layout.fillHeight:     true
+
+                                    tempSeries:   robotCard.robotData.tempSeries
+                                    torqueSeries: robotCard.robotData.torqueSeries
+                                    lineColors:   root.axisColors
+
+                                    // true: J6 → J1 표시
+                                    // false: J1 → J6 표시
+                                    reverseOrder: root.axisLegendReverseOrder
+                                }
+                        }   // end: 온도/부하 그래프 + 축별 현재값 블록
+                        // 하단: 알람 이력 + 위험도 패널
+                        RowLayout {
+                            Layout.fillWidth:       true
+                            Layout.preferredHeight: root.bottomPanelHeight
+                            Layout.minimumHeight:   root.bottomPanelHeight
+                            Layout.maximumHeight:   root.bottomPanelHeight
+                            Layout.fillHeight:      false
+                            spacing: 8
+
+                            // 알람 이력
+                            Rectangle {
+                                Layout.fillWidth:  true
+                                Layout.fillHeight: true
+                                radius:       6
+                                color:        "#fafafa"
+                                border.color: "#e0e4ea"
+                                border.width: 1
+
+                                ColumnLayout {
+                                    anchors.fill:    parent
+                                    anchors.margins: 10
+                                    spacing:          6
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 6
+                                        Rectangle { width: 3; height: 14; radius: 1; color: "#f9a825" }
+                                        Text {
+                                            text:           "최근 알람"
+                                            font.family:    "Asta Sans"
+                                            font.pixelSize: 13
+                                            font.bold:      true
+                                            color:          "#212121"
+                                        }
+                                    }
+
+                                    Repeater {
+                                        model: robotCard.robotData.alarms.slice(0, 3)
+
+                                        Rectangle {
+                                            Layout.fillWidth:       true
+                                            Layout.preferredHeight: 32
+                                            Layout.minimumHeight:   32
+                                            Layout.maximumHeight:   32
+                                            Layout.fillHeight:      false
+                                            radius:       4
+                                            color:        root.alarmBackground(modelData.level)
+                                            border.color: root.alarmBorder(modelData.level)
+                                            border.width: 1
+
+                                            RowLayout {
+                                                anchors.fill:    parent
+                                                anchors.margins: 6
+                                                spacing:         6
+
+                                                Rectangle {
+                                                    width:  36
+                                                    height: 18
+                                                    radius:  9
+                                                    color: root.alarmBadgeColor(modelData.level)
+
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        text:           root.alarmLevelLabel(modelData.level)
+                                                        color:          "white"
+                                                        font.family:    "Asta Sans"
+                                                        font.pixelSize: 9
+                                                        font.bold:      true
+                                                    }
+                                                }
+
+                                                Text {
+                                                    text:                  root.alarmDisplayTime(modelData)
+                                                    color:                 "#757575"
+                                                    font.family:           "Asta Sans"
+                                                    font.pixelSize:        11
+                                                    Layout.preferredWidth: 56
+                                                }
+
+                                                Text {
+                                                    text:           modelData.message
+                                                    color:          "#374151"
+                                                    font.family:    "Asta Sans"
+                                                    font.pixelSize: 12
+                                                    Layout.fillWidth: true
+                                                    elide:          Text.ElideRight
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Item { Layout.fillHeight: true }
+                                }
+                            }
+
+                            // 위험도 / 조치
+                            Rectangle {
+                                Layout.fillWidth:  true
+                                Layout.fillHeight: true
+                                radius:       6
+                                color:        "#fafafa"
+                                border.color: "#e0e4ea"
+                                border.width: 1
+                                clip:         true
+
+                                ColumnLayout {
+                                    anchors.fill:    parent
+                                    anchors.margins: 10
+                                    spacing:         6
+
+                                    // 헤더: 항상 고정
+                                    RowLayout {
+                                        Layout.fillWidth:       true
+                                        Layout.preferredHeight: 20
+                                        Layout.minimumHeight:   20
+                                        Layout.maximumHeight:   20
+                                        Layout.fillHeight:      false
+                                        spacing: 6
+                                        Rectangle { width: 3; height: 14; radius: 1; color: "#1976d2" }
+                                        Text {
+                                            text:           "위험도 / 권장 조치"
+                                            font.family:    "Asta Sans"
+                                            font.pixelSize: 13
+                                            font.bold:      true
+                                            color:          "#212121"
+                                        }
+                                    }
+
+                                    // 콘텐츠만 스크롤
+                                    Flickable {
+                                        id: riskFlick
+                                        Layout.fillWidth:  true
+                                        Layout.fillHeight: true
+                                        contentWidth:  width
+                                        contentHeight: riskCol.implicitHeight
+                                        flickableDirection: Flickable.VerticalFlick
+                                        boundsBehavior: Flickable.DragAndOvershootBounds
+                                        clip: true
+
+                                        ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+
+                                        ColumnLayout {
+                                            id: riskCol
+                                            width: riskFlick.width
+                                            spacing: 6
+
+                                            RiskBlock {
+                                                Layout.fillWidth: true
+                                                riskLabel:    "위험도"
+                                                riskValue:    robotCard.robotData.prediction.riskLevel
+                                                              + " (" + robotCard.robotData.prediction.score + ")"
+                                                riskDetail:   robotCard.robotData.prediction.score >= 90
+                                                              ? "즉시 점검 필요" : "추세 관찰 필요"
+                                                valueColor:   robotCard.robotData.prediction.score >= 90
+                                                              ? "#c62828" : "#f9a825"
+                                            }
+
+                                            RiskBlock {
+                                                Layout.fillWidth: true
+                                                riskLabel:    "원인"
+                                                riskValue:    robotCard.robotData.prediction.causeText
+                                                riskDetail:   "이상 판단 원인"
+                                                valueColor:   "#374151"
+                                            }
+
+                                            RiskBlock {
+                                                Layout.fillWidth: true
+                                                riskLabel:    "조치"
+                                                riskValue:    robotCard.robotData.prediction.recommendedAction
+                                                riskDetail:   "작업자 확인 항목"
+                                                valueColor:   "#374151"
+                                                wrapValue:    true
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
     // [컴포넌트] MetricCard
-    // 사용 위치: 요약 카드 영역
-    // 용도: 가동 상태, Max 온도, Max 전류, 워스트 축 표시
-    // ============================================================
+    // ═══════════════════════════════════════════════════════════
     component MetricCard: Rectangle {
-        id: metricRoot
+        id: mc
 
-        property string title: ""
-        property string valueText: "-"
-        property string subText: "-"
-        property color valueColor: "#334155"
-
-        Layout.fillWidth: true
-        Layout.preferredHeight: root.summaryCardHeight
-        Layout.minimumHeight: root.summaryCardHeight
-        Layout.maximumHeight: root.summaryCardHeight
-        Layout.fillHeight: false
-
-        radius: 6
-        color: "#f8fafc"
-        border.color: "#e2e8f0"
-
-        ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 6
-            spacing: 0
-
-            Text {
-                Layout.fillWidth: true
-                text: metricRoot.title
-                color: "#64748b"
-                font.pixelSize: 11
-                elide: Text.ElideRight
-            }
-
-            Text {
-                Layout.fillWidth: true
-                text: metricRoot.valueText
-                color: metricRoot.valueColor
-                font.pixelSize: 15
-                font.bold: true
-                elide: Text.ElideRight
-            }
-
-            Text {
-                Layout.fillWidth: true
-                text: metricRoot.subText
-                color: "#94a3b8"
-                font.pixelSize: 10
-                elide: Text.ElideRight
-            }
-        }
-    }
-
-
-    // ============================================================
-    // [컴포넌트] RiskActionBlock
-    // 사용 위치: 하단 우측 위험도 / 조치 요청 패널
-    // 용도:
-    // - 위험도
-    // - 원인
-    // - 조치
-    // 3개 항목을 동일한 카드 형태로 표시
-    // ============================================================
-    component RiskActionBlock: Rectangle {
-        id: blockRoot
-
-        property string title: ""
-        property string valueText: "-"
-        property string detailText: ""
-        property color valueColor: "#334155"
-        property bool wrapValue: false
-
-        Layout.fillWidth: true
+        Layout.fillWidth:  true
         Layout.fillHeight: true
-        Layout.minimumHeight: 42
 
-        radius: 6
-        color: "#f8fafc"
-        border.color: "#e2e8f0"
+        property string cardLabel:   ""
+        property string cardValue:   "-"
+        property string cardUnit:    ""
+        property string cardSub:     ""
+        property color  accentColor: "#1976d2"
+
+        radius:       6
+        color:        "#f5f7fa"
+        border.color: "#e0e4ea"
+        border.width: 1
+        clip:         true
 
         ColumnLayout {
-            anchors.fill: parent
+            anchors.fill:    parent
             anchors.margins: 6
-            spacing: 2
+            spacing:         2
 
             Text {
                 Layout.fillWidth: true
-                text: blockRoot.title
-                color: "#64748b"
-                font.pixelSize: 10
-                font.bold: true
-                elide: Text.ElideRight
+                text:           mc.cardLabel
+                font.family:    "Asta Sans"
+                font.pixelSize: 11
+                color:          "#9e9e9e"
+                elide:          Text.ElideRight
+            }
+
+            RowLayout {
+                Layout.fillWidth:       true
+                Layout.preferredHeight: 30
+                spacing: 3
+
+                Text {
+                    Layout.fillWidth: true
+                    text:           mc.cardValue
+                    font.family:    "Asta Sans"
+                    font.pixelSize: 22
+                    font.bold:      true
+                    color:          mc.accentColor
+                    elide:          Text.ElideRight
+                }
+
+                Text {
+                    text:            mc.cardUnit
+                    font.family:     "Asta Sans"
+                    font.pixelSize:  13
+                    color:           mc.accentColor
+                    visible:         mc.cardUnit !== ""
+                    Layout.alignment: Qt.AlignVCenter | Qt.AlignBottom
+                    Layout.bottomMargin: 3
+                }
             }
 
             Text {
                 Layout.fillWidth: true
-                Layout.fillHeight: blockRoot.wrapValue
-                text: blockRoot.valueText
-                color: blockRoot.valueColor
-                font.pixelSize: 12
-                font.bold: blockRoot.title === "위험도"
-                wrapMode: blockRoot.wrapValue ? Text.WordWrap : Text.NoWrap
-                elide: blockRoot.wrapValue ? Text.ElideNone : Text.ElideRight
-                maximumLineCount: blockRoot.wrapValue ? 2 : 1
-            }
-
-            Text {
-                Layout.fillWidth: true
-                text: blockRoot.detailText
-                color: "#94a3b8"
-                font.pixelSize: 9
-                elide: Text.ElideRight
+                text:           mc.cardSub
+                font.family:    "Asta Sans"
+                font.pixelSize: 11
+                color:          "#9e9e9e"
+                elide:          Text.ElideRight
             }
         }
     }
 
-    // ============================================================
-    // [컴포넌트] IoTToolbarButton
-    // 사용 위치: IoT 상단 툴바
-    // 용도:
-    // - 임계값 설정
-    // - 이력 조회
-    // ============================================================
-    component IoTToolbarButton: Button {
-        id: toolbarButton
+    // ═══════════════════════════════════════════════════════════
+    // [컴포넌트] RiskBlock
+    // ═══════════════════════════════════════════════════════════
+    component RiskBlock: Rectangle {
+        id: rb
 
-        Layout.preferredHeight: 28
-        Layout.minimumHeight: 28
-        Layout.maximumHeight: 28
-        Layout.fillHeight: false
+        property string riskLabel:  ""
+        property string riskValue:  "-"
+        property string riskDetail: ""
+        property color  valueColor: "#374151"
+        property bool   wrapValue:  false
 
-        font.pixelSize: 12
+        Layout.fillWidth:     true
+        Layout.fillHeight:    true
+        Layout.minimumHeight: 40
+
+        radius:       4
+        color:        "#ffffff"
+        border.color: "#e0e4ea"
+        border.width: 1
+
+        RowLayout {
+            anchors.fill:    parent
+            anchors.margins: 6
+            spacing:         8
+
+            Text {
+                text:                  rb.riskLabel
+                font.family:           "Asta Sans"
+                font.pixelSize:        11
+                font.bold:             true
+                color:                 "#9e9e9e"
+                Layout.preferredWidth: 38
+                verticalAlignment:     Text.AlignVCenter
+            }
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 1
+
+                Text {
+                    Layout.fillWidth: true
+                    text:           rb.riskValue
+                    font.family:    "Asta Sans"
+                    font.pixelSize: 13
+                    font.bold:      rb.riskLabel === "위험도"
+                    color:          rb.valueColor
+                    wrapMode:       rb.wrapValue ? Text.WordWrap : Text.NoWrap
+                    elide:          rb.wrapValue ? Text.ElideNone : Text.ElideRight
+                    maximumLineCount: rb.wrapValue ? 2 : 1
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    text:           rb.riskDetail
+                    font.family:    "Asta Sans"
+                    font.pixelSize: 10
+                    color:          "#bdbdbd"
+                    elide:          Text.ElideRight
+                }
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // [컴포넌트] IoTToolButton
+    // ═══════════════════════════════════════════════════════════
+    component IoTToolButton: Button {
+        id: tb
+
+        Layout.preferredHeight: 30
+        Layout.minimumHeight:   30
+        Layout.maximumHeight:   30
+        Layout.fillHeight:      false
 
         contentItem: Text {
-            text: toolbarButton.text
-            color: "#334155"
-            font.pixelSize: 12
+            text:                tb.text
+            font.family:         "Asta Sans"
+            font.pixelSize:      13
+            color:               "#374151"
             horizontalAlignment: Text.AlignHCenter
-            verticalAlignment: Text.AlignVCenter
-            elide: Text.ElideRight
+            verticalAlignment:   Text.AlignVCenter
+            elide:               Text.ElideRight
         }
 
         background: Rectangle {
-            radius: 5
-            color: toolbarButton.pressed ? "#cbd5e1"
-                 : toolbarButton.hovered ? "#e2e8f0"
-                 : "#f1f5f9"
-            border.color: "#cbd5e1"
+            radius:       4
+            color:        tb.down    ? "#cbd5e1"
+                        : tb.hovered ? "#e5e7eb"
+                        :              "#f1f5f9"
+            border.color: "#d1d5db"
+            border.width: 1
         }
     }
 
-    // ============================================================
-    // [컴포넌트] AxisLineChart
-    // 사용 위치:
-    // - 온도 그래프 영역
-    // - 전류/토크 그래프 영역
-    //
-    // 용도:
-    // - Canvas 기반 라인 그래프
-    // - J1~J6 다중 시계열 표시
-    // - 임계값 라인 표시
-    // ============================================================
-    component AxisLineChart: Rectangle {
-        id: chartRoot
+    // ═══════════════════════════════════════════════════════════
+    // [컴포넌트] AxisMetricLegend
+    // 그래프 선 색상과 축별 현재 온도/부하 값을 매칭해서 표시
+    // ═══════════════════════════════════════════════════════════
+    component AxisMetricLegend: Rectangle {
+        id: legend
 
-        property string title: ""
-        property string unit: ""
-        property real minValue: 0
-        property real maxValue: 100
-
-        // 임계값 라인
-        property real normalValue: 0
-        property real warningValue: 0
-        property real alarmValue: 0
-        property var timeLabels: []
-        property var series: []
+        property var tempSeries: []
+        property var torqueSeries: []
         property var lineColors: []
-
-        // ============================================================
-        // [선 스타일 설정]
-        // 축별 데이터 라인과 임계값 라인의 시각적 구분용
-        // ============================================================
-        property real dataLineWidth: 1.7
-        property real thresholdLineWidth: 1.0
-        property real thresholdAlpha: 0.72
-        property real pointRadius: 2.6
+        property bool reverseOrder: false
 
         radius: 6
-        color: "white"
-        border.color: "#e2e8f0"
+        color: "#ffffff"
+        border.color: "#e0e4ea"
+        border.width: 1
+        clip: true
+
+        function axisIndexFromRepeater(repeaterIndex) {
+            return reverseOrder ? (5 - repeaterIndex) : repeaterIndex
+        }
+
+        function colorAt(axisIndex) {
+            if (!lineColors || lineColors.length === 0)
+                return "#64748b"
+
+            return lineColors[axisIndex % lineColors.length]
+        }
+
+        function latest(series, axisIndex) {
+            if (!series || axisIndex < 0 || axisIndex >= series.length)
+                return 0
+
+            var item = series[axisIndex]
+
+            if (!item || !item.values || item.values.length === 0)
+                return 0
+
+            return Number(item.values[item.values.length - 1])
+        }
 
         ColumnLayout {
             anchors.fill: parent
-            anchors.margins: 8
+            anchors.margins: 4
             spacing: 4
+
+            Text {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 20
+                Layout.minimumHeight: 20
+                Layout.maximumHeight: 20
+                Layout.fillHeight: false
+
+                text: "축별 현재값"
+                font.family: "Asta Sans"
+                font.pixelSize: 12
+                font.bold: true
+                color: "#212121"
+                verticalAlignment: Text.AlignVCenter
+                horizontalAlignment: Text.AlignLeft
+                elide: Text.ElideRight
+            }
+
+            Repeater {
+                model: 6
+
+                Rectangle {
+                    id: axisBlock
+
+                    property int axisIndex: legend.axisIndexFromRepeater(index)
+                    property color axisColor: legend.colorAt(axisIndex)
+                    property real currentTemp: legend.latest(legend.tempSeries, axisIndex)
+                    property real currentTorque: legend.latest(legend.torqueSeries, axisIndex)
+
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    Layout.minimumHeight: 40
+
+                    radius: 5
+                    color: "#f8fafc"
+                    border.color: axisColor
+                    border.width: 1
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.margins: 5
+                        spacing: 5
+
+                        Rectangle {
+                            Layout.preferredWidth: 5
+                            Layout.fillHeight: true
+                            radius: 2
+                            color: axisBlock.axisColor
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            spacing: 0
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: "J" + (axisBlock.axisIndex + 1)
+                                font.family: "Asta Sans"
+                                font.pixelSize: 17
+                                font.bold: true
+                                color: axisBlock.axisColor
+                                horizontalAlignment: Text.AlignLeft
+                                elide: Text.ElideRight
+                            }
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: "T " + axisBlock.currentTemp.toFixed(1) + "°C"
+                                font.family: "Asta Sans"
+                                font.pixelSize: 15
+                                color: "#334155"
+                                elide: Text.ElideRight
+                            }
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: "L " + axisBlock.currentTorque.toFixed(1) + " raw"
+                                font.family: "Asta Sans"
+                                font.pixelSize: 15
+                                color: "#334155"
+                                elide: Text.ElideRight
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // ═══════════════════════════════════════════════════════════
+    // [컴포넌트] GraphScaleSettingBlock
+    // ═══════════════════════════════════════════════════════════
+    component GraphScaleSettingBlock: Rectangle {
+        id: block
+
+        property string title: ""
+        property string yMinText: "0"
+        property string yMaxText: "100"
+        property string decimalsText: "0"
+        property string xPointCountText: "60"
+
+        signal applyRequested(real yMin, real yMax, int decimals, int xPointCount)
+
+        Layout.fillWidth: true
+        Layout.preferredHeight: 180
+
+        radius: 6
+        color: "#f8fafc"
+        border.color: "#e0e4ea"
+        border.width: 1
+
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 10
+            spacing: 8
+
+            Text {
+                Layout.fillWidth: true
+                text: block.title
+                font.family: "Asta Sans"
+                font.pixelSize: 14
+                font.bold: true
+                color: "#212121"
+            }
+
+            GridLayout {
+                Layout.fillWidth: true
+                columns: 2
+                columnSpacing: 8
+                rowSpacing: 6
+
+                Text { text: "Y 최소값"; font.pixelSize: 12; color: "#64748b" }
+                TextField {
+                    id: yMinField
+                    Layout.fillWidth: true
+                    text: block.yMinText
+                    selectByMouse: true
+                }
+
+                Text { text: "Y 최대값"; font.pixelSize: 12; color: "#64748b" }
+                TextField {
+                    id: yMaxField
+                    Layout.fillWidth: true
+                    text: block.yMaxText
+                    selectByMouse: true
+                }
+
+                Text { text: "소수점"; font.pixelSize: 12; color: "#64748b" }
+                TextField {
+                    id: decimalsField
+                    Layout.fillWidth: true
+                    text: block.decimalsText
+                    selectByMouse: true
+                }
+
+                Text { text: "X 표시 개수"; font.pixelSize: 12; color: "#64748b" }
+                TextField {
+                    id: xPointCountField
+                    Layout.fillWidth: true
+                    text: block.xPointCountText
+                    selectByMouse: true
+                }
+            }
 
             RowLayout {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 20
-                Layout.fillHeight: false
+
+                Item { Layout.fillWidth: true }
+
+                IoTToolButton {
+                    text: "적용"
+                    Layout.preferredWidth: 70
+                    onClicked: {
+                        var yMin = Number(yMinField.text)
+                        var yMax = Number(yMaxField.text)
+                        var decimals = Math.max(0, Math.round(Number(decimalsField.text)))
+                        var xCount = Math.max(2, Math.round(Number(xPointCountField.text)))
+
+                        if (isNaN(yMin) || isNaN(yMax) || yMax <= yMin)
+                            return
+
+                        if (isNaN(decimals))
+                            decimals = 0
+
+                        if (isNaN(xCount))
+                            xCount = 60
+
+                        block.applyRequested(yMin, yMax, decimals, xCount)
+                    }
+                }
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // [컴포넌트] AxisLineChart
+    // Canvas 기반 라인 그래프
+    // Y축 레이블 클리핑 방지: left 마진 48px, clip: true
+    // ═══════════════════════════════════════════════════════════
+    component AxisLineChart: Rectangle {
+        id: chart
+
+        property string chartTitle:   ""
+        property string unit:         ""
+        property real   minValue:      0
+        property real   maxValue:    100
+        property real   normalValue:   0
+        property real   warningValue:  0
+        property int    valueDecimals: 0
+        property real   alarmValue:    0
+        property int visiblePointCount: 60
+        property var    timeLabels:   []
+        property var    series:       []
+        property var    lineColors:   []
+
+        radius:       6
+        color:        "#ffffff"
+        border.color: "#e0e4ea"
+        border.width: 1
+        clip:         true
+
+        ColumnLayout {
+            anchors.fill:    parent
+            anchors.margins: 6
+            spacing:         2
+
+            // 제목 행 (범례 제거 — Row positioner는 RowLayout 안에서 implicitWidth가 0이 되어 겹침 발생)
+            RowLayout {
+                Layout.fillWidth:       true
+                Layout.preferredHeight: 16
+                Layout.fillHeight:      false
 
                 Text {
-                    text: chartRoot.title
-                    color: "#334155"
-                    font.pixelSize: 15
-                    font.bold: true
+                    text:           chart.chartTitle
+                    font.family:    "Asta Sans"
+                    font.pixelSize: 12
+                    font.bold:      true
+                    color:          "#212121"
                 }
 
                 Item { Layout.fillWidth: true }
 
                 Text {
-                    text: "정상 " + chartRoot.normalValue
-                          + " / 주의 " + chartRoot.warningValue
-                          + " / 경고 " + chartRoot.alarmValue
-                          + " " + chartRoot.unit
-                    color: "#f97316"
-                    font.pixelSize: 11
+                    text:           chart.unit + "  정상 " + chart.normalValue + "  /  주의 " + chart.warningValue + "  /  경고 " + chart.alarmValue
+                    font.family:    "Asta Sans"
+                    font.pixelSize: 10
+                    color:          "#9e9e9e"
                 }
             }
 
+            // 그래프 영역
             Rectangle {
-                Layout.fillWidth: true
+                Layout.fillWidth:  true
                 Layout.fillHeight: true
-                radius: 4
-                color: "#f8fafc"
-                border.color: "#e5e7eb"
+                radius:       4
+                color:        "#f5f7fa"
+                border.color: "#e0e4ea"
+                border.width: 1
+                clip:         true
 
                 Canvas {
-                    id: lineCanvas
+                    id: cv
                     anchors.fill: parent
-                    anchors.margins: 8
+
+                    property var _series:       chart.series
+                    property real _normalValue: chart.normalValue
+                    property real _warningValue: chart.warningValue
+                    property real _alarmValue:  chart.alarmValue
+
+                    property bool paintPending: false
+
+                    function schedulePaint() {
+                        if (paintPending)
+                            return
+
+                        paintPending = true
+                        repaintTimer.restart()
+                    }
+
+                    Timer {
+                        id: repaintTimer
+                        interval: 100
+                        repeat: false
+
+                        onTriggered: {
+                            cv.paintPending = false
+                            cv.requestPaint()
+                        }
+                    }
 
                     onPaint: {
                         var ctx = getContext("2d")
                         ctx.clearRect(0, 0, width, height)
 
-                        var w = width
-                        var h = height
-
-                        var left = 40
-                        var right = 12
-                        var top = 12
-                        var bottom = 24
-
+                        var w = width, h = height
+                        // Y축 레이블이 잘리지 않도록 left 충분히 확보
+                        var left = 48, right = 14, top = 14, bottom = 22
                         var plotW = w - left - right
                         var plotH = h - top - bottom
+                        if (plotW <= 0 || plotH <= 0) return
 
                         function valueToY(v) {
-                            var ratio = (v - chartRoot.minValue) / (chartRoot.maxValue - chartRoot.minValue)
-                            ratio = Math.max(0, Math.min(1, ratio))
-                            return top + plotH * (1 - ratio)
+                            var r = (v - chart.minValue) / (chart.maxValue - chart.minValue)
+                            r = Math.max(0, Math.min(1, r))
+                            return top + plotH * (1 - r)
+                        }
+                        function indexToX(i, cnt) {
+                            if (cnt <= 1) return left
+                            return left + plotW * i / (cnt - 1)
                         }
 
-                        function indexToX(index, count) {
-                            if (count <= 1)
-                                return left
-                            return left + plotW * index / (count - 1)
-                        }
+                        ctx.font = "11px 'Segoe UI', sans-serif"
 
-                        // horizontal grid
+                        // 수평 그리드 + Y 레이블
                         var gridCount = 4
-                        ctx.strokeStyle = "#e5e7eb"
-                        ctx.lineWidth = 1
-                        ctx.font = "11px sans-serif"
-                        ctx.fillStyle = "#94a3b8"
-
+                        ctx.textBaseline = "middle"
                         for (var gy = 0; gy <= gridCount; ++gy) {
-                            var y = top + plotH * gy / gridCount
-                            ctx.beginPath()
-                            ctx.moveTo(left, y)
-                            ctx.lineTo(left + plotW, y)
-                            ctx.stroke()
-
-                            var labelValue = chartRoot.maxValue - (chartRoot.maxValue - chartRoot.minValue) * gy / gridCount
-                            ctx.fillText(labelValue.toFixed(0), 4, y + 4)
+                            var gy_y = top + plotH * gy / gridCount
+                            ctx.strokeStyle = "#e0e4ea"
+                            ctx.lineWidth   = 1
+                            ctx.setLineDash([])
+                            ctx.beginPath(); ctx.moveTo(left, gy_y); ctx.lineTo(left + plotW, gy_y); ctx.stroke()
+                            var lv = chart.maxValue - (chart.maxValue - chart.minValue) * gy / gridCount
+                            ctx.fillStyle = "#9e9e9e"
+                            ctx.textAlign = "right"
+                            //ctx.fillText(lv.toFixed(0), left - 4, gy_y)
+                            ctx.fillText(lv.toFixed(chart.valueDecimals), left - 4, gy_y)
                         }
 
-                        // vertical grid + x labels
-                        for (var tx = 0; tx < chartRoot.timeLabels.length; ++tx) {
-                            var x = indexToX(tx, chartRoot.timeLabels.length)
-                            ctx.strokeStyle = "#eef2f7"
-                            ctx.beginPath()
-                            ctx.moveTo(x, top)
-                            ctx.lineTo(x, top + plotH)
-                            ctx.stroke()
-
-                            ctx.fillStyle = "#94a3b8"
-                            ctx.textAlign = "center"
-                            ctx.fillText(chartRoot.timeLabels[tx], x, h - 6)
+                        // 수직 그리드 + X 레이블
+                        ctx.textBaseline = "alphabetic"
+                        for (var tx = 0; tx < chart.timeLabels.length; ++tx) {
+                            var tx_x = indexToX(tx, chart.timeLabels.length)
+                            ctx.strokeStyle = "#eeeeee"
+                            ctx.lineWidth   = 1
+                            ctx.setLineDash([3, 3])
+                            ctx.beginPath(); ctx.moveTo(tx_x, top); ctx.lineTo(tx_x, top + plotH); ctx.stroke()
+                            ctx.setLineDash([])
+                            ctx.fillStyle  = "#9e9e9e"
+                            var isFirst = (tx === 0)
+                            var isLast  = (tx === chart.timeLabels.length - 1)
+                            ctx.textAlign  = isLast ? "right" : (isFirst ? "left" : "center")
+                            ctx.fillText(chart.timeLabels[tx], tx_x, top + plotH + 14)
                         }
 
-                        function drawThresholdLine(value, color, label) {
-                            if (value <= 0)
+                        // 임계값 라인
+                        function drawLine(val, col) {
+                            if (val <= 0)
                                 return
 
-                            var y = valueToY(value)
+                            if (val < chart.minValue || val > chart.maxValue)
+                                return
 
-                            ctx.strokeStyle = color
+                            var ty = valueToY(val)
+
+                            ctx.strokeStyle = col
                             ctx.lineWidth = 1
                             ctx.setLineDash([5, 4])
                             ctx.beginPath()
-                            ctx.moveTo(left, y)
-                            ctx.lineTo(left + plotW, y)
+                            ctx.moveTo(left, ty)
+                            ctx.lineTo(left + plotW, ty)
                             ctx.stroke()
                             ctx.setLineDash([])
-
-                            ctx.fillStyle = color
-                            ctx.font = "11px sans-serif"
-                            ctx.textAlign = "right"
-                            ctx.fillText(label + " " + value + chartRoot.unit, left + plotW - 4, y - 4)
                         }
+                        drawLine(chart.normalValue,  "#9e9e9e")
+                        drawLine(chart.warningValue, "#f9a825")
+                        drawLine(chart.alarmValue,   "#c62828")
 
-                        // threshold lines
-                        drawThresholdLine(chartRoot.normalValue, "#94a3b8", "정상")
-                        drawThresholdLine(chartRoot.warningValue, "#f97316", "주의")
-                        drawThresholdLine(chartRoot.alarmValue, "#dc2626", "경고")
-
-                        // border
-                        ctx.strokeStyle = "#cbd5e1"
+                        // 외곽선
+                        ctx.strokeStyle = "#d0d0d0"; ctx.lineWidth = 1; ctx.setLineDash([])
                         ctx.strokeRect(left, top, plotW, plotH)
 
-                        // series
-                        for (var si = 0; si < chartRoot.series.length; ++si) {
-                            var item = chartRoot.series[si]
-                            var values = item.values
-                            var color = chartRoot.lineColors[si % chartRoot.lineColors.length]
+                        // 데이터 시리즈
+                        for (var si = 0; si < chart.series.length; ++si) {
+                            var item   = chart.series[si]
+                            var vals   = item.values
+                            var col    = chart.lineColors[si % chart.lineColors.length]
 
-                            if (!values || values.length === 0)
-                                continue
+                            if (!vals || vals.length === 0) continue
 
-                            ctx.strokeStyle = color
-                            ctx.fillStyle = color
-                            ctx.lineWidth = 2
+                            var pointCount = Math.max(2, chart.visiblePointCount)
+                            if (vals.length > pointCount)
+                                vals = vals.slice(vals.length - pointCount)
+
+                            ctx.strokeStyle = col; ctx.fillStyle = col
+                            ctx.lineWidth   = 1.8; ctx.setLineDash([])
                             ctx.beginPath()
-
-                            for (var vi = 0; vi < values.length; ++vi) {
-                                var px = indexToX(vi, values.length)
-                                var py = valueToY(values[vi])
-
-                                if (vi === 0)
-                                    ctx.moveTo(px, py)
-                                else
-                                    ctx.lineTo(px, py)
+                            for (var vi = 0; vi < vals.length; ++vi) {
+                                var vx = indexToX(vi, vals.length)
+                                var vy = valueToY(vals[vi])
+                                if (vi === 0) ctx.moveTo(vx, vy); else ctx.lineTo(vx, vy)
                             }
                             ctx.stroke()
 
-                            for (var pi = 0; pi < values.length; ++pi) {
-                                var cx = indexToX(pi, values.length)
-                                var cy = valueToY(values[pi])
-                                ctx.beginPath()
-                                ctx.arc(cx, cy, 3, 0, Math.PI * 2)
-                                ctx.fill()
+                            for (var pi = 0; pi < vals.length; ++pi) {
+                                var px = indexToX(pi, vals.length)
+                                var py = valueToY(vals[pi])
+                                ctx.beginPath(); ctx.arc(px, py, 2.5, 0, Math.PI * 2); ctx.fill()
                             }
                         }
                     }
 
-                    Component.onCompleted: requestPaint()
-                    onWidthChanged: requestPaint()
-                    onHeightChanged: requestPaint()
-
-                    Connections {
-                        target: chartRoot
-
-                        function onNormalValueChanged() { lineCanvas.requestPaint() }
-                        function onWarningValueChanged() { lineCanvas.requestPaint() }
-                        function onAlarmValueChanged() { lineCanvas.requestPaint() }
-                        function onMinValueChanged() { lineCanvas.requestPaint() }
-                        function onMaxValueChanged() { lineCanvas.requestPaint() }
-                        function onSeriesChanged() { lineCanvas.requestPaint() }
-                        function onTimeLabelsChanged() { lineCanvas.requestPaint() }
+                    Component.onCompleted: {
+                        schedulePaint()
                     }
+
+                    on_SeriesChanged:        schedulePaint()    // requestPaint()
+                    on_NormalValueChanged:   schedulePaint()    // requestPaint()
+                    on_WarningValueChanged:  schedulePaint()    // requestPaint()
+                    on_AlarmValueChanged:    schedulePaint()    // requestPaint()
+                    onWidthChanged:          schedulePaint()    // requestPaint()
+                    onHeightChanged:         schedulePaint()    // requestPaint()
                 }
-            }
-
-            RowLayout {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 16
-                Layout.fillHeight: false
-                spacing: 7
-
-                Repeater {
-                    model: chartRoot.series
-
-                    RowLayout {
-                        spacing: 4
-
-                        Rectangle {
-                            width: 14
-                            height: 3
-                            radius: 2
-                            color: chartRoot.lineColors[index % chartRoot.lineColors.length]
-                        }
-
-                        Text {
-                            text: modelData.axis
-                            color: "#475569"
-                            font.pixelSize: 11
-                        }
-                    }
-                }
-
-                Item { Layout.fillWidth: true }
             }
         }
     }

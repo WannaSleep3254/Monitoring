@@ -1,0 +1,14 @@
+[ERROR] [2026-05-27 15:18:25.222 pid:36288] (145 FRRobot::RobotInstCmdSendRoutineThread) RobotInstCmdSendRoutineThread connect fail
+[ERROR] [2026-05-27 15:18:25.225 pid:8948] (111 FRRobot::RobotStateRoutineThread) RobotStateRoutineThread connect fail
+[ERROR] [2026-05-27 15:18:27.246 pid:44748] (145 FRRobot::RobotInstCmdSendRoutineThread) RobotInstCmdSendRoutineThread connect fail
+[ERROR] [2026-05-27 15:18:27.247 pid:36688] (111 FRRobot::RobotStateRoutineThread) RobotStateRoutineThread connect fail
+[ERROR] [2026-05-27 15:18:32.373 pid:18688] (111 FRRobot::RobotStateRoutineThread) RobotStateRoutineThread connect fail
+[ERROR] [2026-05-27 15:18:32.377 pid:28892] (145 FRRobot::RobotInstCmdSendRoutineThread) RobotInstCmdSendRoutineThread connect fail
+[ERROR] [2026-05-27 15:18:34.388 pid:43960] (145 FRRobot::RobotInstCmdSendRoutineThread) RobotInstCmdSendRoutineThread connect fail
+[ERROR] [2026-05-27 15:18:34.390 pid:2864] (111 FRRobot::RobotStateRoutineThread) RobotStateRoutineThread connect fail
+[ERROR] [2026-05-27 15:18:39.096 pid:49308] (145 FRRobot::RobotInstCmdSendRoutineThread) RobotInstCmdSendRoutineThread connect fail
+[ERROR] [2026-05-27 15:18:39.099 pid:50396] (111 FRRobot::RobotStateRoutineThread) RobotStateRoutineThread connect fail
+[ERROR] [2026-05-27 15:18:41.091 pid:39172] (111 FRRobot::RobotStateRoutineThread) RobotStateRoutineThread connect fail
+[ERROR] [2026-05-27 15:18:41.093 pid:43972] (145 FRRobot::RobotInstCmdSendRoutineThread) RobotInstCmdSendRoutineThread connect fail
+[ERROR] [2026-05-27 15:21:03.349 pid:28696] (111 FRRobot::RobotStateRoutineThread) RobotStateRoutineThread connect fail
+[ERROR] [2026-05-27 15:21:05.352 pid:43208] (111 FRRobot::RobotStateRoutineThread) RobotStateRoutineThread connect fail

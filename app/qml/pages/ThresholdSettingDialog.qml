@@ -15,7 +15,7 @@ Popup {
     // thresholdData:
     // {
     //   temperature: { normalMax, warningMax, alarmMax },
-    //   current:     { normalMax, warningMax, alarmMax }
+    //   torque:     { normalMax, warningMax, alarmMax }
     // }
     signal saveRequested(int robotIndex, var thresholdData)
 
@@ -26,7 +26,7 @@ Popup {
                 warningMax: 60,
                 alarmMax: 70
             },
-            current: {
+            torque: {
                 normalMax: 12,
                 warningMax: 14,
                 alarmMax: 16
@@ -45,7 +45,7 @@ Popup {
 
         return {
             temperature: source.temperature || fallback.temperature,
-            current: source.current || source.torque || fallback.current
+            torque: source.torque || fallback.torque
         }
     }
 
@@ -53,15 +53,16 @@ Popup {
     focus: true
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 
-    width: Math.min(dialogRoot.hostWidth * 0.86, 1180)
-    height: Math.min(dialogRoot.hostHeight * 0.76, 600)
+    width:  Math.min(dialogRoot.hostWidth  * 0.72, 920)
+    height: Math.max(Math.min(dialogRoot.hostHeight * 0.68, 440), 390)
     x: Math.round((dialogRoot.hostWidth - width) / 2)
     y: Math.round((dialogRoot.hostHeight - height) / 2)
 
     background: Rectangle {
         radius: 10
-        color: "white"
-        border.color: "#d7dde6"
+        color:        "#ffffff"
+        border.color: "#e0e4ea"
+        border.width: 1
     }
 
     contentItem: Item {
@@ -75,10 +76,11 @@ Popup {
                 Layout.preferredHeight: 32
 
                 Text {
-                    text: "임계값 설정"
-                    color: "#0f172a"
+                    text:           "임계값 설정"
+                    font.family:    "Asta Sans"
                     font.pixelSize: 20
-                    font.bold: true
+                    font.bold:      true
+                    color:          "#212121"
                 }
 
                 Item { Layout.fillWidth: true }
@@ -125,20 +127,22 @@ Popup {
         font.pixelSize: 12
 
         contentItem: Text {
-            text: toolButton.text
-            color: "#334155"
-            font.pixelSize: 12
+            text:                toolButton.text
+            font.family:         "Asta Sans"
+            font.pixelSize:      13
+            color:               "#374151"
             horizontalAlignment: Text.AlignHCenter
-            verticalAlignment: Text.AlignVCenter
-            elide: Text.ElideRight
+            verticalAlignment:   Text.AlignVCenter
+            elide:               Text.ElideRight
         }
 
         background: Rectangle {
-            radius: 5
-            color: toolButton.pressed ? "#cbd5e1"
-                 : toolButton.hovered ? "#e2e8f0"
-                 : "#f1f5f9"
-            border.color: "#cbd5e1"
+            radius:       4
+            color:        toolButton.pressed ? "#cbd5e1"
+                        : toolButton.hovered ? "#e5e7eb"
+                        :                      "#f1f5f9"
+            border.color: "#d1d5db"
+            border.width: 1
         }
     }
 
@@ -149,9 +153,10 @@ Popup {
         property int robotIndex: 0
         property var thresholdData: dialogRoot.defaultThreshold()
 
-        radius: 8
-        color: "#f8fafc"
-        border.color: "#e2e8f0"
+        radius:       8
+        color:        "#ffffff"
+        border.color: "#e0e4ea"
+        border.width: 1
 
         ColumnLayout {
             anchors.fill: parent
@@ -160,11 +165,12 @@ Popup {
 
             Text {
                 Layout.fillWidth: true
-                text: thresholdCard.robotTitle + " - 임계값 설정"
-                color: "#2563eb"
-                font.pixelSize: 18
-                font.bold: true
-                elide: Text.ElideRight
+                text:           thresholdCard.robotTitle + " - 임계값 설정"
+                font.family:    "Asta Sans"
+                font.pixelSize: 16
+                font.bold:      true
+                color:          "#1976d2"
+                elide:          Text.ElideRight
             }
 
             RowLayout {
@@ -185,15 +191,15 @@ Popup {
                 }
 
                 ThresholdGroup {
-                    id: currentGroup
+                    id: torqueGroup
 
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    title: "전류 임계값 (A)"
-                    normalValue: thresholdCard.thresholdData.current.normalMax
-                    warningValue: thresholdCard.thresholdData.current.warningMax
-                    alarmValue: thresholdCard.thresholdData.current.alarmMax
-                    unitText: "A"
+                    title: "부하 임계값 (raw)"
+                    normalValue: thresholdCard.thresholdData.torque.normalMax
+                    warningValue: thresholdCard.thresholdData.torque.warningMax
+                    alarmValue: thresholdCard.thresholdData.torque.alarmMax
+                    unitText: "raw"
                 }
             }
 
@@ -206,7 +212,7 @@ Popup {
                 onClicked: {
                     var thresholdData = {
                         temperature: tempGroup.toThresholdData(),
-                        current: currentGroup.toThresholdData()
+                        torque: torqueGroup.toThresholdData()
                     }
 
                     console.log("[QML] threshold save requested, robot = " + thresholdCard.robotIndex)
@@ -238,21 +244,24 @@ Popup {
             }
         }
 
-        radius: 6
-        color: "white"
-        border.color: "#d7dde6"
+        radius:       6
+        color:        "#fafafa"
+        border.color: "#e0e4ea"
+        border.width: 1
+        clip:         true
 
         ColumnLayout {
             anchors.fill: parent
-            anchors.margins: 12
-            spacing: 8
+            anchors.margins: 10
+            spacing: 6
 
             Text {
                 Layout.fillWidth: true
-                text: groupRoot.title
-                color: "#334155"
-                font.pixelSize: 15
-                font.bold: true
+                text:           groupRoot.title
+                font.family:    "Asta Sans"
+                font.pixelSize: 13
+                font.bold:      true
+                color:          "#212121"
             }
 
             ThresholdInput {
@@ -281,8 +290,6 @@ Popup {
                 valueText: String(groupRoot.alarmValue)
                 unitText: groupRoot.unitText
             }
-
-            Item { Layout.fillHeight: true }
         }
     }
 
@@ -298,19 +305,23 @@ Popup {
 
         Text {
             Layout.fillWidth: true
-            text: inputRoot.labelText
-            color: "#64748b"
-            font.pixelSize: 12
+            text:           inputRoot.labelText
+            font.family:    "Asta Sans"
+            font.pixelSize: 11
+            color:          "#9e9e9e"
         }
 
         TextField {
             id: thresholdTextField
 
             Layout.fillWidth: true
-            Layout.preferredHeight: 34
-            text: inputRoot.valueText
-            font.pixelSize: 13
-            selectByMouse: true
+            Layout.preferredHeight: 30
+            text:            inputRoot.valueText
+            color:           "#212121"
+            font.family:     "Asta Sans"
+            font.pixelSize:  14
+            font.bold:       true
+            selectByMouse:   true
 
             validator: DoubleValidator {
                 bottom: 0
@@ -319,20 +330,22 @@ Popup {
             }
 
             background: Rectangle {
-                radius: 5
-                color: "#f8fafc"
-                border.color: thresholdTextField.activeFocus ? "#2563eb" : "#cbd5e1"
+                radius:       4
+                color:        "#ffffff"
+                border.color: thresholdTextField.activeFocus ? "#1976d2" : "#d1d5db"
+                border.width: 1
             }
 
             rightPadding: 30
 
             Text {
-                anchors.right: parent.right
-                anchors.rightMargin: 8
+                anchors.right:          parent.right
+                anchors.rightMargin:    8
                 anchors.verticalCenter: parent.verticalCenter
-                text: inputRoot.unitText
-                color: "#94a3b8"
+                text:           inputRoot.unitText
+                font.family:    "Asta Sans"
                 font.pixelSize: 11
+                color:          "#9e9e9e"
             }
         }
     }
@@ -349,20 +362,21 @@ Popup {
         font.pixelSize: 12
 
         contentItem: Text {
-            text: exportButton.text
-            color: "white"
-            font.pixelSize: 12
-            font.bold: true
+            text:                exportButton.text
+            font.family:         "Asta Sans"
+            font.pixelSize:      13
+            font.bold:           true
+            color:               "white"
             horizontalAlignment: Text.AlignHCenter
-            verticalAlignment: Text.AlignVCenter
-            elide: Text.ElideRight
+            verticalAlignment:   Text.AlignVCenter
+            elide:               Text.ElideRight
         }
 
         background: Rectangle {
-            radius: 5
-            color: exportButton.pressed ? Qt.darker(exportButton.buttonColor, 1.15)
-                 : exportButton.hovered ? Qt.lighter(exportButton.buttonColor, 1.08)
-                 : exportButton.buttonColor
+            radius: 4
+            color:  exportButton.pressed ? Qt.darker(exportButton.buttonColor, 1.15)
+                  : exportButton.hovered ? Qt.lighter(exportButton.buttonColor, 1.08)
+                  : exportButton.buttonColor
         }
     }
 }

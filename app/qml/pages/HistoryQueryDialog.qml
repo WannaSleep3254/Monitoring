@@ -1,6 +1,7 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+import Qt.labs.settings 1.1
 
 Popup {
     id: dialogRoot
@@ -8,7 +9,21 @@ Popup {
     property real hostWidth: parent ? parent.width : 1200
     property real hostHeight: parent ? parent.height : 700
 
+    property var viewModel: null
+    property bool hasViewModel: viewModel !== null && viewModel !== undefined
+
+    Settings {
+        id: actionOperatorSettings
+        category: "IotHistoryActionOperator"
+
+        property bool rememberEnabled: true
+        property string lastOperatorName: "작업자"
+    }
+
     signal exportCsvRequested(var rows, string robotFilter, string periodFilter, string typeFilter, string searchText)
+
+    signal alarmConfirmRequested(var alarmRow)
+    signal alarmActionRequested(var alarmRow)
 
 
     modal: true
@@ -17,17 +32,33 @@ Popup {
 
     width: Math.min(dialogRoot.hostWidth * 0.90, 1280)
     height: Math.min(dialogRoot.hostHeight * 0.82, 660)
-    x: Math.round((dialogRoot.width - width) / 2)
-    y: Math.round((dialogRoot.height - height) / 2)
+    x: Math.round((dialogRoot.hostWidth  - width)  / 2)
+    y: Math.round((dialogRoot.hostHeight - height) / 2)
 
     background: Rectangle {
         radius: 10
-        color: "white"
-        border.color: "#d7dde6"
+        color: "#ffffff"
+        border.color: "#e0e4ea"
     }
 
     onOpened: {
         dialogRoot.selectedHistoryIndex = 0
+        dialogRoot.requestHistoryQuery()
+    }
+
+    Component.onCompleted: {
+        dialogRoot.rememberActionOperatorEnabled =
+                actionOperatorSettings.rememberEnabled
+
+        dialogRoot.lastActionOperatorText =
+                actionOperatorSettings.lastOperatorName !== ""
+                ? actionOperatorSettings.lastOperatorName
+                : "작업자"
+
+        dialogRoot.actionOperatorText =
+                dialogRoot.rememberActionOperatorEnabled
+                ? dialogRoot.lastActionOperatorText
+                : "작업자"
     }
 
     contentItem: Item {
@@ -42,7 +73,8 @@ Popup {
 
                 Text {
                     text: "이력 조회 / 내보내기"
-                    color: "#0f172a"
+                    color: "#212121"
+                    font.family:    "Asta Sans"
                     font.pixelSize: 20
                     font.bold: true
                 }
@@ -61,7 +93,7 @@ Popup {
             // ------------------------------------------------------------
             RowLayout {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 62
+                Layout.preferredHeight: historyPeriodCombo.currentText === "사용자 지정" ? 98 : 62
                 Layout.fillHeight: false
                 spacing: 14
 
@@ -71,7 +103,8 @@ Popup {
 
                     Text {
                         text: "로봇 선택"
-                        color: "#334155"
+                        color: "#374151"
+                        font.family:    "Asta Sans"
                         font.pixelSize: 13
                         font.bold: true
                     }
@@ -81,9 +114,27 @@ Popup {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 34
                         model: ["전체", "Robot 1", "Robot 2"]
+                        font.family:    "Asta Sans"
                         font.pixelSize: 12
 
-                        onCurrentTextChanged: dialogRoot.selectedHistoryIndex = 0
+                        onCurrentTextChanged: dialogRoot.requestHistoryQuery()
+
+                        contentItem: Text {
+                            leftPadding:        8
+                            text:               historyRobotCombo.displayText
+                            font.family:        "Asta Sans"
+                            font.pixelSize:     12
+                            color:              "#212121"
+                            verticalAlignment:  Text.AlignVCenter
+                            elide:              Text.ElideRight
+                        }
+
+                        background: Rectangle {
+                            radius:       5
+                            color:        "#fafafa"
+                            border.color: historyRobotCombo.activeFocus ? "#1976d2" : "#d1d5db"
+                            border.width: 1
+                        }
                     }
                 }
 
@@ -93,7 +144,8 @@ Popup {
 
                     Text {
                         text: "기간"
-                        color: "#334155"
+                        color: "#374151"
+                        font.family:    "Asta Sans"
                         font.pixelSize: 13
                         font.bold: true
                     }
@@ -102,10 +154,103 @@ Popup {
                         id: historyPeriodCombo
                         Layout.fillWidth: true
                         Layout.preferredHeight: 34
-                        model: ["오늘", "최근 7일", "최근 30일", "사용자 지정"]
+                        model: ["오늘", "최근 7일", "최근 30일", "최근 90일", "사용자 지정"]
+                        font.family:    "Asta Sans"
                         font.pixelSize: 12
 
-                        onCurrentTextChanged: dialogRoot.selectedHistoryIndex = 0
+                        onCurrentTextChanged: {
+                            if (historyPeriodCombo.currentText === "사용자 지정") {
+                                var now = new Date()
+                                var from = new Date(now)
+                                from.setDate(now.getDate() - 7)
+
+                                if (dialogRoot.customFromDateText === "")
+                                    dialogRoot.customFromDateText = dialogRoot.toDateText(from)
+
+                                if (dialogRoot.customToDateText === "")
+                                    dialogRoot.customToDateText = dialogRoot.toDateText(now)
+                            }
+
+                            dialogRoot.requestHistoryQuery()
+                        }
+
+                        contentItem: Text {
+                            leftPadding:        8
+                            text:               historyPeriodCombo.displayText
+                            font.family:        "Asta Sans"
+                            font.pixelSize:     12
+                            color:              "#212121"
+                            verticalAlignment:  Text.AlignVCenter
+                            elide:              Text.ElideRight
+                        }
+
+                        background: Rectangle {
+                            radius:       5
+                            color:        "#fafafa"
+                            border.color: historyPeriodCombo.activeFocus ? "#1976d2" : "#d1d5db"
+                            border.width: 1
+                        }
+                    }
+                    // 사용자 지정 기간 입력 필드
+                    RowLayout {
+                        visible: historyPeriodCombo.currentText === "사용자 지정"
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 30
+                        spacing: 6
+
+                        TextField {
+                            id: customFromDateField
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 28
+                            text: dialogRoot.customFromDateText
+                            placeholderText: "YYYY-MM-DD"
+                            selectByMouse: true
+                            font.family: "Asta Sans"
+                            font.pixelSize: 11
+
+                            onTextChanged: dialogRoot.customFromDateText = text
+
+                            onEditingFinished: {
+                                dialogRoot.requestHistoryQuery()
+                            }
+
+                            background: Rectangle {
+                                radius: 5
+                                color: "#ffffff"
+                                border.color: parent.activeFocus ? "#2563eb" : "#d1d5db"
+                            }
+                        }
+
+                        Text {
+                            text: "~"
+                            color: "#64748b"
+                            font.family: "Asta Sans"
+                            font.pixelSize: 12
+                            verticalAlignment: Text.AlignVCenter
+                        }
+
+                        TextField {
+                            id: customToDateField
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 28
+                            text: dialogRoot.customToDateText
+                            placeholderText: "YYYY-MM-DD"
+                            selectByMouse: true
+                            font.family: "Asta Sans"
+                            font.pixelSize: 11
+
+                            onTextChanged: dialogRoot.customToDateText = text
+
+                            onEditingFinished: {
+                                dialogRoot.requestHistoryQuery()
+                            }
+
+                            background: Rectangle {
+                                radius: 5
+                                color: "#ffffff"
+                                border.color: parent.activeFocus ? "#2563eb" : "#d1d5db"
+                            }
+                        }
                     }
                 }
 
@@ -115,7 +260,8 @@ Popup {
 
                     Text {
                         text: "이력 구분"
-                        color: "#334155"
+                        color: "#374151"
+                        font.family:    "Asta Sans"
                         font.pixelSize: 13
                         font.bold: true
                     }
@@ -123,14 +269,14 @@ Popup {
                     RowLayout {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 34
-                        spacing: 0
+                        spacing: 4
 
                         HistorySegmentButton {
                             text: "전체"
                             selected: dialogRoot.historyFilterType === "전체"
                             onClicked: {
                                 dialogRoot.historyFilterType = "전체"
-                                dialogRoot.selectedHistoryIndex = 0
+                                dialogRoot.requestHistoryQuery()
                             }
                         }
 
@@ -139,7 +285,8 @@ Popup {
                             selected: dialogRoot.historyFilterType === "알람 이력"
                             onClicked: {
                                 dialogRoot.historyFilterType = "알람 이력"
-                                dialogRoot.selectedHistoryIndex = 0
+                                //dialogRoot.selectedHistoryIndex = 0
+                                dialogRoot.requestHistoryQuery()
                             }
                         }
 
@@ -148,7 +295,8 @@ Popup {
                             selected: dialogRoot.historyFilterType === "조치 이력"
                             onClicked: {
                                 dialogRoot.historyFilterType = "조치 이력"
-                                dialogRoot.selectedHistoryIndex = 0
+                                //dialogRoot.selectedHistoryIndex = 0
+                                dialogRoot.requestHistoryQuery()
                             }
                         }
                     }
@@ -160,7 +308,8 @@ Popup {
 
                     Text {
                         text: "검색"
-                        color: "#334155"
+                        color: "#374151"
+                        font.family:    "Asta Sans"
                         font.pixelSize: 13
                         font.bold: true
                     }
@@ -170,15 +319,18 @@ Popup {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 34
                         placeholderText: "설명 / 조치내용 검색"
-                        font.pixelSize: 12
-                        selectByMouse: true
+                        color:           "#212121"
+                        font.family:     "Asta Sans"
+                        font.pixelSize:  12
+                        selectByMouse:   true
 
                         onTextChanged: dialogRoot.selectedHistoryIndex = 0
+                        onAccepted: dialogRoot.requestHistoryQuery()
 
                         background: Rectangle {
                             radius: 5
-                            color: "#f8fafc"
-                            border.color: historySearchField.activeFocus ? "#2563eb" : "#cbd5e1"
+                            color: "#fafafa"
+                            border.color: historySearchField.activeFocus ? "#1976d2" : "#d1d5db"
                         }
                     }
                 }
@@ -209,6 +361,17 @@ Popup {
                                                           dialogRoot.historyFilterType,
                                                           historySearchField.text)
                         }
+                }
+
+                ExportButton {
+                    text: "90일 이전 삭제"
+                    buttonColor: "#64748b"
+                    Layout.fillWidth: false
+                    Layout.preferredWidth: 130
+
+                    onClicked: {
+                        cleanupConfirmPopup.open()
+                    }
                 }
 
                 Item { Layout.fillWidth: true }
@@ -244,68 +407,85 @@ Popup {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     radius: 6
-                    color: "white"
-                    border.color: "#d7dde6"
+                    color: "#ffffff"
+                    border.color: "#e0e4ea"
                     clip: true
 
                     ColumnLayout {
                         anchors.fill: parent
                         spacing: 0
 
-                        HistoryTableRow {
+                        // 헤더 + 데이터: 단일 Flickable(가로+세로)
+                        Flickable {
+                            id: tableFlick
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 34
-                            Layout.minimumHeight: 34
-                            Layout.maximumHeight: 34
-                            Layout.fillHeight: false
-                            isHeader: true
-                            timeText: "시간"
-                            robotText: "로봇"
-                            kindText: "구분"
-                            axisText: "축"
-                            tempText: "온도"
-                            torqueText: "토크"
-                            statusText: "상태"
-                            descText: "설명"
-                            actionStatusText: "조치상태"
-                        }
+                            Layout.fillHeight: true
+                            contentWidth:  Math.max(width, 600)
+                            contentHeight: tableRows.implicitHeight
+                            flickableDirection: Flickable.HorizontalAndVerticalFlick
+                            boundsBehavior: Flickable.DragAndOvershootBounds
+                            clip: true
 
-                        Repeater {
-                            model: dialogRoot.filteredHistoryRows(historySearchField.text,
-                                                            historyRobotCombo.currentText,
-                                                            dialogRoot.historyFilterType)
+                            ScrollBar.horizontal: ScrollBar { policy: ScrollBar.AsNeeded }
+                            ScrollBar.vertical:   ScrollBar { policy: ScrollBar.AsNeeded }
 
-                            HistoryTableRow {
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: 34
-                                Layout.minimumHeight: 34
-                                Layout.maximumHeight: 34
-                                Layout.fillHeight: false
+                            Column {
+                                id: tableRows
+                                width: tableFlick.contentWidth
+                                spacing: 0
 
-                                isHeader: false
-                                selected: index === dialogRoot.selectedHistoryIndex
+                                HistoryTableRow {
+                                    width: parent.width
+                                    height: 34
+                                    isHeader: true
+                                    timeText: "일시"
+                                    robotText: "로봇"
+                                    kindText: "구분"
+                                    axisText: "축"
+                                    tempText: "온도"
+                                    torqueText: "토크"
+                                    statusText: "상태"
+                                    descText: "설명"
+                                    actionStatusText: "조치상태"
+                                }
 
-                                timeText: modelData.time
-                                robotText: modelData.robot
-                                kindText: modelData.kind
-                                axisText: modelData.axis
-                                tempText: modelData.temp
-                                torqueText: modelData.torque
-                                statusText: modelData.status
-                                descText: modelData.desc
-                                actionStatusText: modelData.actionStatus
+                                Repeater {
+                                    model: dialogRoot.filteredHistoryRows(historySearchField.text,
+                                                                    historyRobotCombo.currentText,
+                                                                    dialogRoot.historyFilterType)
 
-                                onRowClicked: dialogRoot.selectedHistoryIndex = index
+                                    HistoryTableRow {
+                                        width: tableRows.width
+                                        height: 34
+                                        isHeader: false
+                                        selected: index === dialogRoot.selectedHistoryIndex
+
+                                        timeText: dialogRoot.displayDateTime(modelData)
+                                        robotText: modelData.robot
+                                        kindText: modelData.kind
+                                        axisText: modelData.axis
+                                        tempText: modelData.temp
+                                        torqueText: modelData.torque
+                                        statusText: modelData.status
+                                        descText: modelData.desc
+                                        actionStatusText: modelData.actionStatus
+
+                                        onRowClicked: {
+                                            dialogRoot.selectedHistoryIndex = index
+                                            dialogRoot.actionEditMode = false
+                                            dialogRoot.actionTargetItem = null
+                                        }
+                                    }
+                                }
                             }
                         }
 
-                        Item { Layout.fillHeight: true }
-
+                        // 푸터: 건수
                         Rectangle {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 36
                             Layout.fillHeight: false
-                            color: "#f8fafc"
+                            color: "#fafafa"
                             border.color: "#e2e8f0"
 
                             RowLayout {
@@ -319,7 +499,8 @@ Popup {
                                                                                historyRobotCombo.currentText,
                                                                                dialogRoot.historyFilterType)
                                     text: "총 " + rows.length + "건"
-                                    color: "#475569"
+                                    color: "#374151"
+                                    font.family:    "Asta Sans"
                                     font.pixelSize: 12
                                 }
 
@@ -330,7 +511,8 @@ Popup {
                                     text: rows.length > 0
                                           ? " |  " + (dialogRoot.clampHistoryIndex(rows) + 1) + " / " + rows.length
                                           : " |  0 / 0"
-                                    color: "#64748b"
+                                    color: "#9e9e9e"
+                                    font.family:    "Asta Sans"
                                     font.pixelSize: 12
                                 }
 
@@ -349,152 +531,620 @@ Popup {
                     property int safeIndex: dialogRoot.clampHistoryIndex(rows)
                     property var selectedItem: safeIndex >= 0 ? rows[safeIndex] : null
 
-                    Layout.preferredWidth: 360
+                    Layout.preferredWidth: 280
                     Layout.fillHeight: true
                     radius: 6
-                    color: "white"
-                    border.color: "#d7dde6"
+                    color: "#ffffff"
+                    border.color: "#e0e4ea"
+                    clip: true
 
-                    ColumnLayout {
+                    Flickable {
+                        id: detailFlick
                         anchors.fill: parent
-                        anchors.margins: 12
-                        spacing: 8
+                        contentWidth:  width
+                        contentHeight: detailCol.implicitHeight
+                        flickableDirection: Flickable.VerticalFlick
+                        boundsBehavior: Flickable.DragAndOvershootBounds
+                        clip: false
 
-                        Text {
-                            Layout.fillWidth: true
-                            text: "선택 이력 상세"
-                            color: "#0f172a"
-                            font.pixelSize: 16
-                            font.bold: true
-                        }
+                        ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
-                        HistoryDetailItem {
-                            labelText: "이력 종류"
-                            valueText: historyDetailPanel.selectedItem ? historyDetailPanel.selectedItem.kind + " 이력" : "-"
-                        }
-
-                        HistoryDetailItem {
-                            labelText: "로봇"
-                            valueText: historyDetailPanel.selectedItem ? historyDetailPanel.selectedItem.robot : "-"
-                        }
-
-                        HistoryDetailItem {
-                            labelText: "대상 축"
-                            valueText: historyDetailPanel.selectedItem ? historyDetailPanel.selectedItem.axis : "-"
-                        }
-
-                        HistoryDetailItem {
-                            labelText: "위험도"
-                            valueText: historyDetailPanel.selectedItem
-                                       ? (historyDetailPanel.selectedItem.status === "주의" ? "주의 (82)"
-                                          : historyDetailPanel.selectedItem.status === "경고" ? "경고 (91)"
-                                          : "정상")
-                                       : "-"
-                            valueColor: historyDetailPanel.selectedItem && historyDetailPanel.selectedItem.status === "경고" ? "#dc2626"
-                                       : historyDetailPanel.selectedItem && historyDetailPanel.selectedItem.status === "주의" ? "#f97316"
-                                       : "#16a34a"
-                        }
-
-                        HistoryDetailItem {
-                            labelText: "원인"
-                            valueText: historyDetailPanel.selectedItem ? historyDetailPanel.selectedItem.cause : "-"
-                        }
-
-                        HistoryDetailItem {
-                            labelText: "조치 상태"
-                            valueText: historyDetailPanel.selectedItem ? historyDetailPanel.selectedItem.actionStatus : "-"
-                            valueColor: historyDetailPanel.selectedItem && historyDetailPanel.selectedItem.actionStatus === "완료" ? "#16a34a"
-                                       : historyDetailPanel.selectedItem && historyDetailPanel.selectedItem.actionStatus === "확인중" ? "#2563eb"
-                                       : "#f97316"
-                        }
-
-                        HistoryDetailItem {
-                            labelText: "조치자"
-                            valueText: historyDetailPanel.selectedItem ? historyDetailPanel.selectedItem.operatorName : "-"
-                        }
-
-                        // ------------------------------------------------------------
-                        // 조치 내용 영역
-                        // 하단 안내 카드와 겹치지 않도록 고정 높이 사용
-                        // ------------------------------------------------------------
-                        Rectangle {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 74
-                            Layout.minimumHeight: 74
-                            Layout.maximumHeight: 74
-                            Layout.fillHeight: false
-                            radius: 6
-                            color: "#f8fafc"
-                            border.color: "#e2e8f0"
-                            clip: true
-
-                            ColumnLayout {
-                                anchors.fill: parent
-                                anchors.margins: 8
-                                spacing: 6
-
-                                Text {
-                                    Layout.fillWidth: true
-                                    Layout.preferredHeight: 16
-                                    Layout.fillHeight: false
-
-                                    text: "조치 내용"
-                                    color: "#64748b"
-                                    font.pixelSize: 12
-                                    font.bold: true
-                                    verticalAlignment: Text.AlignVCenter
-                                }
-
-                                Text {
-                                    Layout.fillWidth: true
-                                    Layout.fillHeight: true
-                                    text: historyDetailPanel.selectedItem ? historyDetailPanel.selectedItem.actionContent : "-"
-                                    color: "#334155"
-                                    font.pixelSize: 12
-                                    wrapMode: Text.WordWrap
-                                    elide: Text.ElideRight
-                                    maximumLineCount: 2
-                                }
-                            }
-                        }
-
-                        // ------------------------------------------------------------
-                        // 하단 기록 방식 안내 카드
-                        // 카드 영역은 고정 높이로 유지하여 조치 내용 영역을 침범하지 않게 함
-                        // ------------------------------------------------------------
-                        RowLayout {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 44
-                            Layout.minimumHeight: 44
-                            Layout.maximumHeight: 44
-                            Layout.fillHeight: false
+                        ColumnLayout {
+                            id: detailCol
+                            width:   detailFlick.width - 24
+                            anchors.top:   parent.top
+                            anchors.left:  parent.left
+                            anchors.leftMargin:  12
+                            anchors.topMargin:   12
                             spacing: 8
 
-                            HistoryModeCard {
+                            Text {
                                 Layout.fillWidth: true
-                                titleText: "GUI 자동 기록"
-                                bodyText: "알람/조치요청 생성"
-                                accentColor: "#2563eb"
+                                text: "선택 이력 상세"
+                                color: "#212121"
+                                font.family:    "Asta Sans"
+                                font.pixelSize: 16
+                                font.bold: true
                             }
 
-                            HistoryModeCard {
-                                Layout.fillWidth: true
-                                titleText: "작업자 수동 입력"
-                                bodyText: "확인/완료/비고 기록"
-                                accentColor: "#16a34a"
+                            HistoryDetailItem {
+                                labelText: "이력 종류"
+                                valueText: historyDetailPanel.selectedItem ? historyDetailPanel.selectedItem.kind + " 이력" : "-"
                             }
+
+                            HistoryDetailItem {
+                                labelText: "발생 일시"
+                                valueText: historyDetailPanel.selectedItem
+                                           ? dialogRoot.displayDateTime(historyDetailPanel.selectedItem)
+                                           : "-"
+                            }
+
+                            HistoryDetailItem {
+                                labelText: "로봇"
+                                valueText: historyDetailPanel.selectedItem ? historyDetailPanel.selectedItem.robot : "-"
+                            }
+
+                            HistoryDetailItem {
+                                labelText: "대상 축"
+                                valueText: historyDetailPanel.selectedItem ? historyDetailPanel.selectedItem.axis : "-"
+                            }
+
+                            HistoryDetailItem {
+                                labelText: "위험도"
+                                valueText: historyDetailPanel.selectedItem
+                                           ? (historyDetailPanel.selectedItem.status === "주의" ? "주의 (82)"
+                                              : historyDetailPanel.selectedItem.status === "경고" ? "경고 (91)"
+                                              : "정상")
+                                           : "-"
+                                valueColor: historyDetailPanel.selectedItem && historyDetailPanel.selectedItem.status === "경고" ? "#dc2626"
+                                           : historyDetailPanel.selectedItem && historyDetailPanel.selectedItem.status === "주의" ? "#f97316"
+                                           : "#16a34a"
+                            }
+
+                            HistoryDetailItem {
+                                labelText: "원인"
+                                valueText: historyDetailPanel.selectedItem ? historyDetailPanel.selectedItem.cause : "-"
+                            }
+
+                            HistoryDetailItem {
+                                labelText: "조치 상태"
+                                valueText: historyDetailPanel.selectedItem ? historyDetailPanel.selectedItem.actionStatus : "-"
+                                valueColor: historyDetailPanel.selectedItem && historyDetailPanel.selectedItem.actionStatus === "완료" ? "#16a34a"
+                                           : historyDetailPanel.selectedItem && historyDetailPanel.selectedItem.actionStatus === "확인중" ? "#2563eb"
+                                           : "#f97316"
+                            }
+
+                            RowLayout {
+                                visible: dialogRoot.actionEditMode
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 34
+                                spacing: 8
+
+                                Text {
+                                    Layout.preferredWidth: 82
+                                    text: "저장 상태"
+                                    font.family: "Asta Sans"
+                                    font.pixelSize: 12
+                                    font.bold: true
+                                    color: "#9e9e9e"
+                                    elide: Text.ElideRight
+                                }
+
+                                ComboBox {
+                                    id: actionStatusCombo
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 30
+                                    model: ["완료", "보류", "확인중"]
+                                    currentIndex: model.indexOf(dialogRoot.actionStatusText)
+
+                                    font.family: "Asta Sans"
+                                    font.pixelSize: 12
+
+                                    onCurrentTextChanged: {
+                                        dialogRoot.actionStatusText = currentText
+                                    }
+
+                                    background: Rectangle {
+                                        radius: 5
+                                        color: "#ffffff"
+                                        border.color: parent.activeFocus ? "#2563eb" : "#d1d5db"
+                                    }
+                                }
+                            }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: dialogRoot.actionEditMode ? 34 : 24
+
+                                Text {
+                                    Layout.preferredWidth: 82
+                                    text: "조치자"
+                                    font.family: "Asta Sans"
+                                    font.pixelSize: 12
+                                    font.bold: true
+                                    color: "#9e9e9e"
+                                    elide: Text.ElideRight
+                                }
+
+                                Text {
+                                    visible: !dialogRoot.actionEditMode
+                                    Layout.fillWidth: true
+                                    text: historyDetailPanel.selectedItem
+                                          ? historyDetailPanel.selectedItem.operatorName
+                                          : "-"
+                                    font.family: "Asta Sans"
+                                    font.pixelSize: 12
+                                    color: "#374151"
+                                    elide: Text.ElideRight
+                                }
+
+                                TextField {
+                                    visible: dialogRoot.actionEditMode
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 30
+                                    text: dialogRoot.actionOperatorText
+                                    placeholderText: "조치자 입력"
+                                    selectByMouse: true
+                                    font.family: "Asta Sans"
+                                    font.pixelSize: 12
+
+                                    onTextChanged: dialogRoot.actionOperatorText = text
+
+                                    background: Rectangle {
+                                        radius: 5
+                                        color: "#ffffff"
+                                        border.color: parent.activeFocus ? "#2563eb" : "#d1d5db"
+                                    }
+                                }
+                            }
+
+                            RowLayout {
+                                visible: dialogRoot.actionEditMode
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 24
+                                spacing: 6
+
+                                Item {
+                                    Layout.preferredWidth: 82
+                                }
+
+                                CheckBox {
+                                    id: rememberOperatorCheckBox
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 24
+
+                                    checked: dialogRoot.rememberActionOperatorEnabled
+                                    text: "조치자 기억"
+
+                                    font.family: "Asta Sans"
+                                    font.pixelSize: 11
+
+                                    onToggled: {
+                                        dialogRoot.rememberActionOperatorEnabled = checked
+                                        actionOperatorSettings.rememberEnabled = checked
+
+                                        if (checked) {
+                                            dialogRoot.actionOperatorText = dialogRoot.lastActionOperatorText
+                                        } else {
+                                            dialogRoot.actionOperatorText = "작업자"
+                                        }
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: dialogRoot.actionEditMode ? 92 : 60
+                                Layout.minimumHeight: 0
+                                Layout.fillHeight: false
+                                radius: 6
+                                color: "#fafafa"
+                                border.color: "#e2e8f0"
+                                clip: true
+
+                                ColumnLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 8
+                                    spacing: 6
+
+                                    Text {
+                                        Layout.fillWidth: true
+                                        Layout.preferredHeight: 16
+                                        Layout.fillHeight: false
+                                        text: "조치 내용"
+                                        color: "#9e9e9e"
+                                        font.family:    "Asta Sans"
+                                        font.pixelSize: 12
+                                        font.bold: true
+                                        verticalAlignment: Text.AlignVCenter
+                                    }
+
+                                    Text {
+                                        visible: !dialogRoot.actionEditMode
+                                        Layout.fillWidth: true
+                                        Layout.fillHeight: true
+                                        text: historyDetailPanel.selectedItem
+                                              ? historyDetailPanel.selectedItem.actionContent
+                                              : "-"
+                                        color: "#374151"
+                                        font.family: "Asta Sans"
+                                        font.pixelSize: 12
+                                        wrapMode: Text.WordWrap
+                                        elide: Text.ElideRight
+                                        maximumLineCount: 2
+                                    }
+
+                                    TextArea {
+                                        visible: dialogRoot.actionEditMode
+                                        Layout.fillWidth: true
+                                        Layout.fillHeight: true
+                                        text: dialogRoot.actionContentText
+                                        placeholderText: "조치 내용을 입력하세요"
+                                        selectByMouse: true
+                                        wrapMode: TextArea.Wrap
+                                        font.family: "Asta Sans"
+                                        font.pixelSize: 12
+
+                                        onTextChanged: dialogRoot.actionContentText = text
+
+                                        background: Rectangle {
+                                            radius: 5
+                                            color: "#ffffff"
+                                            border.color: parent.activeFocus ? "#2563eb" : "#d1d5db"
+                                        }
+                                    }
+                                }
+                            }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 54
+                                Layout.minimumHeight: 54
+                                Layout.fillHeight: false
+                                spacing: 8
+
+                                visible: !dialogRoot.actionEditMode
+
+                                HistoryActionCardButton {
+                                    titleText: "확인"
+                                    bodyText: "알람 확인"
+                                    accentColor: "#2563eb"
+
+                                    enabled: dialogRoot.canConfirmAlarm(historyDetailPanel.selectedItem)
+
+                                    onClicked: {
+                                        if (!dialogRoot.canConfirmAlarm(historyDetailPanel.selectedItem))
+                                            return
+
+                                        dialogRoot.alarmConfirmRequested(historyDetailPanel.selectedItem)
+                                    }
+                                }
+
+                                HistoryActionCardButton {
+                                    titleText: "조치 등록"
+                                    bodyText: "조치내용 입력"
+                                    accentColor: "#16a34a"
+
+                                    enabled: dialogRoot.canRegisterAction(historyDetailPanel.selectedItem)
+
+                                    onClicked: {
+                                        if (!dialogRoot.canRegisterAction(historyDetailPanel.selectedItem))
+                                            return
+
+                                        dialogRoot.actionTargetItem = historyDetailPanel.selectedItem
+                                        dialogRoot.actionOperatorText =
+                                                dialogRoot.rememberActionOperatorEnabled
+                                                ? dialogRoot.lastActionOperatorText
+                                                : "작업자"
+
+                                        dialogRoot.actionContentText = ""
+                                        dialogRoot.actionMemoText = historyDetailPanel.selectedItem
+                                                                    ? historyDetailPanel.selectedItem.cause
+                                                                    : ""
+                                        dialogRoot.actionStatusText = "완료"
+                                        dialogRoot.actionEditMode = true
+                                    }
+                                }
+                            }
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 54
+                                Layout.minimumHeight: 54
+                                Layout.fillHeight: false
+                                spacing: 8
+                                visible: dialogRoot.actionEditMode
+
+                                HistoryActionCardButton {
+                                    titleText: "저장"
+                                    bodyText: "조치 이력 저장"
+                                    accentColor: "#16a34a"
+
+                                    enabled: dialogRoot.actionContentText.trim().length > 0
+
+                                    onClicked: {
+                                        var content = dialogRoot.actionContentText.trim()
+
+                                        if (content.length <= 0)
+                                            return
+
+                                        var target = dialogRoot.actionTargetItem
+
+                                        if (!target) {
+                                            console.warn("[QML] action save failed: target item is null")
+                                            return
+                                        }
+
+                                        var alarmId = 0
+                                        var robotId = 0
+
+                                        if (target.kind === "알람")
+                                            alarmId = Number(target.id)
+                                        else if (target.kind === "조치")
+                                            alarmId = Number(target.alarmId)
+
+                                        robotId = Number(target.robotId)
+
+                                        if (alarmId <= 0 || robotId <= 0) {
+                                            console.warn("[QML] action save failed: invalid target",
+                                                         "alarmId =", alarmId,
+                                                         "robotId =", robotId,
+                                                         "kind =", target.kind)
+                                            return
+                                        }
+
+                                        if (!dialogRoot.hasViewModel || !dialogRoot.viewModel.saveAction) {
+                                            console.warn("[QML] action save failed: viewModel.saveAction is not available")
+                                            return
+                                        }
+
+                                        var actionData = {
+                                            "alarmId": alarmId,
+                                            "robotId": robotId,
+                                            "status": dialogRoot.actionStatusText,
+                                            "operatorName": dialogRoot.actionOperatorText,
+                                            "actionContent": content,
+                                            "memo": dialogRoot.actionMemoText
+                                        }
+
+                                        console.log("[QML] action save requested:",
+                                                    "alarmId =", alarmId,
+                                                    "robotId =", robotId,
+                                                    "status =", dialogRoot.actionStatusText,
+                                                    "operator =", dialogRoot.actionOperatorText,
+                                                    "content =", content)
+
+                                        if (!dialogRoot.viewModel.saveAction(actionData)) {
+                                            console.warn("[QML] action save failed:",
+                                                         dialogRoot.viewModel.lastError)
+                                            return
+                                        }
+
+                                        var savedOperatorName = dialogRoot.actionOperatorText.trim()
+
+                                        if (dialogRoot.rememberActionOperatorEnabled &&
+                                            savedOperatorName.length > 0) {
+                                            dialogRoot.lastActionOperatorText = savedOperatorName
+                                            actionOperatorSettings.lastOperatorName = savedOperatorName
+                                        }
+
+                                        dialogRoot.actionEditMode = false
+                                        dialogRoot.actionTargetItem = null
+                                        dialogRoot.actionOperatorText =
+                                                dialogRoot.rememberActionOperatorEnabled
+                                                ? dialogRoot.lastActionOperatorText
+                                                : "작업자"
+                                        dialogRoot.actionContentText = ""
+                                        dialogRoot.actionMemoText = ""
+                                        dialogRoot.actionStatusText = "완료"
+
+                                        dialogRoot.requestHistoryQuery()
+                                    }
+                                }
+
+                                HistoryActionCardButton {
+                                    titleText: "취소"
+                                    bodyText: "입력 취소"
+                                    accentColor: "#64748b"
+
+                                    onClicked: {
+                                        dialogRoot.actionEditMode = false
+                                        dialogRoot.actionTargetItem = null
+                                        dialogRoot.actionOperatorText =
+                                                dialogRoot.rememberActionOperatorEnabled
+                                                ? dialogRoot.lastActionOperatorText
+                                                : "작업자"
+                                        dialogRoot.actionContentText = ""
+                                        dialogRoot.actionMemoText = ""
+                                        dialogRoot.actionStatusText = "완료"
+                                    }
+                                }
+                            }
+                        } // end ColumnLayout
+                    } // end Flickable
+                }
+            }
+        }
+    }
+    // ===== 90일 이전 이력 삭제 확인 팝업 =====
+    Popup {
+        id: cleanupConfirmPopup
+
+        modal: true
+        focus: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+        width: 380
+        height: 190
+        x: Math.round((dialogRoot.width - width) / 2)
+        y: Math.round((dialogRoot.height - height) / 2)
+
+        background: Rectangle {
+            radius: 8
+            color: "#ffffff"
+            border.color: "#e2e8f0"
+        }
+
+        contentItem: ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 18
+            spacing: 12
+
+            Text {
+                Layout.fillWidth: true
+                text: "90일 이전 이력 삭제"
+                color: "#111827"
+                font.family: "Asta Sans"
+                font.pixelSize: 16
+                font.bold: true
+            }
+
+            Text {
+                Layout.fillWidth: true
+                text: "90일 이전 알람/조치 이력을 삭제하시겠습니까?\n삭제된 이력은 복구할 수 없습니다."
+                color: "#475569"
+                font.family: "Asta Sans"
+                font.pixelSize: 12
+                wrapMode: Text.WordWrap
+            }
+
+            Item { Layout.fillHeight: true }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 34
+                spacing: 8
+
+                Item { Layout.fillWidth: true }
+
+                DialogToolButton {
+                    text: "취소"
+                    Layout.preferredWidth: 72
+                    onClicked: cleanupConfirmPopup.close()
+                }
+
+                ExportButton {
+                    text: "삭제"
+                    buttonColor: "#dc2626"
+                    Layout.fillWidth: false
+                    Layout.preferredWidth: 72
+
+                    onClicked: {
+                        if (!dialogRoot.hasViewModel ||
+                            !dialogRoot.viewModel.deleteOldHistoryDays) {
+                            console.warn("[QML] deleteOldHistoryDays is not available")
+                            return
                         }
+
+                        if (!dialogRoot.viewModel.deleteOldHistoryDays(90)) {
+                            console.warn("[QML] delete old history failed:",
+                                         dialogRoot.viewModel.lastError)
+
+                            cleanupResultPopup.titleText = "삭제 실패"
+                            cleanupResultPopup.messageText =
+                                    "90일 이전 이력 삭제에 실패했습니다.\n" +
+                                    dialogRoot.viewModel.lastError
+
+                            cleanupConfirmPopup.close()
+                            cleanupResultPopup.open()
+                            return
+                        }
+
+                        cleanupConfirmPopup.close()
+                        dialogRoot.requestHistoryQuery()
+
+                        var summary = dialogRoot.viewModel.lastCleanupSummary
+
+                        var alarmsDeleted = summary && summary.alarmsDeleted !== undefined
+                                ? Number(summary.alarmsDeleted)
+                                : 0
+
+                        var actionsDeleted = summary && summary.actionsDeleted !== undefined
+                                ? Number(summary.actionsDeleted)
+                                : 0
+
+                        var totalDeleted = summary && summary.totalDeleted !== undefined
+                                ? Number(summary.totalDeleted)
+                                : 0
+
+                        cleanupResultPopup.titleText = "삭제 완료"
+                        cleanupResultPopup.messageText =
+                                "90일 이전 알람/조치 이력 삭제 처리가 완료되었습니다.\n" +
+                                "삭제된 알람: " + alarmsDeleted + "건\n" +
+                                "삭제된 조치: " + actionsDeleted + "건\n" +
+                                "총 삭제: " + totalDeleted + "건"
+
+                        cleanupResultPopup.open()
                     }
                 }
             }
         }
     }
+    // ===== 삭제 결과 알림 팝업 =====
+    Popup {
+        id: cleanupResultPopup
 
+        modal: true
+        focus: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+        width: 340
+        height: 150
+        x: Math.round((dialogRoot.width - width) / 2)
+        y: Math.round((dialogRoot.height - height) / 2)
+
+        property string titleText: "삭제 완료"
+        property string messageText: ""
+
+        background: Rectangle {
+            radius: 8
+            color: "#ffffff"
+            border.color: "#e2e8f0"
+        }
+
+        contentItem: ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 18
+            spacing: 12
+
+            Text {
+                Layout.fillWidth: true
+                text: cleanupResultPopup.titleText
+                color: "#111827"
+                font.family: "Asta Sans"
+                font.pixelSize: 16
+                font.bold: true
+            }
+
+            Text {
+                Layout.fillWidth: true
+                text: cleanupResultPopup.messageText
+                color: "#475569"
+                font.family: "Asta Sans"
+                font.pixelSize: 12
+                wrapMode: Text.WordWrap
+            }
+
+            Item { Layout.fillHeight: true }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 34
+
+                Item { Layout.fillWidth: true }
+
+                DialogToolButton {
+                    text: "확인"
+                    Layout.preferredWidth: 72
+                    onClicked: cleanupResultPopup.close()
+                }
+            }
+        }
+    }
     // ===== 이력 조회 샘플 데이터 =====
     // kind:
     // - "알람" : 센서/위험도 기반으로 GUI가 자동 생성한 이력
     // - "조치" : 알람에 대한 작업자 확인/완료/보류 이력
-    property var historyRows: [
+    property var sampleHistoryRows: [
         {
             time: "10:43:21",
             robot: "Robot 1",
@@ -571,10 +1221,182 @@ Popup {
             recordMode: "작업자 수동 입력"
         }
     ]
-
+    property var historyRows: dialogRoot.hasViewModel
+                              ? dialogRoot.viewModel.historyRows
+                              : dialogRoot.sampleHistoryRows
+    // 필터링 및 검색 조건
     property string historyFilterType: "전체"
     property int selectedHistoryIndex: 0
+    // 편집 모드 여부 및 대상 아이템
+    property bool actionEditMode: false
+    property var actionTargetItem: null
+    // 조치 등록/수정 시 입력값 보관용
+    property string actionOperatorText: "작업자"
+    property string lastActionOperatorText: "작업자"
+    property bool rememberActionOperatorEnabled: true
+
+    onRememberActionOperatorEnabledChanged: {
+        actionOperatorSettings.rememberEnabled = dialogRoot.rememberActionOperatorEnabled
+    }
+
+    onLastActionOperatorTextChanged: {
+        actionOperatorSettings.lastOperatorName = dialogRoot.lastActionOperatorText
+    }
+
+    // 상태 및 내용 입력용
+    property string actionContentText: ""
+    property string actionMemoText: ""
+    property string actionStatusText: "완료"
+    // 사용자 지정날짜 입력용
+    property string customFromDateText: ""
+    property string customToDateText: ""
     // =============================
+    function pad2(v) {
+        return v < 10 ? "0" + v : "" + v
+    }
+
+    function toLocalIso(dt) {
+        return dt.getFullYear() + "-"
+                + pad2(dt.getMonth() + 1) + "-"
+                + pad2(dt.getDate()) + "T"
+                + pad2(dt.getHours()) + ":"
+                + pad2(dt.getMinutes()) + ":"
+                + pad2(dt.getSeconds())
+    }
+
+    function toDateText(dt) {
+        return dt.getFullYear() + "-"
+                + pad2(dt.getMonth() + 1) + "-"
+                + pad2(dt.getDate())
+    }
+
+    function isValidDateText(text) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(text))
+            return false
+
+        var parts = text.split("-")
+        var y = Number(parts[0])
+        var m = Number(parts[1])
+        var d = Number(parts[2])
+
+        var date = new Date(y, m - 1, d)
+
+        return date.getFullYear() === y
+               && date.getMonth() === m - 1
+               && date.getDate() === d
+    }
+
+    function customStartIso(text) {
+        return text + "T00:00:00"
+    }
+
+    function customEndIso(text) {
+        return text + "T23:59:59"
+    }
+
+    function historyFilterMap() {
+        var filter = {}
+
+        if (historyRobotCombo.currentText === "Robot 1")
+            filter.robotId = 1
+        else if (historyRobotCombo.currentText === "Robot 2")
+            filter.robotId = 2
+        else
+            filter.robotId = 0
+
+        filter.kind = dialogRoot.historyFilterType
+        filter.searchText = historySearchField.text
+        filter.limit = 500
+
+        var now = new Date()
+        var from = new Date(now)
+
+        if (historyPeriodCombo.currentText === "오늘") {
+            from.setHours(0, 0, 0, 0)
+            filter.from = toLocalIso(from)
+            filter.to = toLocalIso(now)
+        } else if (historyPeriodCombo.currentText === "최근 7일") {
+            from.setDate(now.getDate() - 7)
+            filter.from = toLocalIso(from)
+            filter.to = toLocalIso(now)
+        } else if (historyPeriodCombo.currentText === "최근 30일") {
+            from.setDate(now.getDate() - 30)
+            filter.from = toLocalIso(from)
+            filter.to = toLocalIso(now)
+        } else if (historyPeriodCombo.currentText === "최근 90일") {
+            from.setDate(now.getDate() - 90)
+            filter.from = toLocalIso(from)
+            filter.to = toLocalIso(now)
+        } else if (historyPeriodCombo.currentText === "사용자 지정") {
+            if (dialogRoot.isValidDateText(dialogRoot.customFromDateText) &&
+                dialogRoot.isValidDateText(dialogRoot.customToDateText)) {
+                filter.from = dialogRoot.customStartIso(dialogRoot.customFromDateText)
+                filter.to = dialogRoot.customEndIso(dialogRoot.customToDateText)
+            }
+        }
+
+        return filter
+    }
+
+    function requestHistoryQuery() {
+        dialogRoot.selectedHistoryIndex = 0
+
+        if (!dialogRoot.hasViewModel || !dialogRoot.viewModel.queryHistory)
+            return
+
+        if (!dialogRoot.viewModel.queryHistory(dialogRoot.historyFilterMap())) {
+            console.warn("[QML] queryHistory failed")
+        }
+    }
+
+    function displayDateTime(item) {
+        if (!item)
+            return "-"
+
+        var iso = ""
+
+        if (item.sortTime !== undefined && item.sortTime !== "")
+            iso = item.sortTime
+        else if (item.occurredAt !== undefined && item.occurredAt !== "")
+            iso = item.occurredAt
+        else if (item.actionAt !== undefined && item.actionAt !== "")
+            iso = item.actionAt
+
+        if (iso === undefined || iso === "")
+            return item.time !== undefined ? item.time : "-"
+
+        if (iso.length >= 19)
+            return iso.substr(0, 10) + " " + iso.substr(11, 8)
+
+        return iso
+    }
+
+    function isAlarmItem(item) {
+        return item && item.kind === "알람"
+    }
+
+    function canConfirmAlarm(item) {
+        return isAlarmItem(item)
+               && item.actionStatus === "요청"
+    }
+
+    function isActionItem(item) {
+        return item && item.kind === "조치"
+    }
+
+    function canRegisterAction(item) {
+        if (!item)
+            return false
+
+        if (isAlarmItem(item))
+            return item.actionStatus !== "완료"
+
+        if (isActionItem(item))
+            return item.actionStatus === "확인중"
+                   || item.actionStatus === "보류"
+
+        return false
+    }
 
     function filteredHistoryRows(keyword, robotFilter, typeFilter) {
         var rows = []
@@ -652,11 +1474,14 @@ Popup {
         Layout.maximumHeight: 28
         Layout.fillHeight: false
 
+        font.family:    "Asta Sans"
+
         font.pixelSize: 12
 
         contentItem: Text {
             text: toolButton.text
-            color: "#334155"
+            color: "#374151"
+            font.family:    "Asta Sans"
             font.pixelSize: 12
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
@@ -687,11 +1512,14 @@ Popup {
         Layout.preferredHeight: 34
         Layout.fillHeight: false
 
+        font.family:    "Asta Sans"
+
         font.pixelSize: 12
 
         contentItem: Text {
             text: exportButton.text
-            color: "white"
+            color: "#ffffff"
+            font.family:    "Asta Sans"
             font.pixelSize: 12
             font.bold: true
             horizontalAlignment: Text.AlignHCenter
@@ -704,6 +1532,90 @@ Popup {
             color: exportButton.pressed ? Qt.darker(exportButton.buttonColor, 1.15)
                  : exportButton.hovered ? Qt.lighter(exportButton.buttonColor, 1.08)
                  : exportButton.buttonColor
+        }
+    }
+
+    // ============================================================
+    // [컴포넌트] HistoryActionCardButton
+    // 사용 위치: 이력 조회 다이얼로그의 확인 / 조치 버튼
+    // ============================================================
+
+    component HistoryActionCardButton: Button {
+        id: cardButton
+
+        property color accentColor: "#2563eb"
+        property string titleText: "확인"
+        property string bodyText: "알람 확인"
+
+        Layout.fillWidth: true
+        Layout.preferredHeight: 54
+        Layout.minimumHeight: 54
+        Layout.maximumHeight: 54
+        Layout.fillHeight: false
+
+        padding: 0
+        hoverEnabled: true
+        opacity: enabled ? 1.0 : 0.45
+
+        background: Rectangle {
+            radius: 6
+            color: !cardButton.enabled ? "#f1f5f9"
+                 : cardButton.pressed ? "#eef2f7"
+                 : cardButton.hovered ? "#f8fafc"
+                 : "#fafafa"
+            border.color: cardButton.hovered ? "#cbd5e1" : "#e0e4ea"
+            border.width: 1
+        }
+
+        contentItem: Item {
+            RowLayout {
+                anchors.fill: parent
+                anchors.margins: 6
+                spacing: 6
+
+                Rectangle {
+                    Layout.preferredWidth: 6
+                    Layout.fillHeight: true
+                    radius: 3
+                    color: cardButton.accentColor
+                    opacity: 0.9
+                }
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    spacing: 2
+
+                    Text {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 16
+                        Layout.fillHeight: false
+                        text: cardButton.titleText
+                        color: cardButton.accentColor
+                        font.family: "Asta Sans"
+                        font.pixelSize: 12
+                        font.bold: true
+                        horizontalAlignment: Text.AlignLeft
+                        verticalAlignment: Text.AlignVCenter
+                        elide: Text.ElideRight
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 15
+                        Layout.fillHeight: false
+                        text: cardButton.bodyText
+                        color: "#374151"
+                        font.family: "Asta Sans"
+                        font.pixelSize: 10
+                        horizontalAlignment: Text.AlignLeft
+                        verticalAlignment: Text.AlignVCenter
+                        wrapMode: Text.WordWrap
+                        maximumLineCount: 2
+                        elide: Text.ElideRight
+                    }
+                }
+            }
         }
     }
 
@@ -721,13 +1633,14 @@ Popup {
         Layout.fillHeight: false
 
         contentItem: Text {
-            text: segRoot.text
-            color: segRoot.selected ? "white" : "#334155"
-            font.pixelSize: 12
-            font.bold: segRoot.selected
+            text:                segRoot.text
+            color:               segRoot.selected ? "white" : "#374151"
+            font.family:         "Asta Sans"
+            font.pixelSize:      12
+            font.bold:           segRoot.selected
             horizontalAlignment: Text.AlignHCenter
-            verticalAlignment: Text.AlignVCenter
-            elide: Text.ElideRight
+            verticalAlignment:   Text.AlignVCenter
+            elide:               Text.ElideRight
         }
 
         background: Rectangle {
@@ -755,8 +1668,8 @@ Popup {
         Layout.fillHeight: false
 
         radius: 5
-        color: "#f8fafc"
-        border.color: "#d7dde6"
+        color: "#fafafa"
+        border.color: "#e0e4ea"
 
         RowLayout {
             anchors.fill: parent
@@ -772,7 +1685,8 @@ Popup {
 
             Text {
                 text: summaryRoot.labelText + " " + summaryRoot.valueText
-                color: "#334155"
+                color: "#374151"
+                font.family:    "Asta Sans"
                 font.pixelSize: 12
                 font.bold: true
                 elide: Text.ElideRight
@@ -818,7 +1732,7 @@ Popup {
             spacing: 0
 
             HistoryTableCell {
-                width: 88
+                width: 142  //88
                 height: rowRoot.height
                 textValue: rowRoot.timeText
                 isHeader: rowRoot.isHeader
@@ -867,7 +1781,8 @@ Popup {
             }
 
             HistoryTableCell {
-                width: Math.max(120, rowRoot.width - 88 - 82 - 68 - 48 - 62 - 62 - 72 - 78)
+                //width: Math.max(120, rowRoot.width - 88 - 82 - 68 - 48 - 62 - 62 - 72 - 78)
+                width: Math.max(120, rowRoot.width - 142 - 82 - 68 - 48 - 62 - 62 - 72 - 78)
                 height: rowRoot.height
                 textValue: rowRoot.descText
                 isHeader: rowRoot.isHeader
@@ -909,6 +1824,7 @@ Popup {
 
             text: cellRoot.textValue
             color: cellRoot.isHeader ? "#334155" : "#475569"
+            font.family:    "Asta Sans"
             font.pixelSize: 11
             font.bold: cellRoot.isHeader
             verticalAlignment: Text.AlignVCenter
@@ -935,7 +1851,8 @@ Popup {
             anchors.fill: parent
             anchors.leftMargin: 8
             text: kindRoot.kindText
-            color: "#334155"
+            color: "#374151"
+            font.family:    "Asta Sans"
             font.pixelSize: 11
             font.bold: true
             verticalAlignment: Text.AlignVCenter
@@ -954,6 +1871,7 @@ Popup {
                 anchors.centerIn: parent
                 text: kindRoot.kindText
                 color: kindRoot.kindText === "알람" ? "#dc2626" : "#2563eb"
+                font.family:    "Asta Sans"
                 font.pixelSize: 11
                 font.bold: true
             }
@@ -978,7 +1896,8 @@ Popup {
             anchors.fill: parent
             anchors.leftMargin: 8
             text: statusRoot.statusText
-            color: "#334155"
+            color: "#374151"
+            font.family:    "Asta Sans"
             font.pixelSize: 11
             font.bold: true
             verticalAlignment: Text.AlignVCenter
@@ -992,6 +1911,7 @@ Popup {
             radius: 4
             color: statusRoot.statusText === "경고" ? "#fee2e2"
                  : statusRoot.statusText === "주의" ? "#ffedd5"
+                 : statusRoot.statusText === "조치" ? "#dbeafe"
                  : "#dcfce7"
 
             Text {
@@ -999,7 +1919,9 @@ Popup {
                 text: statusRoot.statusText
                 color: statusRoot.statusText === "경고" ? "#dc2626"
                      : statusRoot.statusText === "주의" ? "#f97316"
+                     : statusRoot.statusText === "조치" ? "#2563eb"
                      : "#15803d"
+                font.family: "Asta Sans"
                 font.pixelSize: 11
                 font.bold: true
             }
@@ -1024,7 +1946,8 @@ Popup {
             anchors.fill: parent
             anchors.leftMargin: 8
             text: actionRoot.actionText
-            color: "#334155"
+            color: "#374151"
+            font.family:    "Asta Sans"
             font.pixelSize: 11
             font.bold: true
             verticalAlignment: Text.AlignVCenter
@@ -1038,14 +1961,19 @@ Popup {
             radius: 4
             color: actionRoot.actionText === "완료" ? "#dcfce7"
                  : actionRoot.actionText === "확인중" ? "#dbeafe"
-                 : "#fef3c7"
+                 : actionRoot.actionText === "보류" ? "#fef3c7"
+                 : actionRoot.actionText === "요청" ? "#ffedd5"
+                 : "#f1f5f9"
 
             Text {
                 anchors.centerIn: parent
                 text: actionRoot.actionText
                 color: actionRoot.actionText === "완료" ? "#16a34a"
                      : actionRoot.actionText === "확인중" ? "#2563eb"
-                     : "#d97706"
+                     : actionRoot.actionText === "보류" ? "#d97706"
+                     : actionRoot.actionText === "요청" ? "#f97316"
+                     : "#64748b"
+                font.family: "Asta Sans"
                 font.pixelSize: 11
                 font.bold: true
             }
@@ -1061,34 +1989,32 @@ Popup {
 
         property string labelText: ""
         property string valueText: ""
-        property color valueColor: "#334155"
+        property color  valueColor: "#374151"
 
         Layout.fillWidth: true
         Layout.preferredHeight: 24
 
         Text {
             Layout.preferredWidth: 82
-            text: detailRoot.labelText
-            color: "#64748b"
+            text:           detailRoot.labelText
+            font.family:    "Asta Sans"
             font.pixelSize: 12
-            font.bold: true
-            elide: Text.ElideRight
+            font.bold:      true
+            color:          "#9e9e9e"
+            elide:          Text.ElideRight
         }
 
         Text {
             Layout.fillWidth: true
-            text: detailRoot.valueText
-            color: detailRoot.valueColor
+            text:           detailRoot.valueText
+            font.family:    "Asta Sans"
             font.pixelSize: 12
-            font.bold: detailRoot.valueColor !== "#334155"
-            elide: Text.ElideRight
+            font.bold:      detailRoot.valueColor !== "#374151"
+            color:          detailRoot.valueColor
+            elide:          Text.ElideRight
         }
     }
 
-    // ============================================================
-    // [컴포넌트] HistoryModeCard
-    // 사용 위치: 선택 이력 상세 패널 하단
-    // ============================================================
     // ============================================================
     // [컴포넌트] HistoryModeCard
     // 사용 위치: 선택 이력 상세 패널 하단
@@ -1105,20 +2031,19 @@ Popup {
         property color accentColor: "#2563eb"
 
         Layout.fillWidth: true
-        Layout.fillHeight: false
-        Layout.preferredHeight: 44
-        Layout.minimumHeight: 44
-        Layout.maximumHeight: 44
+        Layout.fillHeight: true
+        Layout.preferredHeight: 54
+        Layout.minimumHeight: 0
 
         radius: 6
-        color: "#f8fafc"
-        border.color: "#d7dde6"
+        color: "#fafafa"
+        border.color: "#e0e4ea"
         clip: true
 
         RowLayout {
             anchors.fill: parent
-            anchors.margins: 5
-            spacing: 5
+            anchors.margins: 6
+            spacing: 6
 
             Rectangle {
                 Layout.preferredWidth: 6
@@ -1139,6 +2064,7 @@ Popup {
                     Layout.fillHeight: false
                     text: modeRoot.titleText
                     color: modeRoot.accentColor
+                    font.family:    "Asta Sans"
                     font.pixelSize: 12
                     font.bold: true
                     horizontalAlignment: Text.AlignLeft
@@ -1151,7 +2077,8 @@ Popup {
                     Layout.preferredHeight: 15
                     Layout.fillHeight: false
                     text: modeRoot.bodyText
-                    color: "#475569"
+                    color: "#374151"
+                    font.family:    "Asta Sans"
                     font.pixelSize: 10
                     horizontalAlignment: Text.AlignLeft
                     verticalAlignment: Text.AlignVCenter
@@ -1164,3 +2091,5 @@ Popup {
     }
 
 }
+
+
