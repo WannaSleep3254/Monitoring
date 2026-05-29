@@ -33,6 +33,8 @@ struct FairinoMonitorService::Impl
     bool reconnecting = false;
     int reconnect_count = 0;
     std::string last_recovery_message;
+    int64_t last_recovery_epoch_ms = 0;
+    int recovery_event_id = 0;
 
     std::chrono::steady_clock::time_point last_fast_poll{};
     std::chrono::steady_clock::time_point last_torque_poll{};
@@ -57,6 +59,20 @@ struct FairinoMonitorService::Impl
     static bool isCommunicationError(int code)
     {
         return code == -2; // ERR_SOCKET_COM_FAILED
+    }
+
+    static int64_t currentEpochMs()
+    {
+        return std::chrono::duration_cast<std::chrono::milliseconds>(
+                   std::chrono::system_clock::now().time_since_epoch())
+            .count();
+    }
+
+    void markRecoveryEvent(const std::string& message)
+    {
+        last_recovery_message = message;
+        last_recovery_epoch_ms = currentEpochMs();
+        ++recovery_event_id;
     }
 
     bool connectLocked()
@@ -89,6 +105,8 @@ struct FairinoMonitorService::Impl
         sdk_session_disconnected = false;
         reconnecting = false;
         last_recovery_message.clear();
+        last_recovery_epoch_ms = 0;
+        recovery_event_id = 0;
 
         return true;
     }
@@ -99,7 +117,9 @@ struct FairinoMonitorService::Impl
         return connectLocked();
     }
 
-    bool reconnectLocked(const std::string& reason, bool force = false)
+    bool reconnectLocked(const std::string& reason,
+                         bool force = false,
+                         const std::string& successMessage = "reconnect success")
     {
         const auto now = std::chrono::steady_clock::now();
 
@@ -123,7 +143,7 @@ struct FairinoMonitorService::Impl
         if (ok) {
             consecutive_fast_poll_failures = 0;
             reconnecting = false;
-            last_recovery_message = "reconnect success";
+            markRecoveryEvent(successMessage);
             std::cerr << "[FairinoMonitorService] reconnect succeeded\n";
         } else {
             sdk_session_disconnected = true;
@@ -162,6 +182,8 @@ struct FairinoMonitorService::Impl
                 s.reconnecting = reconnecting;
                 s.reconnect_count = reconnect_count;
                 s.last_recovery_message = "fast poll failed";
+                s.last_recovery_epoch_ms = last_recovery_epoch_ms;
+                s.recovery_event_id = recovery_event_id;
                 last_recovery_message = s.last_recovery_message;
 
                 std::cerr << "[FairinoMonitorService] fast poll disconnected after "
@@ -176,7 +198,7 @@ struct FairinoMonitorService::Impl
                 std::cerr << "[FairinoMonitorService] fast poll recovered after "
                           << consecutive_fast_poll_failures
                           << " failures\n";
-                last_recovery_message = "fast poll recovered";
+                markRecoveryEvent("fast poll recovered");
             }
 
             consecutive_fast_poll_failures = 0;
@@ -186,6 +208,8 @@ struct FairinoMonitorService::Impl
             s.reconnecting = false;
             s.reconnect_count = reconnect_count;
             s.last_recovery_message = last_recovery_message;
+            s.last_recovery_epoch_ms = last_recovery_epoch_ms;
+            s.recovery_event_id = recovery_event_id;
 
             s.last_poll_error_code = 0;
             s.last_poll_error.clear();
@@ -221,6 +245,8 @@ struct FairinoMonitorService::Impl
                 s.reconnecting = reconnecting;
                 s.reconnect_count = reconnect_count;
                 s.last_recovery_message = last_recovery_message;
+                s.last_recovery_epoch_ms = last_recovery_epoch_ms;
+                s.recovery_event_id = recovery_event_id;
             }
             return false;
         }
@@ -246,6 +272,8 @@ struct FairinoMonitorService::Impl
                 s.reconnecting = reconnecting;
                 s.reconnect_count = reconnect_count;
                 s.last_recovery_message = last_recovery_message;
+                s.last_recovery_epoch_ms = last_recovery_epoch_ms;
+                s.recovery_event_id = recovery_event_id;
             }
             return false;
         }
@@ -365,10 +393,16 @@ struct FairinoMonitorService::Impl
             s.last_command_timestamp = last.last_command_timestamp;
             s.reconnecting = reconnecting;
             s.reconnect_count = reconnect_count;
+            s.last_recovery_epoch_ms = last_recovery_epoch_ms;
+            s.recovery_event_id = recovery_event_id;
             if (s.last_recovery_message.empty())
                 s.last_recovery_message = last_recovery_message;
             if (s.last_recovery_message.empty())
                 s.last_recovery_message = last.last_recovery_message;
+            if (s.last_recovery_epoch_ms == 0)
+                s.last_recovery_epoch_ms = last.last_recovery_epoch_ms;
+            if (s.recovery_event_id == 0)
+                s.recovery_event_id = last.recovery_event_id;
 
             const auto seq = polling_sequence++;
 
@@ -516,6 +550,8 @@ struct FairinoMonitorService::Impl
             last.reconnecting = reconnecting;
             last.reconnect_count = reconnect_count;
             last.last_recovery_message = last_recovery_message;
+            last.last_recovery_epoch_ms = last_recovery_epoch_ms;
+            last.recovery_event_id = recovery_event_id;
         }
 
         return result;
@@ -532,8 +568,9 @@ struct FairinoMonitorService::Impl
             rtn = fn();
 
             if (isCommunicationError(rtn) &&
-                reconnectLocked(name + " failed: code=" + std::to_string(rtn), true)) {
-                last_recovery_message = "command retry after reconnect";
+                reconnectLocked(name + " failed: code=" + std::to_string(rtn),
+                                true,
+                                "command retry after reconnect")) {
                 rtn = fn();
             }
         }

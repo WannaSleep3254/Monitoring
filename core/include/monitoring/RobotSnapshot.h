@@ -65,6 +65,8 @@ struct RobotSnapshot
     bool reconnecting = false;
     int reconnect_count = 0;
     std::string last_recovery_message;
+    int64_t last_recovery_epoch_ms = 0;
+    int recovery_event_id = 0;
 
     // ---- Command result ----
     std::string last_command_name;

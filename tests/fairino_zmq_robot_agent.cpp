@@ -185,6 +185,9 @@ QByteArray buildSnapshotPayload(
     snapshot["reconnectCount"] = s.reconnect_count;
     snapshot["lastRecoveryMessage"] =
         QString::fromStdString(s.last_recovery_message);
+    snapshot["lastRecoveryEpochMs"] =
+        static_cast<double>(s.last_recovery_epoch_ms);
+    snapshot["recoveryEventId"] = s.recovery_event_id;
 
     snapshot["timestamp"] = toIsoTimestamp(data.timestamp);
     snapshot["sequenceNumber"] =
