@@ -30,6 +30,9 @@ struct FairinoMonitorService::Impl
     int consecutive_fast_poll_failures = 0;
     int consecutive_command_failures = 0;
     bool sdk_session_disconnected = false;
+    bool reconnecting = false;
+    int reconnect_count = 0;
+    std::string last_recovery_message;
 
     std::chrono::steady_clock::time_point last_fast_poll{};
     std::chrono::steady_clock::time_point last_torque_poll{};
@@ -84,6 +87,8 @@ struct FairinoMonitorService::Impl
         last_extra_poll = now;
         consecutive_fast_poll_failures = 0;
         sdk_session_disconnected = false;
+        reconnecting = false;
+        last_recovery_message.clear();
 
         return true;
     }
@@ -105,6 +110,9 @@ struct FairinoMonitorService::Impl
         }
 
         last_reconnect_attempt = now;
+        reconnecting = true;
+        ++reconnect_count;
+        last_recovery_message = "reconnect requested";
 
         std::cerr << "[FairinoMonitorService] reconnect requested: "
                   << reason << "\n";
@@ -114,9 +122,13 @@ struct FairinoMonitorService::Impl
 
         if (ok) {
             consecutive_fast_poll_failures = 0;
+            reconnecting = false;
+            last_recovery_message = "reconnect success";
             std::cerr << "[FairinoMonitorService] reconnect succeeded\n";
         } else {
             sdk_session_disconnected = true;
+            reconnecting = true;
+            last_recovery_message = "reconnect failed";
             std::cerr << "[FairinoMonitorService] reconnect failed\n";
         }
 
@@ -147,6 +159,10 @@ struct FairinoMonitorService::Impl
             if (consecutive_fast_poll_failures >= kDisconnectFailureThreshold) {
                 s.connected = false;
                 sdk_session_disconnected = true;
+                s.reconnecting = reconnecting;
+                s.reconnect_count = reconnect_count;
+                s.last_recovery_message = "fast poll failed";
+                last_recovery_message = s.last_recovery_message;
 
                 std::cerr << "[FairinoMonitorService] fast poll disconnected after "
                           << consecutive_fast_poll_failures
@@ -160,11 +176,16 @@ struct FairinoMonitorService::Impl
                 std::cerr << "[FairinoMonitorService] fast poll recovered after "
                           << consecutive_fast_poll_failures
                           << " failures\n";
+                last_recovery_message = "fast poll recovered";
             }
 
             consecutive_fast_poll_failures = 0;
             sdk_session_disconnected = false;
+            reconnecting = false;
             s.connected = true;
+            s.reconnecting = false;
+            s.reconnect_count = reconnect_count;
+            s.last_recovery_message = last_recovery_message;
 
             s.last_poll_error_code = 0;
             s.last_poll_error.clear();
@@ -197,6 +218,9 @@ struct FairinoMonitorService::Impl
             if (isCommunicationError(rtn) &&
                 consecutive_fast_poll_failures >= kDisconnectFailureThreshold) {
                 reconnectLocked(msg);
+                s.reconnecting = reconnecting;
+                s.reconnect_count = reconnect_count;
+                s.last_recovery_message = last_recovery_message;
             }
             return false;
         }
@@ -219,6 +243,9 @@ struct FairinoMonitorService::Impl
             if (isCommunicationError(rtn) &&
                 consecutive_fast_poll_failures >= kDisconnectFailureThreshold) {
                 reconnectLocked(msg);
+                s.reconnecting = reconnecting;
+                s.reconnect_count = reconnect_count;
+                s.last_recovery_message = last_recovery_message;
             }
             return false;
         }
@@ -336,6 +363,12 @@ struct FairinoMonitorService::Impl
             s.last_command_ok = last.last_command_ok;
             s.command_sequence_number = last.command_sequence_number;
             s.last_command_timestamp = last.last_command_timestamp;
+            s.reconnecting = reconnecting;
+            s.reconnect_count = reconnect_count;
+            if (s.last_recovery_message.empty())
+                s.last_recovery_message = last_recovery_message;
+            if (s.last_recovery_message.empty())
+                s.last_recovery_message = last.last_recovery_message;
 
             const auto seq = polling_sequence++;
 
@@ -480,6 +513,9 @@ struct FairinoMonitorService::Impl
             last.last_command_ok = result.ok;
             last.last_command_error_code = result.code;
             last.last_command_error = result.message;
+            last.reconnecting = reconnecting;
+            last.reconnect_count = reconnect_count;
+            last.last_recovery_message = last_recovery_message;
         }
 
         return result;
@@ -497,6 +533,7 @@ struct FairinoMonitorService::Impl
 
             if (isCommunicationError(rtn) &&
                 reconnectLocked(name + " failed: code=" + std::to_string(rtn), true)) {
+                last_recovery_message = "command retry after reconnect";
                 rtn = fn();
             }
         }

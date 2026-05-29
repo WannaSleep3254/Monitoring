@@ -61,6 +61,11 @@ struct RobotSnapshot
     std::string last_poll_error;
     int last_poll_error_code = 0;
 
+    // ---- Recovery state ----
+    bool reconnecting = false;
+    int reconnect_count = 0;
+    std::string last_recovery_message;
+
     // ---- Command result ----
     std::string last_command_name;
     std::string last_command_error;

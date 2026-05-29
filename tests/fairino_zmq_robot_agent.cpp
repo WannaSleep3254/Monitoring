@@ -181,6 +181,11 @@ QByteArray buildSnapshotPayload(
             ? QStringLiteral("NG")
             : QStringLiteral("OK");
 
+    snapshot["reconnecting"] = s.reconnecting;
+    snapshot["reconnectCount"] = s.reconnect_count;
+    snapshot["lastRecoveryMessage"] =
+        QString::fromStdString(s.last_recovery_message);
+
     snapshot["timestamp"] = toIsoTimestamp(data.timestamp);
     snapshot["sequenceNumber"] =
         static_cast<double>(data.sequence_number);
