@@ -99,6 +99,10 @@ public:
 
     CommandResult startJointJogEx(int joint, bool positive, float vel, float acc, float max_deg);
     CommandResult stopJointJogEx();
+    CommandResult startWorkspaceJogEx(const std::string& axis, bool positive, float vel, float acc, float max_dis);
+    CommandResult stopWorkspaceJogEx();
+    CommandResult startBaseJogEx(const std::string& axis, bool positive, float vel, float acc, float max_dis);
+    CommandResult stopBaseJogEx();
 
 private:
     struct Impl;

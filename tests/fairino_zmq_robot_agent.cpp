@@ -42,7 +42,9 @@ using SteadyClock = std::chrono::steady_clock;
 struct JogWatchdogState
 {
     bool active = false;
+    bool workspaceJog = false;
     int joint = 0;
+    QString axis;
     QString sessionId;
     SteadyClock::time_point lastHeartbeat;
 };
@@ -264,6 +266,20 @@ CommandRequest parseCommandRequest(const QByteArray& payload)
     result.operatorName = object.value(QStringLiteral("operator")).toString();
     result.params = object.value("params").toObject();
 
+    const auto copyTopLevelParam = [&](const QString& key)
+    {
+        if (!result.params.contains(key) && object.contains(key)) {
+            result.params.insert(key, object.value(key));
+        }
+    };
+
+    copyTopLevelParam(QStringLiteral("joint"));
+    copyTopLevelParam(QStringLiteral("axis"));
+    copyTopLevelParam(QStringLiteral("direction"));
+    copyTopLevelParam(QStringLiteral("frame"));
+    copyTopLevelParam(QStringLiteral("speed"));
+    copyTopLevelParam(QStringLiteral("jogSessionId"));
+
     if (result.commandId.isEmpty()) {
         result.error = QStringLiteral("Missing commandId");
         return result;
@@ -326,18 +342,32 @@ QByteArray buildParseErrorResponse(const QString& error)
     return QJsonDocument(response).toJson(QJsonDocument::Compact);
 }
 
+bool isStartWorkspaceJogCommand(const QString& command)
+{
+    return command == QStringLiteral("startWorkspaceJog") ||
+           command == QStringLiteral("startBaseJog");
+}
+
+bool isStopWorkspaceJogCommand(const QString& command)
+{
+    return command == QStringLiteral("stopWorkspaceJog") ||
+           command == QStringLiteral("stopBaseJog");
+}
+
 bool requiresCommandMaster(const QString& command)
 {
     return command == QStringLiteral("setManualMode") ||
            command == QStringLiteral("setAutoMode") ||
            command == QStringLiteral("clearError") ||
            command == QStringLiteral("startJointJog") ||
+           isStartWorkspaceJogCommand(command) ||
            command == QStringLiteral("jogHeartbeat");
 }
 
 bool isSafetyStopCommand(const QString& command)
 {
     return command == QStringLiteral("stopJointJog") ||
+           isStopWorkspaceJogCommand(command) ||
            command == QStringLiteral("stop");
 }
 
@@ -436,12 +466,17 @@ void checkJogTimeouts(JogWatchdogStates& jogStates,
             selectRobot(robotId, robot1, robot2);
 
         if (robot && robot->isRunning()) {
-            const auto result = robot->stopJointJogEx();
+            const auto result =
+                state.workspaceJog
+                    ? robot->stopWorkspaceJogEx()
+                    : robot->stopJointJogEx();
 
             qWarning() << "[FairinoZmqRobotAgent]"
                        << "jog heartbeat timeout stop"
                        << "robotId =" << robotId
+                       << "kind =" << (state.workspaceJog ? "workspace" : "joint")
                        << "joint =" << state.joint
+                       << "axis =" << state.axis
                        << "elapsedMs =" << static_cast<qlonglong>(elapsedMs)
                        << "ok =" << result.ok
                        << "code =" << result.code
@@ -449,7 +484,9 @@ void checkJogTimeouts(JogWatchdogStates& jogStates,
         }
 
         state.active = false;
+        state.workspaceJog = false;
         state.joint = 0;
+        state.axis.clear();
         state.sessionId.clear();
 
         if (masterState.active) {
@@ -490,6 +527,27 @@ QByteArray executeCommand(const CommandRequest& request,
     }
 
     if (!robot->isRunning()) {
+        if (isStopWorkspaceJogCommand(request.command)) {
+            if (request.robotId >= 1 && request.robotId <= kMaxRobotCount) {
+                JogWatchdogState& state = jogStates[request.robotId];
+                state.active = false;
+                state.workspaceJog = false;
+                state.joint = 0;
+                state.axis.clear();
+                state.sessionId.clear();
+            }
+
+            if (masterState.active) {
+                masterState.active = false;
+                masterState.ownerId.clear();
+            }
+
+            return buildResponse(request,
+                                 true,
+                                 0,
+                                 QStringLiteral("workspace jog stop ignored: robot not connected"));
+        }
+
         return buildResponse(request,
                              false,
                              200,
@@ -515,7 +573,9 @@ QByteArray executeCommand(const CommandRequest& request,
             JogWatchdogState& state = jogStates[request.robotId];
 
             state.active = false;
+            state.workspaceJog = false;
             state.joint = 0;
+            state.axis.clear();
             state.sessionId.clear();
 
             qInfo() << "[FairinoZmqRobotAgent]"
@@ -561,7 +621,9 @@ QByteArray executeCommand(const CommandRequest& request,
             JogWatchdogState& state = jogStates[request.robotId];
 
             state.active = true;
+            state.workspaceJog = false;
             state.joint = joint;
+            state.axis.clear();
             state.sessionId = defaultJogSessionId(request);
             state.lastHeartbeat = SteadyClock::now();
 
@@ -569,6 +631,91 @@ QByteArray executeCommand(const CommandRequest& request,
                     << "jog watchdog started"
                     << "robotId =" << request.robotId
                     << "joint =" << joint
+                    << "sessionId =" << state.sessionId;
+        }
+
+    } else if (isStopWorkspaceJogCommand(request.command)) {
+        result = robot->stopWorkspaceJogEx();
+
+        if (request.robotId >= 1 && request.robotId <= kMaxRobotCount) {
+            JogWatchdogState& state = jogStates[request.robotId];
+
+            state.active = false;
+            state.workspaceJog = false;
+            state.joint = 0;
+            state.axis.clear();
+            state.sessionId.clear();
+
+            qInfo() << "[FairinoZmqRobotAgent]"
+                    << "workspace jog watchdog stopped"
+                    << "robotId =" << request.robotId;
+        }
+
+        if (masterState.active) {
+            qInfo() << "[FairinoZmqRobotAgent]"
+                    << "command master released by workspace jog stop"
+                    << "owner =" << masterState.ownerId;
+
+            masterState.active = false;
+            masterState.ownerId.clear();
+        }
+
+    } else if (isStartWorkspaceJogCommand(request.command)) {
+        const QString axis =
+            request.params.value("axis").toString().trimmed().toUpper();
+
+        const QString direction =
+            request.params.value("direction").toString().trimmed();
+
+        const QString frame =
+            request.params.value("frame").toString().trimmed().toLower();
+
+        if (direction != QStringLiteral("+") &&
+            direction != QStringLiteral("-")) {
+            result.ok = false;
+            result.code = -10015;
+            result.name = request.command.toStdString();
+            result.message =
+                "Invalid workspace jog direction: " + direction.toStdString();
+        } else if (!frame.isEmpty() &&
+                   frame != QStringLiteral("workspace") &&
+                   frame != QStringLiteral("workpiece")) {
+            result.ok = false;
+            result.code = -10016;
+            result.name = request.command.toStdString();
+            result.message =
+                "Invalid workspace jog frame: " + frame.toStdString();
+        } else {
+            const bool positive = direction == QStringLiteral("+");
+
+            const double speed =
+                request.params.value("speed").toDouble(5.0);
+
+            // 초기 실기 테스트 안전값
+            constexpr float kDefaultAccPercent = 5.0f;
+            constexpr float kMaxWorkspaceJogDistanceOrDegree = 1.0f;
+
+            result = robot->startWorkspaceJogEx(axis.toStdString(),
+                                                positive,
+                                                static_cast<float>(speed),
+                                                kDefaultAccPercent,
+                                                kMaxWorkspaceJogDistanceOrDegree);
+        }
+
+        if (result.ok && request.robotId >= 1 && request.robotId <= kMaxRobotCount) {
+            JogWatchdogState& state = jogStates[request.robotId];
+
+            state.active = true;
+            state.workspaceJog = true;
+            state.joint = 0;
+            state.axis = axis;
+            state.sessionId = defaultJogSessionId(request);
+            state.lastHeartbeat = SteadyClock::now();
+
+            qInfo() << "[FairinoZmqRobotAgent]"
+                    << "workspace jog watchdog started"
+                    << "robotId =" << request.robotId
+                    << "axis =" << axis
                     << "sessionId =" << state.sessionId;
         }
 

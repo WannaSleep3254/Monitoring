@@ -647,6 +647,89 @@ struct FairinoMonitorService::Impl
         return stopJointJogEx().ok;
     }
 
+    CommandResult startWorkspaceJogEx(
+        const std::string& axis,
+        bool positive,
+        float vel,
+        float acc,
+        float max_dis)
+    {
+        int axisIndex = 0;
+
+        if (axis == "X") {
+            axisIndex = 1;
+        } else if (axis == "Y") {
+            axisIndex = 2;
+        } else if (axis == "Z") {
+            axisIndex = 3;
+        } else if (axis == "RX") {
+            axisIndex = 4;
+        } else if (axis == "RY") {
+            axisIndex = 5;
+        } else if (axis == "RZ") {
+            axisIndex = 6;
+        } else {
+            return makeValidationError(
+                -10011,
+                "startWorkspaceJog",
+                "Invalid workspace jog axis: " + axis
+                );
+        }
+
+        if (vel < 0.0f || vel > 100.0f) {
+            return makeValidationError(
+                -10012,
+                "startWorkspaceJog",
+                "Invalid velocity percent: " + std::to_string(vel)
+                );
+        }
+
+        if (acc < 0.0f || acc > 100.0f) {
+            return makeValidationError(
+                -10013,
+                "startWorkspaceJog",
+                "Invalid acceleration percent: " + std::to_string(acc)
+                );
+        }
+
+        if (max_dis <= 0.0f || max_dis > 5.0f) {
+            return makeValidationError(
+                -10014,
+                "startWorkspaceJog",
+                "Invalid max distance/degree: " + std::to_string(max_dis)
+                );
+        }
+
+        return startJogEx(
+            8,                       // StartJOG ref: workpiece/workspace coordinate system
+            axisIndex,               // X/Y/Z/RX/RY/RZ
+            positive ? 1 : 0,        // + / -
+            vel,
+            acc,
+            max_dis
+            );
+    }
+
+    CommandResult stopWorkspaceJogEx()
+    {
+        return stopJogEx(9);    // StopJOG ref: workpiece/workspace coordinate system
+    }
+
+    CommandResult startBaseJogEx(
+        const std::string& axis,
+        bool positive,
+        float vel,
+        float acc,
+        float max_dis)
+    {
+        return startWorkspaceJogEx(axis, positive, vel, acc, max_dis);
+    }
+
+    CommandResult stopBaseJogEx()
+    {
+        return stopWorkspaceJogEx();
+    }
+
     // SDK 명령 함수 예시: StartJOG, StopJOG, ImmStopJOG, RobotEnable, Mode, ResetAllError 등
     CommandResult startJogEx(int ref, int axis, int dir, float vel, float acc, float max_dis)
     {
@@ -936,6 +1019,40 @@ FairinoMonitorService::CommandResult
 FairinoMonitorService::stopJointJogEx()
 {
     return d->stopJointJogEx();
+}
+
+FairinoMonitorService::CommandResult
+FairinoMonitorService::startWorkspaceJogEx(
+    const std::string& axis,
+    bool positive,
+    float vel,
+    float acc,
+    float max_dis)
+{
+    return d->startWorkspaceJogEx(axis, positive, vel, acc, max_dis);
+}
+
+FairinoMonitorService::CommandResult
+FairinoMonitorService::stopWorkspaceJogEx()
+{
+    return d->stopWorkspaceJogEx();
+}
+
+FairinoMonitorService::CommandResult
+FairinoMonitorService::startBaseJogEx(
+    const std::string& axis,
+    bool positive,
+    float vel,
+    float acc,
+    float max_dis)
+{
+    return d->startBaseJogEx(axis, positive, vel, acc, max_dis);
+}
+
+FairinoMonitorService::CommandResult
+FairinoMonitorService::stopBaseJogEx()
+{
+    return d->stopBaseJogEx();
 }
 
 FairinoMonitorService::CommandResult
