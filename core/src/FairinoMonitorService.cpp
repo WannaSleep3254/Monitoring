@@ -85,24 +85,52 @@ struct FairinoMonitorService::Impl
     // 빠르게 읽어야 하는 상태 (joint pos 등)만 별도 함수로 분리, pollOnce에서 필요 시 호출
     bool readFastState(RobotSnapshot& s)
     {
-#if false
         int rtn = 0;
 
+        auto setPollError = [&](int code, const std::string& msg)
+        {
+            s.connected = false;
+
+            s.last_poll_error_code = code;
+            s.last_poll_error = msg;
+
+            // 기존 호환용 summary
+            s.last_error_code = code;
+            s.last_error = msg;
+        };
+
+        auto clearPollError = [&]()
+        {
+            s.connected = true;
+
+            s.last_poll_error_code = 0;
+            s.last_poll_error.clear();
+
+            s.last_error_code = 0;
+            s.last_error.clear();
+        };
+
+        auto copyDescPoseToArray = [](const DescPose& pose, auto& out)
+        {
+            out[0] = pose.tran.x;
+            out[1] = pose.tran.y;
+            out[2] = pose.tran.z;
+            out[3] = pose.rpy.rx;
+            out[4] = pose.rpy.ry;
+            out[5] = pose.rpy.rz;
+        };
+
+        // ------------------------------------------------------------
+        // 1. Joint position [deg] - 필수
+        // ------------------------------------------------------------
         JointPos j_deg{};
         rtn = robot.GetActualJointPosDegree(opt.robot_id, &j_deg);
+
         if (rtn != 0) {
             const std::string msg =
                 "GetActualJointPosDegree failed: code=" + std::to_string(rtn);
 
-            s.connected = false;
-
-            // polling error
-            s.last_poll_error_code = rtn;
-            s.last_poll_error = msg;
-
-            // 기존 호환용 summary
-            s.last_error_code = rtn;
-            s.last_error = msg;
+            setPollError(rtn, msg);
             return false;
         }
 
@@ -110,41 +138,46 @@ struct FairinoMonitorService::Impl
             s.joint_pos_deg[i] = j_deg.jPos[i];
         }
 
-        return true;
-#else
+        // ------------------------------------------------------------
+        // 2. TCP pose [x, y, z, rx, ry, rz] - 필수
+        // ------------------------------------------------------------
         DescPose tcpPose{};
-        int rtn = robot.GetActualTCPPose(0, &tcpPose);   // SDK 시그니처 확인 필요
+        rtn = robot.GetActualTCPPose(0, &tcpPose);
 
-        if (rtn == 0) {
-            s.tcp_pose[0] = tcpPose.tran.x;
-            s.tcp_pose[1] = tcpPose.tran.y;
-            s.tcp_pose[2] = tcpPose.tran.z;
-            s.tcp_pose[3] = tcpPose.rpy.rx;
-            s.tcp_pose[4] = tcpPose.rpy.ry;
-            s.tcp_pose[5] = tcpPose.rpy.rz;
-        } else {
-            s.last_poll_error_code = rtn;
-            s.last_poll_error = "GetActualTCPPose failed: code=" + std::to_string(rtn);
+        if (rtn != 0) {
+            const std::string msg =
+                "GetActualTCPPose failed: code=" + std::to_string(rtn);
+
+            setPollError(rtn, msg);
+            return false;
         }
 
+        copyDescPoseToArray(tcpPose, s.tcp_pose);
+
+        // ------------------------------------------------------------
+        // 3. 여기까지 성공이면 joint/tcp 전송 가능 상태
+        // ------------------------------------------------------------
+        clearPollError();
+
+        // ------------------------------------------------------------
+        // 4. Flange pose - 선택 데이터
+        // ------------------------------------------------------------
         DescPose flangePose{};
-        rtn = robot.GetActualToolFlangePose(0, &flangePose);   // SDK 시그니처 확인 필요
+        rtn = robot.GetActualToolFlangePose(0, &flangePose);
 
         if (rtn == 0) {
-            s.flange_pose[0] = flangePose.tran.x;
-            s.flange_pose[1] = flangePose.tran.y;
-            s.flange_pose[2] = flangePose.tran.z;
-            s.flange_pose[3] = flangePose.rpy.rx;
-            s.flange_pose[4] = flangePose.rpy.ry;
-            s.flange_pose[5] = flangePose.rpy.rz;
+            copyDescPoseToArray(flangePose, s.flange_pose);
         }
         else {
-            s.last_poll_error_code = rtn;
-            s.last_poll_error = "GetActualToolFlangePose failed: code=" + std::to_string(rtn);
+            // Flange는 선택 데이터로 처리.
+            // joint/tcp 전송 성공 상태는 유지한다.
+            //
+            // 필요 시 별도 warning 필드가 있으면 여기에 저장하는 것이 좋음:
+            // s.last_warning_code = rtn;
+            // s.last_warning = "GetActualToolFlangePose failed: code=" + std::to_string(rtn);
         }
 
-        return rtn == 0;
-#endif
+        return true;
     }
     // 온도/드라이버 토크는 상대적으로 느리게 변할 것으로 예상되어 별도 함수로 분리, pollOnce에서 필요 시 호출
     void readDriverTemperature(RobotSnapshot& s)
