@@ -141,8 +141,12 @@ QByteArray buildSnapshotPayload(
     snapshot["tcpPose"] = toJsonArray(s.tcp_pose);
 //    qDebug()<<s.tcp_pose[0]<<s.tcp_pose[1]<<s.tcp_pose[2]<<s.tcp_pose[3]<<s.tcp_pose[4]<<s.tcp_pose[5];
     qDebug()<<"비상버튼 "<<s.safety_si0<<s.safety_si1;
-//    qDebug()<<"2 "<<snapshot["safety_si0"]<<snapshot["safety_si1"];
-//    qDebug()<<"3 "<<snapshot["SafetyStopState"];
+
+    snapshot["safetySi0"] = static_cast<int>(s.safety_si0);
+    snapshot["safetySi1"] = static_cast<int>(s.safety_si1);
+
+    const bool safetyStop = (s.safety_si0 != 0 || s.safety_si1 != 0);
+    snapshot["safetyStop"] = safetyStop;
 
     // 실측 결과 joint_torque는 0으로 들어오고 driver_torque가 유효하므로
     // payload의 torques는 driver_torque 우선 사용.
@@ -173,7 +177,9 @@ QByteArray buildSnapshotPayload(
 
     snapshot["sequenceState"] = QStringLiteral("SDK");
     snapshot["interlockState"] =
-        s.emergency_stop ? QStringLiteral("NG") : QStringLiteral("OK");
+        (s.emergency_stop || safetyStop)
+            ? QStringLiteral("NG")
+            : QStringLiteral("OK");
 
     snapshot["timestamp"] = toIsoTimestamp(data.timestamp);
     snapshot["sequenceNumber"] =
