@@ -85,6 +85,7 @@ struct FairinoMonitorService::Impl
     // 빠르게 읽어야 하는 상태 (joint pos 등)만 별도 함수로 분리, pollOnce에서 필요 시 호출
     bool readFastState(RobotSnapshot& s)
     {
+#if false
         int rtn = 0;
 
         JointPos j_deg{};
@@ -110,6 +111,40 @@ struct FairinoMonitorService::Impl
         }
 
         return true;
+#else
+        DescPose tcpPose{};
+        int rtn = robot.GetActualTCPPose(0, &tcpPose);   // SDK 시그니처 확인 필요
+
+        if (rtn == 0) {
+            s.tcp_pose[0] = tcpPose.tran.x;
+            s.tcp_pose[1] = tcpPose.tran.y;
+            s.tcp_pose[2] = tcpPose.tran.z;
+            s.tcp_pose[3] = tcpPose.rpy.rx;
+            s.tcp_pose[4] = tcpPose.rpy.ry;
+            s.tcp_pose[5] = tcpPose.rpy.rz;
+        } else {
+            s.last_poll_error_code = rtn;
+            s.last_poll_error = "GetActualTCPPose failed: code=" + std::to_string(rtn);
+        }
+
+        DescPose flangePose{};
+        rtn = robot.GetActualToolFlangePose(0, &flangePose);   // SDK 시그니처 확인 필요
+
+        if (rtn == 0) {
+            s.flange_pose[0] = flangePose.tran.x;
+            s.flange_pose[1] = flangePose.tran.y;
+            s.flange_pose[2] = flangePose.tran.z;
+            s.flange_pose[3] = flangePose.rpy.rx;
+            s.flange_pose[4] = flangePose.rpy.ry;
+            s.flange_pose[5] = flangePose.rpy.rz;
+        }
+        else {
+            s.last_poll_error_code = rtn;
+            s.last_poll_error = "GetActualToolFlangePose failed: code=" + std::to_string(rtn);
+        }
+
+        return rtn == 0;
+#endif
     }
     // 온도/드라이버 토크는 상대적으로 느리게 변할 것으로 예상되어 별도 함수로 분리, pollOnce에서 필요 시 호출
     void readDriverTemperature(RobotSnapshot& s)

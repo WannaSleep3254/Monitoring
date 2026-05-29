@@ -139,6 +139,10 @@ QByteArray buildSnapshotPayload(
 
     snapshot["jointPositions"] = toJsonArray(s.joint_pos_deg);
     snapshot["tcpPose"] = toJsonArray(s.tcp_pose);
+//    qDebug()<<s.tcp_pose[0]<<s.tcp_pose[1]<<s.tcp_pose[2]<<s.tcp_pose[3]<<s.tcp_pose[4]<<s.tcp_pose[5];
+    qDebug()<<"비상버튼 "<<s.safety_si0<<s.safety_si1;
+//    qDebug()<<"2 "<<snapshot["safety_si0"]<<snapshot["safety_si1"];
+//    qDebug()<<"3 "<<snapshot["SafetyStopState"];
 
     // 실측 결과 joint_torque는 0으로 들어오고 driver_torque가 유효하므로
     // payload의 torques는 driver_torque 우선 사용.
@@ -209,7 +213,6 @@ bool publishSnapshot(zmq::socket_t& socket,
                    << "robotId =" << robotId;
         return false;
     }
-
     return true;
 }
 
