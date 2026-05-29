@@ -10,6 +10,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonParseError>
+#include <QJsonValue>
 #include <QThread>
 
 #ifdef ENABLE_ZEROMQ_TRANSPORT
@@ -277,6 +278,8 @@ CommandRequest parseCommandRequest(const QByteArray& payload)
     copyTopLevelParam(QStringLiteral("axis"));
     copyTopLevelParam(QStringLiteral("direction"));
     copyTopLevelParam(QStringLiteral("frame"));
+    copyTopLevelParam(QStringLiteral("ioName"));
+    copyTopLevelParam(QStringLiteral("state"));
     copyTopLevelParam(QStringLiteral("speed"));
     copyTopLevelParam(QStringLiteral("jogSessionId"));
 
@@ -352,6 +355,62 @@ bool isStopWorkspaceJogCommand(const QString& command)
 {
     return command == QStringLiteral("stopWorkspaceJog") ||
            command == QStringLiteral("stopBaseJog");
+}
+
+bool isSupportedRobotIoName(int robotId, const QString& ioName)
+{
+    if (robotId == 1) {
+        return ioName == QStringLiteral("toolLock") ||
+               ioName == QStringLiteral("bulkVacuum") ||
+               ioName == QStringLiteral("sortingVacuum");
+    }
+
+    if (robotId == 2) {
+        return ioName == QStringLiteral("magnet") ||
+               ioName == QStringLiteral("clamp1") ||
+               ioName == QStringLiteral("clamp2");
+    }
+
+    return false;
+}
+
+bool parseBoolValue(const QJsonValue& value, bool& out)
+{
+    if (value.isBool()) {
+        out = value.toBool();
+        return true;
+    }
+
+    if (value.isDouble()) {
+        out = value.toInt() != 0;
+        return true;
+    }
+
+    if (value.isString()) {
+        const QString text = value.toString().trimmed().toLower();
+        if (text == QStringLiteral("true") ||
+            text == QStringLiteral("on") ||
+            text == QStringLiteral("1")) {
+            out = true;
+            return true;
+        }
+
+        if (text == QStringLiteral("false") ||
+            text == QStringLiteral("off") ||
+            text == QStringLiteral("0")) {
+            out = false;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool hasSafetyStop(const monitoring::RobotSnapshot& snapshot)
+{
+    return snapshot.emergency_stop != 0 ||
+           snapshot.safety_si0 != 0 ||
+           snapshot.safety_si1 != 0;
 }
 
 bool requiresCommandMaster(const QString& command)
@@ -553,6 +612,67 @@ QByteArray executeCommand(const CommandRequest& request,
                              200,
                              QStringLiteral("Robot is not connected: %1")
                                  .arg(request.robotId));
+    }
+
+    if (request.command == QStringLiteral("setRobotIo")) {
+        const QString ioName =
+            request.params.value(QStringLiteral("ioName")).toString().trimmed();
+
+        if (ioName.isEmpty()) {
+            return buildResponse(request,
+                                 false,
+                                 -11002,
+                                 QStringLiteral("Missing robot IO name"));
+        }
+
+        if (!isSupportedRobotIoName(request.robotId, ioName)) {
+            return buildResponse(
+                request,
+                false,
+                -11001,
+                QStringLiteral("Unsupported robot IO: robotId=%1, ioName=%2")
+                    .arg(request.robotId)
+                    .arg(ioName));
+        }
+
+        bool state = false;
+        if (!parseBoolValue(request.params.value(QStringLiteral("state")), state)) {
+            return buildResponse(request,
+                                 false,
+                                 -11002,
+                                 QStringLiteral("Invalid or missing robot IO state"));
+        }
+
+        const monitoring::RobotSnapshot latest = robot->latest();
+        if (hasSafetyStop(latest)) {
+            return buildResponse(request,
+                                 false,
+                                 -11003,
+                                 QStringLiteral("Robot IO blocked by safety stop"));
+        }
+
+        if (request.robotId >= 1 && request.robotId <= kMaxRobotCount &&
+            jogStates[request.robotId].active) {
+            return buildResponse(request,
+                                 false,
+                                 -11004,
+                                 QStringLiteral("Robot IO blocked while jog is active"));
+        }
+
+        qInfo() << "[FairinoZmqRobotAgent]"
+                << "robot IO interface accepted"
+                << "robotId =" << request.robotId
+                << "ioName =" << ioName
+                << "state =" << state
+                << "mapping =" << "pending";
+
+        return buildResponse(
+            request,
+            true,
+            0,
+            QStringLiteral("Robot IO interface accepted: ioName=%1, state=%2, mapping=pending")
+                .arg(ioName)
+                .arg(state ? QStringLiteral("true") : QStringLiteral("false")));
     }
 
     monitoring::FairinoMonitorService::CommandResult result;
