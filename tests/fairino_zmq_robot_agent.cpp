@@ -140,7 +140,7 @@ QByteArray buildSnapshotPayload(
     snapshot["jointPositions"] = toJsonArray(s.joint_pos_deg);
     snapshot["tcpPose"] = toJsonArray(s.tcp_pose);
 //    qDebug()<<s.tcp_pose[0]<<s.tcp_pose[1]<<s.tcp_pose[2]<<s.tcp_pose[3]<<s.tcp_pose[4]<<s.tcp_pose[5];
-    qDebug()<<"비상버튼 "<<s.safety_si0<<s.safety_si1;
+//    qDebug()<<"비상버튼 "<<s.safety_si0<<s.safety_si1;
 
     snapshot["safetySi0"] = static_cast<int>(s.safety_si0);
     snapshot["safetySi1"] = static_cast<int>(s.safety_si1);

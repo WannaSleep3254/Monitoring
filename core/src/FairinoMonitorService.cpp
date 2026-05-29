@@ -27,11 +27,17 @@ struct FairinoMonitorService::Impl
     //추가
     uint64_t polling_sequence = 0;
     uint64_t command_sequence = 0;
+    int consecutive_fast_poll_failures = 0;
+    int consecutive_command_failures = 0;
+    bool sdk_session_disconnected = false;
 
     std::chrono::steady_clock::time_point last_fast_poll{};
     std::chrono::steady_clock::time_point last_torque_poll{};
     std::chrono::steady_clock::time_point last_temp_poll{};
     std::chrono::steady_clock::time_point last_extra_poll{};
+    std::chrono::steady_clock::time_point last_reconnect_attempt{};
+
+    static constexpr int kDisconnectFailureThreshold = 3;
 
     // 내부 유틸: 배열 복사
     template<typename T, size_t N>
@@ -45,10 +51,13 @@ struct FairinoMonitorService::Impl
         for (int i=0;i<6;i++) dst[i] = src[i];
     }
 
-    bool connect()
+    static bool isCommunicationError(int code)
     {
-        std::lock_guard<std::mutex> lock(sdk_mutex);
+        return code == -2; // ERR_SOCKET_COM_FAILED
+    }
 
+    bool connectLocked()
+    {
         robot.LoggerInit();
         robot.SetLoggerLevel(opt.logger_level);
 
@@ -73,8 +82,45 @@ struct FairinoMonitorService::Impl
         last_torque_poll = now;
         last_temp_poll = now;
         last_extra_poll = now;
+        consecutive_fast_poll_failures = 0;
+        sdk_session_disconnected = false;
 
         return true;
+    }
+
+    bool connect()
+    {
+        std::lock_guard<std::mutex> lock(sdk_mutex);
+        return connectLocked();
+    }
+
+    bool reconnectLocked(const std::string& reason, bool force = false)
+    {
+        const auto now = std::chrono::steady_clock::now();
+
+        if (!force &&
+            last_reconnect_attempt.time_since_epoch().count() != 0 &&
+            now - last_reconnect_attempt < std::chrono::seconds(3)) {
+            return false;
+        }
+
+        last_reconnect_attempt = now;
+
+        std::cerr << "[FairinoMonitorService] reconnect requested: "
+                  << reason << "\n";
+
+        robot.CloseRPC();
+        const bool ok = connectLocked();
+
+        if (ok) {
+            consecutive_fast_poll_failures = 0;
+            std::cerr << "[FairinoMonitorService] reconnect succeeded\n";
+        } else {
+            sdk_session_disconnected = true;
+            std::cerr << "[FairinoMonitorService] reconnect failed\n";
+        }
+
+        return ok;
     }
 
     void disconnect()
@@ -89,7 +135,7 @@ struct FairinoMonitorService::Impl
 
         auto setPollError = [&](int code, const std::string& msg)
         {
-            s.connected = false;
+            ++consecutive_fast_poll_failures;
 
             s.last_poll_error_code = code;
             s.last_poll_error = msg;
@@ -97,10 +143,27 @@ struct FairinoMonitorService::Impl
             // 기존 호환용 summary
             s.last_error_code = code;
             s.last_error = msg;
+
+            if (consecutive_fast_poll_failures >= kDisconnectFailureThreshold) {
+                s.connected = false;
+                sdk_session_disconnected = true;
+
+                std::cerr << "[FairinoMonitorService] fast poll disconnected after "
+                          << consecutive_fast_poll_failures
+                          << " failures: " << msg << "\n";
+            }
         };
 
         auto clearPollError = [&]()
         {
+            if (consecutive_fast_poll_failures > 0 || sdk_session_disconnected) {
+                std::cerr << "[FairinoMonitorService] fast poll recovered after "
+                          << consecutive_fast_poll_failures
+                          << " failures\n";
+            }
+
+            consecutive_fast_poll_failures = 0;
+            sdk_session_disconnected = false;
             s.connected = true;
 
             s.last_poll_error_code = 0;
@@ -131,6 +194,10 @@ struct FairinoMonitorService::Impl
                 "GetActualJointPosDegree failed: code=" + std::to_string(rtn);
 
             setPollError(rtn, msg);
+            if (isCommunicationError(rtn) &&
+                consecutive_fast_poll_failures >= kDisconnectFailureThreshold) {
+                reconnectLocked(msg);
+            }
             return false;
         }
 
@@ -149,6 +216,10 @@ struct FairinoMonitorService::Impl
                 "GetActualTCPPose failed: code=" + std::to_string(rtn);
 
             setPollError(rtn, msg);
+            if (isCommunicationError(rtn) &&
+                consecutive_fast_poll_failures >= kDisconnectFailureThreshold) {
+                reconnectLocked(msg);
+            }
             return false;
         }
 
@@ -381,6 +452,21 @@ struct FairinoMonitorService::Impl
 
         if (rtn != 0) {
             result.message = name + " failed: code=" + std::to_string(rtn);
+            ++consecutive_command_failures;
+
+            std::cerr << "[FairinoMonitorService] command failed: "
+                      << result.message
+                      << ", consecutive=" << consecutive_command_failures
+                      << "\n";
+        } else {
+            if (consecutive_command_failures > 0) {
+                std::cerr << "[FairinoMonitorService] command recovered: "
+                          << name
+                          << ", previousFailures=" << consecutive_command_failures
+                          << "\n";
+            }
+
+            consecutive_command_failures = 0;
         }
 
         {
@@ -397,6 +483,25 @@ struct FairinoMonitorService::Impl
         }
 
         return result;
+    }
+
+    template <typename Fn>
+    CommandResult executeSdkCommandWithReconnect(const std::string& name, Fn fn)
+    {
+        int rtn = 0;
+
+        {
+            std::lock_guard<std::mutex> lock(sdk_mutex);
+
+            rtn = fn();
+
+            if (isCommunicationError(rtn) &&
+                reconnectLocked(name + " failed: code=" + std::to_string(rtn), true)) {
+                rtn = fn();
+            }
+        }
+
+        return updateCommandResult(rtn, name);
     }
     // SDK 명령 함수 예시: StartJointJog, StopJointJog 등, 내부적으로 startJog/stopJog 호출
     CommandResult startJointJogEx(
@@ -471,12 +576,8 @@ struct FairinoMonitorService::Impl
     // SDK 명령 함수 예시: StartJOG, StopJOG, ImmStopJOG, RobotEnable, Mode, ResetAllError 등
     CommandResult startJogEx(int ref, int axis, int dir, float vel, float acc, float max_dis)
     {
-        int rtn = 0;
-
-        {
-            std::lock_guard<std::mutex> lock(sdk_mutex);
-
-            rtn = robot.StartJOG(
+        return executeSdkCommandWithReconnect("StartJOG", [&]() {
+            return robot.StartJOG(
                 static_cast<uint8_t>(ref),
                 static_cast<uint8_t>(axis),
                 static_cast<uint8_t>(dir),
@@ -484,9 +585,7 @@ struct FairinoMonitorService::Impl
                 acc,
                 max_dis
                 );
-        }
-
-        return updateCommandResult(rtn, "StartJOG");
+        });
     }
 
     bool startJog(int ref, int axis, int dir, float vel, float acc, float max_dis)
@@ -496,14 +595,9 @@ struct FairinoMonitorService::Impl
 
     CommandResult stopJogEx(int ref)
     {
-        int rtn = 0;
-
-        {
-            std::lock_guard<std::mutex> lock(sdk_mutex);
-            rtn = robot.StopJOG(static_cast<uint8_t>(ref));
-        }
-
-        return updateCommandResult(rtn, "StopJOG");
+        return executeSdkCommandWithReconnect("StopJOG", [&]() {
+            return robot.StopJOG(static_cast<uint8_t>(ref));
+        });
     }
 
     bool stopJog(int ref)
@@ -513,14 +607,9 @@ struct FairinoMonitorService::Impl
 
     CommandResult immStopJogEx()
     {
-        int rtn = 0;
-
-        {
-            std::lock_guard<std::mutex> lock(sdk_mutex);
-            rtn = robot.ImmStopJOG();
-        }
-
-        return updateCommandResult(rtn, "ImmStopJOG");
+        return executeSdkCommandWithReconnect("ImmStopJOG", [&]() {
+            return robot.ImmStopJOG();
+        });
     }
 
     bool immStopJog()
@@ -530,14 +619,9 @@ struct FairinoMonitorService::Impl
 
     CommandResult robotEnableEx(bool enable)
     {
-        int rtn = 0;
-
-        {
-            std::lock_guard<std::mutex> lock(sdk_mutex);
-            rtn = robot.RobotEnable(enable ? 1 : 0);
-        }
-
-        return updateCommandResult(rtn, "RobotEnable");
+        return executeSdkCommandWithReconnect("RobotEnable", [&]() {
+            return robot.RobotEnable(enable ? 1 : 0);
+        });
     }
 
     bool robotEnable(bool enable)
@@ -575,14 +659,9 @@ struct FairinoMonitorService::Impl
 
     CommandResult setManualModeEx()
     {
-        int rtn = 0;
-
-        {
-            std::lock_guard<std::mutex> lock(sdk_mutex);
-            rtn = robot.Mode(1);
-        }
-
-        return updateCommandResult(rtn, "Mode(Manual)");
+        return executeSdkCommandWithReconnect("Mode(Manual)", [&]() {
+            return robot.Mode(1);
+        });
     }
 
     bool setManualMode()
@@ -592,14 +671,9 @@ struct FairinoMonitorService::Impl
 
     CommandResult setAutoModeEx()
     {
-        int rtn = 0;
-
-        {
-            std::lock_guard<std::mutex> lock(sdk_mutex);
-            rtn = robot.Mode(0);
-        }
-
-        return updateCommandResult(rtn, "Mode(Auto)");
+        return executeSdkCommandWithReconnect("Mode(Auto)", [&]() {
+            return robot.Mode(0);
+        });
     }
 
     bool setAutoMode()
@@ -609,14 +683,9 @@ struct FairinoMonitorService::Impl
 
     CommandResult clearErrorEx()
     {
-        int rtn = 0;
-
-        {
-            std::lock_guard<std::mutex> lock(sdk_mutex);
-            rtn = robot.ResetAllError();
-        }
-
-        return updateCommandResult(rtn, "ResetAllError");
+        return executeSdkCommandWithReconnect("ResetAllError", [&]() {
+            return robot.ResetAllError();
+        });
     }
 
     bool clearError()
