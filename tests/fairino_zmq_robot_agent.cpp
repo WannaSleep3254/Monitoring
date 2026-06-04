@@ -168,6 +168,17 @@ bool toolStateValidFromMountState(const QString& mountState)
            mountState == QStringLiteral("UNMOUNTED");
 }
 
+QString clampStateFromDi(bool onInput, bool offInput)
+{
+    if (onInput && !offInput) {
+        return QStringLiteral("ON");
+    }
+    if (!onInput && offInput) {
+        return QStringLiteral("OFF");
+    }
+    return QStringLiteral("ERROR");
+}
+
 QByteArray buildSnapshotPayload(
     int robotId,
     const monitoring::FairinoMonitorService::SnapshotWithMeta& data)
@@ -350,6 +361,34 @@ QByteArray buildSensorStatePayload(
                 : QStringLiteral("ROBOT_DI_READ_FAILED");
     }
 
+    QJsonObject clamp;
+    if (robotId == 2) {
+        const bool di0On = static_cast<int>(s.robot_di[0]) != 0;
+        const bool di1On = static_cast<int>(s.robot_di[1]) != 0;
+        const bool di2On = static_cast<int>(s.robot_di[2]) != 0;
+        const bool di3On = static_cast<int>(s.robot_di[3]) != 0;
+        const QString clamp1State = clampStateFromDi(di1On, di0On);
+        const QString clamp2State = clampStateFromDi(di2On, di3On);
+        const bool clampValid =
+            s.robot_di_valid &&
+            clamp1State != QStringLiteral("ERROR") &&
+            clamp2State != QStringLiteral("ERROR");
+
+        clamp["clamp1State"] = clamp1State;
+        clamp["clamp1On"] = clamp1State == QStringLiteral("ON");
+        clamp["clamp1Off"] = clamp1State == QStringLiteral("OFF");
+        clamp["clamp2State"] = clamp2State;
+        clamp["clamp2On"] = clamp2State == QStringLiteral("ON");
+        clamp["clamp2Off"] = clamp2State == QStringLiteral("OFF");
+        clamp["valid"] = clampValid;
+        if (!clampValid) {
+            clamp["error"] =
+                s.robot_di_valid
+                    ? QStringLiteral("INVALID_CLAMP_DI_PATTERN")
+                    : QStringLiteral("ROBOT_DI_READ_FAILED");
+        }
+    }
+
     const auto epochMs =
         std::chrono::duration_cast<std::chrono::milliseconds>(
             data.timestamp.time_since_epoch()).count();
@@ -363,6 +402,9 @@ QByteArray buildSensorStatePayload(
     payload["timestamp"] = toIsoTimestamp(data.timestamp);
     payload["timestampEpochMs"] = static_cast<double>(epochMs);
     payload["tool"] = tool;
+    if (robotId == 2) {
+        payload["clamp"] = clamp;
+    }
     payload["di"] = di;
 
     return QJsonDocument(payload).toJson(QJsonDocument::Compact);
@@ -924,6 +966,32 @@ QByteArray executeCommand(const CommandRequest& request,
 
     } else if (request.command == QStringLiteral("clearError")) {
         result = robot->clearErrorEx();
+
+    } else if (request.command == QStringLiteral("stop")) {
+        result = robot->immStopJogEx();
+
+        if (request.robotId >= 1 && request.robotId <= kMaxRobotCount) {
+            JogWatchdogState& state = jogStates[request.robotId];
+
+            state.active = false;
+            state.workspaceJog = false;
+            state.joint = 0;
+            state.axis.clear();
+            state.sessionId.clear();
+
+            qInfo() << "[FairinoZmqRobotAgent]"
+                    << "jog watchdog stopped by generic stop"
+                    << "robotId =" << request.robotId;
+        }
+
+        if (masterState.active) {
+            qInfo() << "[FairinoZmqRobotAgent]"
+                    << "command master released by generic stop"
+                    << "owner =" << masterState.ownerId;
+
+            masterState.active = false;
+            masterState.ownerId.clear();
+        }
 
     } else if (request.command == QStringLiteral("stopJointJog")) {
         result = robot->stopJointJogEx();
