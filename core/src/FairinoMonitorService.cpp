@@ -372,6 +372,27 @@ struct FairinoMonitorService::Impl
             s.safety_si0 = si0;
             s.safety_si1 = si1;
         }
+
+        const int diCount = opt.robot_id == 1 ? 2 : 4;
+        bool diOk = true;
+
+        for (int i = 0; i < diCount; ++i) {
+            uint8_t di = 0;
+            const int rtn = robot.GetDI(i, 1, &di);
+            if (rtn != 0) {
+                s.robot_di_valid = false;
+                s.last_robot_di_error = rtn;
+                diOk = false;
+                break;
+            }
+
+            s.robot_di[static_cast<size_t>(i)] = di;
+        }
+
+        if (diOk) {
+            s.robot_di_valid = true;
+            s.last_robot_di_error = 0;
+        }
     }
 
     // 스냅샷 저장 + 콜백 호출 (공통 로직 분리, pollOnce과 에러 처리에서 모두 사용)
@@ -609,7 +630,7 @@ struct FairinoMonitorService::Impl
                 );
         }
 
-        if (max_deg <= 0.0f || max_deg > 5.0f) {
+        if (max_deg <= 0.0f || max_deg > 300.0f) {
             return makeValidationError(
                 -10004,
                 "startJointJog",
@@ -692,7 +713,7 @@ struct FairinoMonitorService::Impl
                 );
         }
 
-        if (max_dis <= 0.0f || max_dis > 5.0f) {
+        if (max_dis <= 0.0f || max_dis > 300.0f) {
             return makeValidationError(
                 -10014,
                 "startWorkspaceJog",
@@ -784,6 +805,26 @@ struct FairinoMonitorService::Impl
     bool robotEnable(bool enable)
     {
         return robotEnableEx(enable).ok;
+    }
+
+    CommandResult setRobotDoEx(int do_index, bool state)
+    {
+        if (do_index < 0 || do_index > 15) {
+            return makeValidationError(
+                -11005,
+                "SetDO",
+                "Invalid robot DO index: " + std::to_string(do_index)
+                );
+        }
+
+        return executeSdkCommandWithReconnect("SetDO", [&]() {
+            return robot.SetDO(
+                do_index,
+                state ? 1 : 0,
+                0,  // smooth: off
+                1   // SDK block flag: non-blocking
+                );
+        });
     }
 
     CommandResult makeValidationError(
@@ -1101,6 +1142,12 @@ FairinoMonitorService::CommandResult
 FairinoMonitorService::clearErrorEx()
 {
     return d->clearErrorEx();
+}
+
+FairinoMonitorService::CommandResult
+FairinoMonitorService::setRobotDoEx(int do_index, bool state)
+{
+    return d->setRobotDoEx(do_index, state);
 }
 
 bool FairinoMonitorService::queryAndPrintStaticInfo()

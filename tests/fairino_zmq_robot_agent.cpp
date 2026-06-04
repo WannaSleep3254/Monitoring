@@ -11,6 +11,7 @@
 #include <QJsonObject>
 #include <QJsonParseError>
 #include <QJsonValue>
+#include <QStringList>
 #include <QThread>
 
 #ifdef ENABLE_ZEROMQ_TRANSPORT
@@ -24,6 +25,7 @@
 #include <cstdint>
 #include <mutex>
 #include <string>
+#include <vector>
 
 namespace
 {
@@ -118,6 +120,54 @@ QString toIsoTimestamp(const std::chrono::system_clock::time_point& timestamp)
         .toString(Qt::ISODateWithMs);
 }
 
+QString protocolRobotName(int robotId)
+{
+    return robotId == 1
+        ? QStringLiteral("a")
+        : QStringLiteral("b");
+}
+
+QString toolMountStateForSnapshot(
+    int robotId,
+    const monitoring::RobotSnapshot& s)
+{
+    if (robotId != 1) {
+        return QStringLiteral("UNKNOWN");
+    }
+
+    const bool di0On = static_cast<int>(s.robot_di[0]) != 0;
+    const bool di1On = static_cast<int>(s.robot_di[1]) != 0;
+
+    if (di0On && !di1On) {
+        return QStringLiteral("SORTING_TOOL_MOUNTED");
+    }
+    if (!di0On && di1On) {
+        return QStringLiteral("BULK_TOOL_MOUNTED");
+    }
+    if (!di0On && !di1On) {
+        return QStringLiteral("ERROR");
+    }
+    return QStringLiteral("UNMOUNTED");
+}
+
+QString toolNameFromMountState(const QString& mountState)
+{
+    if (mountState == QStringLiteral("SORTING_TOOL_MOUNTED")) {
+        return QStringLiteral("sorting");
+    }
+    if (mountState == QStringLiteral("BULK_TOOL_MOUNTED")) {
+        return QStringLiteral("bulk");
+    }
+    return QStringLiteral("empty");
+}
+
+bool toolStateValidFromMountState(const QString& mountState)
+{
+    return mountState == QStringLiteral("SORTING_TOOL_MOUNTED") ||
+           mountState == QStringLiteral("BULK_TOOL_MOUNTED") ||
+           mountState == QStringLiteral("UNMOUNTED");
+}
+
 QByteArray buildSnapshotPayload(
     int robotId,
     const monitoring::FairinoMonitorService::SnapshotWithMeta& data)
@@ -150,6 +200,73 @@ QByteArray buildSnapshotPayload(
 
     const bool safetyStop = (s.safety_si0 != 0 || s.safety_si1 != 0);
     snapshot["safetyStop"] = safetyStop;
+
+    const int robotDiCount = robotId == 1 ? 2 : 4;
+    QJsonArray robotDi;
+    for (int i = 0; i < robotDiCount; ++i) {
+        const int value = static_cast<int>(s.robot_di[static_cast<size_t>(i)]);
+        robotDi.append(value);
+        snapshot[QStringLiteral("robotDi%1").arg(i)] = value;
+    }
+    snapshot["robotDi"] = robotDi;
+    snapshot["robotDiValid"] = s.robot_di_valid;
+    snapshot["lastRobotDiError"] = s.last_robot_di_error;
+
+    if (robotId == 1) {
+        const bool di0On = static_cast<int>(s.robot_di[0]) != 0;
+        const bool di1On = static_cast<int>(s.robot_di[1]) != 0;
+
+        snapshot["bulkToolReady"] = di0On;
+        snapshot["sortingToolReady"] = di1On;
+
+        QString toolMountState;
+        if (di0On && !di1On) {
+            toolMountState = QStringLiteral("SORTING_TOOL_MOUNTED");
+        } else if (!di0On && di1On) {
+            toolMountState = QStringLiteral("BULK_TOOL_MOUNTED");
+        } else if (!di0On && !di1On) {
+            toolMountState = QStringLiteral("ERROR");
+        } else {
+            toolMountState = QStringLiteral("UNMOUNTED");
+        }
+
+        snapshot["toolMountState"] = toolMountState;
+    } else if (robotId == 2) {
+        const bool di0On = static_cast<int>(s.robot_di[0]) != 0;
+        const bool di1On = static_cast<int>(s.robot_di[1]) != 0;
+        const bool di2On = static_cast<int>(s.robot_di[2]) != 0;
+        const bool di3On = static_cast<int>(s.robot_di[3]) != 0;
+
+        const bool clamp1On = !di0On && di1On;
+        const bool clamp1Off = di0On && !di1On;
+        const bool clamp2On = di2On && !di3On;
+        const bool clamp2Off = !di2On && di3On;
+
+        QString clamp1State;
+        if (clamp1On) {
+            clamp1State = QStringLiteral("ON");
+        } else if (clamp1Off) {
+            clamp1State = QStringLiteral("OFF");
+        } else {
+            clamp1State = QStringLiteral("ERROR");
+        }
+
+        QString clamp2State;
+        if (clamp2On) {
+            clamp2State = QStringLiteral("ON");
+        } else if (clamp2Off) {
+            clamp2State = QStringLiteral("OFF");
+        } else {
+            clamp2State = QStringLiteral("ERROR");
+        }
+
+        snapshot["clamp1On"] = clamp1On;
+        snapshot["clamp1Off"] = clamp1Off;
+        snapshot["clamp1State"] = clamp1State;
+        snapshot["clamp2On"] = clamp2On;
+        snapshot["clamp2Off"] = clamp2Off;
+        snapshot["clamp2State"] = clamp2State;
+    }
 
     // 실측 결과 joint_torque는 0으로 들어오고 driver_torque가 유효하므로
     // payload의 torques는 driver_torque 우선 사용.
@@ -199,12 +316,63 @@ QByteArray buildSnapshotPayload(
     return QJsonDocument(snapshot).toJson(QJsonDocument::Compact);
 }
 
-bool publishSnapshot(zmq::socket_t& socket,
-                     std::mutex& publishMutex,
-                     int robotId,
-                     const QByteArray& payload)
+QByteArray buildSensorStatePayload(
+    int robotId,
+    const monitoring::FairinoMonitorService::SnapshotWithMeta& data)
 {
-    const QString topic = QStringLiteral("robot/%1").arg(robotId);
+    const monitoring::RobotSnapshot& s = data.snapshot;
+    const int robotDiCount = robotId == 1 ? 2 : 4;
+    const QString robotName = protocolRobotName(robotId);
+    const QString mountState = toolMountStateForSnapshot(robotId, s);
+    const QString toolName = toolNameFromMountState(mountState);
+    const bool toolValid =
+        s.robot_di_valid && toolStateValidFromMountState(mountState);
+
+    QJsonArray robotDi;
+    QJsonObject di;
+    for (int i = 0; i < robotDiCount; ++i) {
+        const int value = static_cast<int>(s.robot_di[static_cast<size_t>(i)]);
+        robotDi.append(value);
+        di[QStringLiteral("robotDi%1").arg(i)] = value;
+    }
+    di["robotDi"] = robotDi;
+    di["valid"] = s.robot_di_valid;
+    di["lastError"] = s.last_robot_di_error;
+
+    QJsonObject tool;
+    tool["name"] = toolName;
+    tool["mountState"] = mountState;
+    tool["valid"] = toolValid;
+    if (!toolValid) {
+        tool["error"] =
+            s.robot_di_valid
+                ? QStringLiteral("INVALID_TOOL_DI_PATTERN")
+                : QStringLiteral("ROBOT_DI_READ_FAILED");
+    }
+
+    const auto epochMs =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            data.timestamp.time_since_epoch()).count();
+
+    QJsonObject payload;
+    payload["messageType"] = QStringLiteral("sensorState");
+    payload["schemaVersion"] = 1;
+    payload["robot"] = robotName;
+    payload["robotId"] = robotId;
+    payload["seq"] = static_cast<double>(data.sequence_number);
+    payload["timestamp"] = toIsoTimestamp(data.timestamp);
+    payload["timestampEpochMs"] = static_cast<double>(epochMs);
+    payload["tool"] = tool;
+    payload["di"] = di;
+
+    return QJsonDocument(payload).toJson(QJsonDocument::Compact);
+}
+
+bool publishMultipartPayload(zmq::socket_t& socket,
+                             std::mutex& publishMutex,
+                             const QString& topic,
+                             const QByteArray& payload)
+{
     const QByteArray topicPayload = topic.toUtf8();
 
     std::lock_guard<std::mutex> lock(publishMutex);
@@ -216,7 +384,7 @@ bool publishSnapshot(zmq::socket_t& socket,
 
     if (!topicResult.has_value()) {
         qWarning() << "[FairinoZmqRobotAgent] topic send failed"
-                   << "robotId =" << robotId;
+                   << "topic =" << topic;
         return false;
     }
 
@@ -227,10 +395,33 @@ bool publishSnapshot(zmq::socket_t& socket,
 
     if (!payloadResult.has_value()) {
         qWarning() << "[FairinoZmqRobotAgent] payload send failed"
-                   << "robotId =" << robotId;
+                   << "topic =" << topic;
         return false;
     }
+
     return true;
+}
+
+bool publishSnapshot(zmq::socket_t& socket,
+                     std::mutex& publishMutex,
+                     int robotId,
+                     const QByteArray& payload)
+{
+    const QString topic = QStringLiteral("robot/%1").arg(robotId);
+    return publishMultipartPayload(socket, publishMutex, topic, payload);
+}
+
+bool publishSensorState(
+    zmq::socket_t& socket,
+    std::mutex& publishMutex,
+    int robotId,
+    const monitoring::FairinoMonitorService::SnapshotWithMeta& data)
+{
+    const QString topic =
+        QStringLiteral("robot/%1/sensor_state")
+            .arg(protocolRobotName(robotId));
+    const QByteArray payload = buildSensorStatePayload(robotId, data);
+    return publishMultipartPayload(socket, publishMutex, topic, payload);
 }
 
 
@@ -357,21 +548,38 @@ bool isStopWorkspaceJogCommand(const QString& command)
            command == QStringLiteral("stopBaseJog");
 }
 
-bool isSupportedRobotIoName(int robotId, const QString& ioName)
+std::vector<int> robotIoDoIndices(int robotId, const QString& ioName)
 {
     if (robotId == 1) {
-        return ioName == QStringLiteral("toolLock") ||
-               ioName == QStringLiteral("bulkVacuum") ||
-               ioName == QStringLiteral("sortingVacuum");
+        if (ioName == QStringLiteral("toolLock"))
+            return {0};
+        if (ioName == QStringLiteral("bulkVacuum"))
+            return {1, 2};
+        if (ioName == QStringLiteral("sortingVacuum"))
+            return {2};
+        if (ioName == QStringLiteral("pickerVacuum"))
+            return {3};
     }
 
     if (robotId == 2) {
-        return ioName == QStringLiteral("magnet") ||
-               ioName == QStringLiteral("clamp1") ||
-               ioName == QStringLiteral("clamp2");
+        if (ioName == QStringLiteral("magnet"))
+            return {0};
+        if (ioName == QStringLiteral("clamp1"))
+            return {2};
+        if (ioName == QStringLiteral("clamp2"))
+            return {3};
     }
 
-    return false;
+    return {};
+}
+
+QString formatDoIndices(const std::vector<int>& doIndices)
+{
+    QStringList parts;
+    for (int doIndex : doIndices) {
+        parts.append(QString::number(doIndex));
+    }
+    return parts.join(QStringLiteral(","));
 }
 
 bool parseBoolValue(const QJsonValue& value, bool& out)
@@ -625,7 +833,9 @@ QByteArray executeCommand(const CommandRequest& request,
                                  QStringLiteral("Missing robot IO name"));
         }
 
-        if (!isSupportedRobotIoName(request.robotId, ioName)) {
+        const std::vector<int> doIndices =
+            robotIoDoIndices(request.robotId, ioName);
+        if (doIndices.empty()) {
             return buildResponse(
                 request,
                 false,
@@ -659,20 +869,49 @@ QByteArray executeCommand(const CommandRequest& request,
                                  QStringLiteral("Robot IO blocked while jog is active"));
         }
 
+        const bool outputState =
+            (request.robotId == 1 && ioName == QStringLiteral("toolLock")) ||
+            (request.robotId == 1 && ioName == QStringLiteral("sortingVacuum")) ||
+            (request.robotId == 1 && ioName == QStringLiteral("pickerVacuum")) ||
+            (request.robotId == 2 && ioName == QStringLiteral("magnet"))
+                ? !state
+                : state;
+
         qInfo() << "[FairinoZmqRobotAgent]"
-                << "robot IO interface accepted"
+                << "robot DO command"
                 << "robotId =" << request.robotId
                 << "ioName =" << ioName
-                << "state =" << state
-                << "mapping =" << "pending";
+                << "requestedState =" << state
+                << "outputState =" << outputState
+                << "doIndices =" << formatDoIndices(doIndices);
+
+        monitoring::FairinoMonitorService::CommandResult ioResult;
+        for (int doIndex : doIndices) {
+            ioResult = robot->setRobotDoEx(doIndex, outputState);
+            if (!ioResult.ok) {
+                break;
+            }
+        }
+
+        const QString ioMessage =
+            ioResult.message.empty()
+                ? QStringLiteral("Robot DO set: ioName=%1, requestedState=%2, outputState=%3, doIndices=%4")
+                      .arg(ioName)
+                      .arg(state ? QStringLiteral("true") : QStringLiteral("false"))
+                      .arg(outputState ? QStringLiteral("true") : QStringLiteral("false"))
+                      .arg(formatDoIndices(doIndices))
+                : QStringLiteral("%1: ioName=%2, requestedState=%3, outputState=%4, doIndices=%5")
+                      .arg(QString::fromStdString(ioResult.message))
+                      .arg(ioName)
+                      .arg(state ? QStringLiteral("true") : QStringLiteral("false"))
+                      .arg(outputState ? QStringLiteral("true") : QStringLiteral("false"))
+                      .arg(formatDoIndices(doIndices));
 
         return buildResponse(
             request,
-            true,
-            0,
-            QStringLiteral("Robot IO interface accepted: ioName=%1, state=%2, mapping=pending")
-                .arg(ioName)
-                .arg(state ? QStringLiteral("true") : QStringLiteral("false")));
+            ioResult.ok,
+            ioResult.code,
+            ioMessage);
     }
 
     monitoring::FairinoMonitorService::CommandResult result;
@@ -729,7 +968,7 @@ QByteArray executeCommand(const CommandRequest& request,
 
         // 초기 실기 테스트 안전값
         constexpr float kDefaultAccPercent = 5.0f;
-        constexpr float kMaxJogDegree = 1.0f;
+        constexpr float kMaxJogDegree = 300.0f;
 
         result = robot->startJointJogEx(joint,
                                         positive,
@@ -813,7 +1052,7 @@ QByteArray executeCommand(const CommandRequest& request,
 
             // 초기 실기 테스트 안전값
             constexpr float kDefaultAccPercent = 5.0f;
-            constexpr float kMaxWorkspaceJogDistanceOrDegree = 1.0f;
+            constexpr float kMaxWorkspaceJogDistanceOrDegree = 300.0f;
 
             result = robot->startWorkspaceJogEx(axis.toStdString(),
                                                 positive,
@@ -916,6 +1155,11 @@ int main(int argc, char* argv[])
             ? app.arguments().at(2)
             : QStringLiteral("tcp://*:5557");
 
+    const QString sensorEndpoint =
+        app.arguments().size() >= 6
+            ? app.arguments().at(5)
+            : QStringLiteral("tcp://127.0.0.1:5560");
+
     const QString robot1Ip =
         app.arguments().size() >= 4
             ? app.arguments().at(3)
@@ -928,6 +1172,7 @@ int main(int argc, char* argv[])
 
     qInfo() << "[FairinoZmqRobotAgent] snapshotEndpoint =" << snapshotEndpoint;
     qInfo() << "[FairinoZmqRobotAgent] commandEndpoint =" << commandEndpoint;
+    qInfo() << "[FairinoZmqRobotAgent] sensorEndpoint =" << sensorEndpoint;
     qInfo() << "[FairinoZmqRobotAgent] robot1Ip =" << robot1Ip;
     qInfo() << "[FairinoZmqRobotAgent] robot2Ip =" << robot2Ip;
 
@@ -938,12 +1183,17 @@ int main(int argc, char* argv[])
         pubSocket.set(zmq::sockopt::linger, 0);
         pubSocket.bind(snapshotEndpoint.toStdString());
 
+        zmq::socket_t sensorPubSocket(context, zmq::socket_type::pub);
+        sensorPubSocket.set(zmq::sockopt::linger, 0);
+        sensorPubSocket.bind(sensorEndpoint.toStdString());
+
         zmq::socket_t repSocket(context, zmq::socket_type::rep);
         repSocket.set(zmq::sockopt::linger, 0);
         repSocket.set(zmq::sockopt::rcvtimeo, 100);
         repSocket.bind(commandEndpoint.toStdString());
 
         std::mutex publishMutex;
+        std::mutex sensorPublishMutex;
 
         monitoring::FairinoMonitorService robot1;
         monitoring::FairinoMonitorService robot2;
@@ -965,12 +1215,14 @@ int main(int argc, char* argv[])
             [&](const monitoring::FairinoMonitorService::SnapshotWithMeta& data) {
                 const QByteArray payload = buildSnapshotPayload(1, data);
                 publishSnapshot(pubSocket, publishMutex, 1, payload);
+                publishSensorState(sensorPubSocket, sensorPublishMutex, 1, data);
             });
 
         robot2.setCallback(
             [&](const monitoring::FairinoMonitorService::SnapshotWithMeta& data) {
                 const QByteArray payload = buildSnapshotPayload(2, data);
                 publishSnapshot(pubSocket, publishMutex, 2, payload);
+                publishSensorState(sensorPubSocket, sensorPublishMutex, 2, data);
             });
 
         const bool robot1Started =
@@ -1038,6 +1290,7 @@ int main(int argc, char* argv[])
         robot2.stop();
 
         repSocket.close();
+        sensorPubSocket.close();
         pubSocket.close();
         context.shutdown();
         context.close();

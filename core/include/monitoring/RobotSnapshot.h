@@ -43,6 +43,11 @@ struct RobotSnapshot
     int last_temperature_error = 0;
     int last_driver_torque_error = 0;
 
+    // ---- Controller DI ----
+    std::array<uint8_t, 16> robot_di{};
+    bool robot_di_valid = false;
+    int last_robot_di_error = 0;
+
     // ---- System / state ----
     float system_clock_ms = 0.0f;  // GetSystemClock
     int joints_config = 0;         // GetRobotCurJointsConfig

@@ -96,6 +96,7 @@ public:
     CommandResult setManualModeEx();
     CommandResult setAutoModeEx();
     CommandResult clearErrorEx();
+    CommandResult setRobotDoEx(int do_index, bool state);
 
     CommandResult startJointJogEx(int joint, bool positive, float vel, float acc, float max_deg);
     CommandResult stopJointJogEx();
