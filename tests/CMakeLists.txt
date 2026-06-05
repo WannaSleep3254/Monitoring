@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
-find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core)
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core)
+find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core Sql)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Sql)
 
 add_executable(manual_monitor_test
     manual_monitor_test.cpp
@@ -218,6 +218,33 @@ if(ENABLE_ZEROMQ_TRANSPORT)
                 "$<TARGET_FILE_DIR:fairino_zmq_robot_agent>"
         )
     endif()
+
+    # ----------------------------
+    # IoT storage collector
+    # ----------------------------
+    add_executable(iot_storage_collector
+        iot_storage_collector.cpp
+    )
+
+    target_compile_definitions(iot_storage_collector PRIVATE
+        ENABLE_ZEROMQ_TRANSPORT
+    )
+
+    target_include_directories(iot_storage_collector PRIVATE
+        "${ZEROMQ_INCLUDE_DIR}"
+    )
+
+    target_link_libraries(iot_storage_collector PRIVATE
+        Qt${QT_VERSION_MAJOR}::Core
+        Qt${QT_VERSION_MAJOR}::Sql
+        "${ZEROMQ_LIB_PATH}"
+    )
+
+    add_custom_command(TARGET iot_storage_collector POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${ZEROMQ_DLL_PATH}"
+            "$<TARGET_FILE_DIR:iot_storage_collector>"
+    )
 endif()
 
 

@@ -75,6 +75,12 @@ struct CommandMasterState
 using JogWatchdogStates =
     std::array<JogWatchdogState, kMaxRobotCount + 1>;
 
+struct ProcessStateCache
+{
+    mutable std::mutex mutex;
+    std::array<QJsonObject, kMaxRobotCount + 1> latestByRobot;
+};
+
 QString defaultJogSessionId(const CommandRequest& request)
 {
     const QString requested =
@@ -181,7 +187,8 @@ QString clampStateFromDi(bool onInput, bool offInput)
 
 QByteArray buildSnapshotPayload(
     int robotId,
-    const monitoring::FairinoMonitorService::SnapshotWithMeta& data)
+    const monitoring::FairinoMonitorService::SnapshotWithMeta& data,
+    const ProcessStateCache* processStateCache = nullptr)
 {
     const monitoring::RobotSnapshot& s = data.snapshot;
 
@@ -324,6 +331,15 @@ QByteArray buildSnapshotPayload(
     snapshot["sequenceNumber"] =
         static_cast<double>(data.sequence_number);
 
+    if (processStateCache && robotId >= 1 && robotId <= kMaxRobotCount) {
+        std::lock_guard<std::mutex> lock(processStateCache->mutex);
+        const QJsonObject processState =
+            processStateCache->latestByRobot[static_cast<size_t>(robotId)];
+        if (!processState.isEmpty()) {
+            snapshot["processState"] = processState;
+        }
+    }
+
     return QJsonDocument(snapshot).toJson(QJsonDocument::Compact);
 }
 
@@ -464,6 +480,135 @@ bool publishSensorState(
             .arg(protocolRobotName(robotId));
     const QByteArray payload = buildSensorStatePayload(robotId, data);
     return publishMultipartPayload(socket, publishMutex, topic, payload);
+}
+
+bool publishProcessEvent(zmq::socket_t& socket,
+                         std::mutex& publishMutex,
+                         const QByteArray& payload)
+{
+    return publishMultipartPayload(
+        socket,
+        publishMutex,
+        QStringLiteral("process/event"),
+        payload);
+}
+
+int robotIdFromProcessEvent(const QJsonObject& object)
+{
+    const int robotId = object.value(QStringLiteral("robotId")).toInt(0);
+    if (robotId >= 1 && robotId <= kMaxRobotCount) {
+        return robotId;
+    }
+
+    const QString robot =
+        object.value(QStringLiteral("robot")).toString().trimmed().toLower();
+    if (robot == QStringLiteral("a") || robot == QStringLiteral("1")) {
+        return 1;
+    }
+    if (robot == QStringLiteral("b") || robot == QStringLiteral("2")) {
+        return 2;
+    }
+    return 0;
+}
+
+QJsonObject compactProcessState(const QJsonObject& object)
+{
+    QJsonObject state;
+
+    const QStringList keys{
+        QStringLiteral("robot"),
+        QStringLiteral("robotId"),
+        QStringLiteral("type"),
+        QStringLiteral("kind"),
+        QStringLiteral("seq"),
+        QStringLiteral("phase"),
+        QStringLiteral("result"),
+        QStringLiteral("errorCode"),
+        QStringLiteral("errorText"),
+        QStringLiteral("timestamp"),
+        QStringLiteral("timestampEpochMs"),
+        QStringLiteral("agentReceivedEpochMs"),
+        QStringLiteral("detail")
+    };
+
+    for (const QString& key : keys) {
+        if (object.contains(key)) {
+            state.insert(key, object.value(key));
+        }
+    }
+
+    return state;
+}
+
+bool handleProcessEventPayload(const QByteArray& payload,
+                               ProcessStateCache& processStateCache,
+                               zmq::socket_t& pubSocket,
+                               std::mutex& publishMutex)
+{
+    QJsonParseError parseError;
+    const QJsonDocument doc = QJsonDocument::fromJson(payload, &parseError);
+    if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
+        qWarning() << "[FairinoZmqRobotAgent] invalid process event skipped"
+                   << parseError.errorString();
+        return false;
+    }
+
+    QJsonObject object = doc.object();
+    if (object.value(QStringLiteral("messageType")).toString()
+        != QStringLiteral("processEvent")) {
+        qWarning() << "[FairinoZmqRobotAgent] non processEvent skipped";
+        return false;
+    }
+
+    const int robotId = robotIdFromProcessEvent(object);
+    if (robotId <= 0) {
+        qWarning() << "[FairinoZmqRobotAgent] processEvent without robot id skipped";
+        return false;
+    }
+
+    const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
+    object[QStringLiteral("agentReceivedEpochMs")] =
+        static_cast<double>(nowMs);
+    object[QStringLiteral("agentReceivedAt")] =
+        QDateTime::fromMSecsSinceEpoch(nowMs).toString(Qt::ISODateWithMs);
+
+    {
+        std::lock_guard<std::mutex> lock(processStateCache.mutex);
+        processStateCache.latestByRobot[static_cast<size_t>(robotId)] =
+            compactProcessState(object);
+    }
+
+    const QByteArray republished =
+        QJsonDocument(object).toJson(QJsonDocument::Compact);
+    publishProcessEvent(pubSocket, publishMutex, republished);
+
+    qInfo() << "[FairinoZmqRobotAgent] process event ="
+            << republished;
+    return true;
+}
+
+void drainProcessEvents(zmq::socket_t& pullSocket,
+                        ProcessStateCache& processStateCache,
+                        zmq::socket_t& pubSocket,
+                        std::mutex& publishMutex)
+{
+    while (true) {
+        zmq::message_t message;
+        const auto recvResult =
+            pullSocket.recv(message, zmq::recv_flags::dontwait);
+        if (!recvResult.has_value()) {
+            return;
+        }
+
+        const QByteArray payload(
+            static_cast<const char*>(message.data()),
+            static_cast<int>(message.size()));
+        handleProcessEventPayload(
+            payload,
+            processStateCache,
+            pubSocket,
+            publishMutex);
+    }
 }
 
 
@@ -1228,6 +1373,11 @@ int main(int argc, char* argv[])
             ? app.arguments().at(5)
             : QStringLiteral("tcp://127.0.0.1:5560");
 
+    const QString processEventEndpoint =
+        app.arguments().size() >= 7
+            ? app.arguments().at(6)
+            : QStringLiteral("tcp://127.0.0.1:5562");
+
     const QString robot1Ip =
         app.arguments().size() >= 4
             ? app.arguments().at(3)
@@ -1241,6 +1391,7 @@ int main(int argc, char* argv[])
     qInfo() << "[FairinoZmqRobotAgent] snapshotEndpoint =" << snapshotEndpoint;
     qInfo() << "[FairinoZmqRobotAgent] commandEndpoint =" << commandEndpoint;
     qInfo() << "[FairinoZmqRobotAgent] sensorEndpoint =" << sensorEndpoint;
+    qInfo() << "[FairinoZmqRobotAgent] processEventEndpoint =" << processEventEndpoint;
     qInfo() << "[FairinoZmqRobotAgent] robot1Ip =" << robot1Ip;
     qInfo() << "[FairinoZmqRobotAgent] robot2Ip =" << robot2Ip;
 
@@ -1260,8 +1411,14 @@ int main(int argc, char* argv[])
         repSocket.set(zmq::sockopt::rcvtimeo, 100);
         repSocket.bind(commandEndpoint.toStdString());
 
+        zmq::socket_t processPullSocket(context, zmq::socket_type::pull);
+        processPullSocket.set(zmq::sockopt::linger, 0);
+        processPullSocket.set(zmq::sockopt::rcvtimeo, 0);
+        processPullSocket.bind(processEventEndpoint.toStdString());
+
         std::mutex publishMutex;
         std::mutex sensorPublishMutex;
+        ProcessStateCache processStateCache;
 
         monitoring::FairinoMonitorService robot1;
         monitoring::FairinoMonitorService robot2;
@@ -1281,14 +1438,16 @@ int main(int argc, char* argv[])
 
         robot1.setCallback(
             [&](const monitoring::FairinoMonitorService::SnapshotWithMeta& data) {
-                const QByteArray payload = buildSnapshotPayload(1, data);
+                const QByteArray payload =
+                    buildSnapshotPayload(1, data, &processStateCache);
                 publishSnapshot(pubSocket, publishMutex, 1, payload);
                 publishSensorState(sensorPubSocket, sensorPublishMutex, 1, data);
             });
 
         robot2.setCallback(
             [&](const monitoring::FairinoMonitorService::SnapshotWithMeta& data) {
-                const QByteArray payload = buildSnapshotPayload(2, data);
+                const QByteArray payload =
+                    buildSnapshotPayload(2, data, &processStateCache);
                 publishSnapshot(pubSocket, publishMutex, 2, payload);
                 publishSensorState(sensorPubSocket, sensorPublishMutex, 2, data);
             });
@@ -1311,12 +1470,23 @@ int main(int argc, char* argv[])
         qInfo() << "[FairinoZmqRobotAgent] agent started";
 
         while (g_running) {
+            drainProcessEvents(
+                processPullSocket,
+                processStateCache,
+                pubSocket,
+                publishMutex);
+
             zmq::message_t requestMessage;
 
             const auto recvResult =
                 repSocket.recv(requestMessage, zmq::recv_flags::none);
 
             if (!recvResult.has_value()) {
+                drainProcessEvents(
+                    processPullSocket,
+                    processStateCache,
+                    pubSocket,
+                    publishMutex);
                 checkJogTimeouts(jogStates, robot1, robot2, commandMaster);
                 continue;
             }
@@ -1349,6 +1519,11 @@ int main(int argc, char* argv[])
             qInfo() << "[FairinoZmqRobotAgent] command response ="
                     << responsePayload;
 
+            drainProcessEvents(
+                processPullSocket,
+                processStateCache,
+                pubSocket,
+                publishMutex);
             checkJogTimeouts(jogStates, robot1, robot2, commandMaster);
         }
 
@@ -1358,6 +1533,7 @@ int main(int argc, char* argv[])
         robot2.stop();
 
         repSocket.close();
+        processPullSocket.close();
         sensorPubSocket.close();
         pubSocket.close();
         context.shutdown();
