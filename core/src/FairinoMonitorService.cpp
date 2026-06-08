@@ -373,6 +373,18 @@ struct FairinoMonitorService::Impl
             s.safety_si1 = si1;
         }
 
+        ROBOT_STATE_PKG statePkg{};
+        if (robot.GetRobotRealTimeState(&statePkg) == 0) {
+            s.robot_mode = static_cast<int>(statePkg.robot_mode);
+            if (statePkg.robot_mode == 0) {
+                s.control_mode = "AUTO";
+            } else if (statePkg.robot_mode == 1) {
+                s.control_mode = "MANUAL";
+            } else {
+                s.control_mode = "UNKNOWN";
+            }
+        }
+
         const int diCount = opt.robot_id == 1 ? 2 : 4;
         bool diOk = true;
 
@@ -416,6 +428,10 @@ struct FairinoMonitorService::Impl
             s.reconnect_count = reconnect_count;
             s.last_recovery_epoch_ms = last_recovery_epoch_ms;
             s.recovery_event_id = recovery_event_id;
+            s.robot_mode = last.robot_mode;
+            s.speed_override_percent = last.speed_override_percent;
+            if (s.control_mode.empty() || s.control_mode == "UNKNOWN")
+                s.control_mode = last.control_mode;
             if (s.last_recovery_message.empty())
                 s.last_recovery_message = last_recovery_message;
             if (s.last_recovery_message.empty())
@@ -857,9 +873,26 @@ struct FairinoMonitorService::Impl
 
     CommandResult setManualModeEx()
     {
-        return executeSdkCommandWithReconnect("Mode(Manual)", [&]() {
+        CommandResult result = executeSdkCommandWithReconnect("Mode(Manual)", [&]() {
             return robot.Mode(1);
         });
+
+        if (!result.ok) {
+            return result;
+        }
+
+        CommandResult speedResult =
+            applyModeInitialSpeed("Manual", opt.manual_mode_initial_speed_percent);
+        if (!speedResult.ok) {
+            return speedResult;
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(state_mutex);
+            last.control_mode = "MANUAL";
+        }
+
+        return result;
     }
 
     bool setManualMode()
@@ -869,14 +902,157 @@ struct FairinoMonitorService::Impl
 
     CommandResult setAutoModeEx()
     {
-        return executeSdkCommandWithReconnect("Mode(Auto)", [&]() {
+        CommandResult result = executeSdkCommandWithReconnect("Mode(Auto)", [&]() {
             return robot.Mode(0);
         });
+
+        if (!result.ok) {
+            return result;
+        }
+
+        CommandResult speedResult =
+            applyModeInitialSpeed("Auto", opt.auto_mode_initial_speed_percent);
+        if (!speedResult.ok) {
+            return speedResult;
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(state_mutex);
+            last.control_mode = "AUTO";
+        }
+
+        return result;
     }
 
     bool setAutoMode()
     {
         return setAutoModeEx().ok;
+    }
+
+    CommandResult setSpeedOverrideEx(int speed_percent)
+    {
+        if (speed_percent < 0 || speed_percent > 100) {
+            return makeValidationError(
+                -10020,
+                "SetSpeed",
+                "Invalid speed percent: " + std::to_string(speed_percent));
+        }
+
+        CommandResult result = executeSdkCommandWithReconnect("SetSpeed", [&]() {
+            return robot.SetSpeed(speed_percent);
+        });
+
+        if (result.ok) {
+            std::lock_guard<std::mutex> lock(state_mutex);
+            last.speed_override_percent = speed_percent;
+        }
+
+        return result;
+    }
+
+    bool setSpeedOverride(int speed_percent)
+    {
+        return setSpeedOverrideEx(speed_percent).ok;
+    }
+
+    CommandResult applyModeInitialSpeed(
+        const char* mode_name,
+        int speed_percent)
+    {
+        if (speed_percent < 0 || speed_percent > 100) {
+            return makeValidationError(
+                -10021,
+                std::string("Mode(") + mode_name + ")+SetSpeed",
+                "Invalid mode initial speed percent: "
+                    + std::to_string(speed_percent));
+        }
+
+        CommandResult result =
+            executeSdkCommandWithReconnect(
+                std::string("Mode(") + mode_name + ")+SetSpeed",
+                [&]() {
+                    return robot.SetSpeed(speed_percent);
+                });
+
+        if (result.ok) {
+            std::lock_guard<std::mutex> lock(state_mutex);
+            last.speed_override_percent = speed_percent;
+        }
+
+        return result;
+    }
+
+    bool applyInitialSpeedForCurrentMode()
+    {
+        ROBOT_STATE_PKG statePkg{};
+        int modeRtn = 0;
+        {
+            std::lock_guard<std::mutex> lock(sdk_mutex);
+            modeRtn = robot.GetRobotRealTimeState(&statePkg);
+        }
+
+        if (modeRtn != 0) {
+            std::cerr << "[FairinoMonitorService] initial speed skipped: "
+                      << "GetRobotRealTimeState failed: code="
+                      << modeRtn << "\n";
+            return false;
+        }
+
+        int speedPercent = 0;
+        const char* modeName = "UNKNOWN";
+        std::string controlMode = "UNKNOWN";
+
+        if (statePkg.robot_mode == 0) {
+            speedPercent = opt.auto_mode_initial_speed_percent;
+            modeName = "Auto";
+            controlMode = "AUTO";
+        } else if (statePkg.robot_mode == 1) {
+            speedPercent = opt.manual_mode_initial_speed_percent;
+            modeName = "Manual";
+            controlMode = "MANUAL";
+        } else {
+            std::cerr << "[FairinoMonitorService] initial speed skipped: "
+                      << "unknown robot_mode="
+                      << static_cast<int>(statePkg.robot_mode) << "\n";
+            std::lock_guard<std::mutex> lock(state_mutex);
+            last.robot_mode = static_cast<int>(statePkg.robot_mode);
+            last.control_mode = controlMode;
+            return false;
+        }
+
+        if (speedPercent < 0 || speedPercent > 100) {
+            std::cerr << "[FairinoMonitorService] initial speed skipped: "
+                      << modeName << " speed out of range: "
+                      << speedPercent << "\n";
+            return false;
+        }
+
+        int speedRtn = 0;
+        {
+            std::lock_guard<std::mutex> lock(sdk_mutex);
+            speedRtn = robot.SetSpeed(speedPercent);
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(state_mutex);
+            last.robot_mode = static_cast<int>(statePkg.robot_mode);
+            last.control_mode = controlMode;
+            if (speedRtn == 0) {
+                last.speed_override_percent = speedPercent;
+            }
+        }
+
+        if (speedRtn != 0) {
+            std::cerr << "[FairinoMonitorService] initial speed failed: "
+                      << "Mode(" << modeName << ")+SetSpeed("
+                      << speedPercent << ") code=" << speedRtn << "\n";
+            return false;
+        }
+
+        std::cerr << "[FairinoMonitorService] initial speed applied: "
+                  << "Mode(" << modeName << ")+SetSpeed("
+                  << speedPercent << ")\n";
+        return true;
     }
 
     CommandResult clearErrorEx()
@@ -959,6 +1135,8 @@ bool FairinoMonitorService::start(const std::string& ip, const Options& opt)
         return false;
     }
 
+    d->applyInitialSpeedForCurrentMode();
+
     d->running.store(true);
     d->th = std::thread([this]() { d->loop(); });
     return true;
@@ -1038,6 +1216,11 @@ bool FairinoMonitorService::setManualMode()
 bool FairinoMonitorService::setAutoMode()
 {
     return d->setAutoMode();
+}
+
+bool FairinoMonitorService::setSpeedOverride(int speed_percent)
+{
+    return d->setSpeedOverride(speed_percent);
 }
 
 bool FairinoMonitorService::clearError()
@@ -1136,6 +1319,12 @@ FairinoMonitorService::CommandResult
 FairinoMonitorService::setAutoModeEx()
 {
     return d->setAutoModeEx();
+}
+
+FairinoMonitorService::CommandResult
+FairinoMonitorService::setSpeedOverrideEx(int speed_percent)
+{
+    return d->setSpeedOverrideEx(speed_percent);
 }
 
 FairinoMonitorService::CommandResult

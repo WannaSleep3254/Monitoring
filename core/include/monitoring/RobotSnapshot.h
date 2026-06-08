@@ -57,6 +57,9 @@ struct RobotSnapshot
     int sdk_com_state = 0;         // GetSDKComState
     uint8_t safety_si0 = 0;        // GetSafetyStopState
     uint8_t safety_si1 = 0;
+    int robot_mode = -1;             // ROBOT_STATE_PKG.robot_mode, 0-auto, 1-manual
+    int speed_override_percent = 0; // SetSpeed command state, 0 means unknown/not set
+    std::string control_mode = "UNKNOWN"; // Last successful Mode command: MANUAL/AUTO/UNKNOWN
 
     // ---- Meta ----
     std::string last_error;        // 에러 텍스트(필요 시)

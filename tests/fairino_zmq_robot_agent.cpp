@@ -39,6 +39,7 @@ void handleSignal(int)
 constexpr int kMaxRobotCount = 2;
 constexpr int kJogHeartbeatTimeoutMs = 500;
 constexpr int kCommandMasterLeaseTimeoutMs = 3000;
+constexpr int kInitialRobotStartRetryMs = 3000;
 
 using SteadyClock = std::chrono::steady_clock;
 
@@ -303,6 +304,12 @@ QByteArray buildSnapshotPayload(
     snapshot["robotState"] =
         s.emergency_stop ? QStringLiteral("ESTOP")
                          : QStringLiteral("RUN");
+    snapshot["controlMode"] =
+        s.control_mode.empty()
+            ? QStringLiteral("UNKNOWN")
+            : QString::fromStdString(s.control_mode);
+    snapshot["robotMode"] = s.robot_mode;
+    snapshot["speedOverridePercent"] = s.speed_override_percent;
 
     snapshot["errorText"] =
         QString::fromStdString(s.last_error.empty()
@@ -812,6 +819,7 @@ bool requiresCommandMaster(const QString& command)
 {
     return command == QStringLiteral("setManualMode") ||
            command == QStringLiteral("setAutoMode") ||
+           command == QStringLiteral("setSpeedOverride") ||
            command == QStringLiteral("clearError") ||
            command == QStringLiteral("startJointJog") ||
            isStartWorkspaceJogCommand(command) ||
@@ -1108,6 +1116,11 @@ QByteArray executeCommand(const CommandRequest& request,
 
     } else if (request.command == QStringLiteral("setAutoMode")) {
         result = robot->setAutoModeEx();
+
+    } else if (request.command == QStringLiteral("setSpeedOverride")) {
+        const int speedPercent =
+            request.params.value(QStringLiteral("speedPercent")).toInt(-1);
+        result = robot->setSpeedOverrideEx(speedPercent);
 
     } else if (request.command == QStringLiteral("clearError")) {
         result = robot->clearErrorEx();
@@ -1430,11 +1443,15 @@ int main(int argc, char* argv[])
         opt1.robot_id = 1;
         opt1.poll_period_ms = 200;
         opt1.enable_reconnect = true;
+        opt1.manual_mode_initial_speed_percent = 30;
+        opt1.auto_mode_initial_speed_percent = 60;
 
         monitoring::FairinoMonitorService::Options opt2;
         opt2.robot_id = 2;
         opt2.poll_period_ms = 200;
         opt2.enable_reconnect = true;
+        opt2.manual_mode_initial_speed_percent = 30;
+        opt2.auto_mode_initial_speed_percent = 100;
 
         robot1.setCallback(
             [&](const monitoring::FairinoMonitorService::SnapshotWithMeta& data) {
@@ -1452,24 +1469,46 @@ int main(int argc, char* argv[])
                 publishSensorState(sensorPubSocket, sensorPublishMutex, 2, data);
             });
 
-        const bool robot1Started =
+        bool robot1Started =
             robot1.start(robot1Ip.toStdString(), opt1);
 
-        const bool robot2Started =
+        bool robot2Started =
             robot2.start(robot2Ip.toStdString(), opt2);
 
         qInfo() << "[FairinoZmqRobotAgent] robot1Started =" << robot1Started;
         qInfo() << "[FairinoZmqRobotAgent] robot2Started =" << robot2Started;
 
         if (!robot1Started && !robot2Started) {
-            qCritical() << "[FairinoZmqRobotAgent]"
-                        << "all robot connections failed";
-            return 2;
+            qWarning() << "[FairinoZmqRobotAgent]"
+                       << "all robot initial connections failed;"
+                       << "agent will keep running and retry";
         }
 
         qInfo() << "[FairinoZmqRobotAgent] agent started";
 
+        SteadyClock::time_point lastRobotStartRetry = SteadyClock::now();
+
         while (g_running) {
+            const SteadyClock::time_point now = SteadyClock::now();
+            if ((!robot1Started || !robot2Started) &&
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    now - lastRobotStartRetry).count() >=
+                    kInitialRobotStartRetryMs) {
+                lastRobotStartRetry = now;
+
+                if (!robot1Started && !robot1.isRunning()) {
+                    robot1Started = robot1.start(robot1Ip.toStdString(), opt1);
+                    qInfo() << "[FairinoZmqRobotAgent] robot1 retry started ="
+                            << robot1Started;
+                }
+
+                if (!robot2Started && !robot2.isRunning()) {
+                    robot2Started = robot2.start(robot2Ip.toStdString(), opt2);
+                    qInfo() << "[FairinoZmqRobotAgent] robot2 retry started ="
+                            << robot2Started;
+                }
+            }
+
             drainProcessEvents(
                 processPullSocket,
                 processStateCache,

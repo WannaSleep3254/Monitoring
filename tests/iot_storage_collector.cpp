@@ -14,6 +14,7 @@
 #include <QSqlQuery>
 #include <QStandardPaths>
 #include <QString>
+#include <QVariant>
 
 #ifdef ENABLE_ZEROMQ_TRANSPORT
 #include <zmq.hpp>
@@ -144,7 +145,46 @@ bool initializeSchema(QSqlDatabase& db)
             query,
             QStringLiteral(
                 "CREATE INDEX IF NOT EXISTS idx_metric_samples_raw "
-                "ON metric_samples(raw_message_id)"));
+                "ON metric_samples(raw_message_id)")) &&
+        execSql(
+            query,
+            QStringLiteral(
+                "CREATE TABLE IF NOT EXISTS process_events ("
+                "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                "received_epoch_ms INTEGER NOT NULL,"
+                "received_at TEXT NOT NULL,"
+                "agent_received_epoch_ms INTEGER,"
+                "agent_received_at TEXT,"
+                "event_epoch_ms INTEGER,"
+                "event_at TEXT,"
+                "topic TEXT NOT NULL,"
+                "robot TEXT,"
+                "robot_id INTEGER,"
+                "type TEXT,"
+                "kind TEXT,"
+                "seq INTEGER,"
+                "phase TEXT,"
+                "result TEXT,"
+                "error_code INTEGER,"
+                "error_text TEXT,"
+                "detail_json TEXT,"
+                "raw_json TEXT NOT NULL"
+                ")")) &&
+        execSql(
+            query,
+            QStringLiteral(
+                "CREATE INDEX IF NOT EXISTS idx_process_events_robot_time "
+                "ON process_events(robot_id, event_epoch_ms)")) &&
+        execSql(
+            query,
+            QStringLiteral(
+                "CREATE INDEX IF NOT EXISTS idx_process_events_command_time "
+                "ON process_events(type, kind, event_epoch_ms)")) &&
+        execSql(
+            query,
+            QStringLiteral(
+                "CREATE INDEX IF NOT EXISTS idx_process_events_phase_time "
+                "ON process_events(phase, event_epoch_ms)"));
 }
 
 qint64 timestampEpochMs(const QJsonObject& object, qint64 fallbackEpochMs)
@@ -543,6 +583,138 @@ bool insertRawMessage(QSqlDatabase& db,
     return true;
 }
 
+bool insertProcessEvent(QSqlDatabase& db,
+                        const QString& topic,
+                        const QByteArray& payload)
+{
+    QJsonParseError parseError;
+    const QJsonDocument doc = QJsonDocument::fromJson(payload, &parseError);
+
+    if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
+        qWarning() << "[IoTStorageCollector] invalid process JSON skipped"
+                   << "topic =" << topic
+                   << "error =" << parseError.errorString();
+        return false;
+    }
+
+    const QJsonObject object = doc.object();
+    if (object.value(QStringLiteral("messageType")).toString() !=
+        QStringLiteral("processEvent")) {
+        qWarning() << "[IoTStorageCollector] non-process event skipped"
+                   << "topic =" << topic
+                   << "messageType ="
+                   << object.value(QStringLiteral("messageType")).toString();
+        return false;
+    }
+
+    const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
+    const QString nowIso =
+        QDateTime::fromMSecsSinceEpoch(nowMs).toString(Qt::ISODateWithMs);
+    const qint64 eventEpochMs = timestampEpochMs(object, nowMs);
+    const QString eventAt =
+        object.value(QStringLiteral("timestamp")).toString(
+            QDateTime::fromMSecsSinceEpoch(eventEpochMs)
+                .toString(Qt::ISODateWithMs));
+
+    const QJsonValue agentReceivedEpochValue =
+        object.value(QStringLiteral("agentReceivedEpochMs"));
+    const QVariant agentReceivedEpochMs =
+        agentReceivedEpochValue.isDouble()
+            ? QVariant(static_cast<qint64>(agentReceivedEpochValue.toDouble()))
+            : QVariant(QVariant::LongLong);
+
+    const QJsonObject detail = object.value(QStringLiteral("detail")).toObject();
+    const QString detailJson =
+        detail.isEmpty()
+            ? QString()
+            : QString::fromUtf8(
+                  QJsonDocument(detail).toJson(QJsonDocument::Compact));
+
+    QSqlQuery query(db);
+    query.prepare(
+        QStringLiteral(
+            "INSERT INTO process_events ("
+            "received_epoch_ms,"
+            "received_at,"
+            "agent_received_epoch_ms,"
+            "agent_received_at,"
+            "event_epoch_ms,"
+            "event_at,"
+            "topic,"
+            "robot,"
+            "robot_id,"
+            "type,"
+            "kind,"
+            "seq,"
+            "phase,"
+            "result,"
+            "error_code,"
+            "error_text,"
+            "detail_json,"
+            "raw_json"
+            ") VALUES ("
+            ":received_epoch_ms,"
+            ":received_at,"
+            ":agent_received_epoch_ms,"
+            ":agent_received_at,"
+            ":event_epoch_ms,"
+            ":event_at,"
+            ":topic,"
+            ":robot,"
+            ":robot_id,"
+            ":type,"
+            ":kind,"
+            ":seq,"
+            ":phase,"
+            ":result,"
+            ":error_code,"
+            ":error_text,"
+            ":detail_json,"
+            ":raw_json"
+            ")"));
+
+    query.bindValue(QStringLiteral(":received_epoch_ms"), nowMs);
+    query.bindValue(QStringLiteral(":received_at"), nowIso);
+    query.bindValue(QStringLiteral(":agent_received_epoch_ms"),
+                    agentReceivedEpochMs);
+    query.bindValue(QStringLiteral(":agent_received_at"),
+                    object.value(QStringLiteral("agentReceivedAt")).toString());
+    query.bindValue(QStringLiteral(":event_epoch_ms"), eventEpochMs);
+    query.bindValue(QStringLiteral(":event_at"), eventAt);
+    query.bindValue(QStringLiteral(":topic"), topic);
+    query.bindValue(QStringLiteral(":robot"),
+                    object.value(QStringLiteral("robot")).toString());
+    query.bindValue(QStringLiteral(":robot_id"),
+                    object.value(QStringLiteral("robotId")).toInt(0));
+    query.bindValue(QStringLiteral(":type"),
+                    object.value(QStringLiteral("type")).toString());
+    query.bindValue(QStringLiteral(":kind"),
+                    object.value(QStringLiteral("kind")).toString());
+    query.bindValue(QStringLiteral(":seq"),
+                    static_cast<qint64>(
+                        object.value(QStringLiteral("seq")).toDouble(0.0)));
+    query.bindValue(QStringLiteral(":phase"),
+                    object.value(QStringLiteral("phase")).toString());
+    query.bindValue(QStringLiteral(":result"),
+                    object.value(QStringLiteral("result")).toString());
+    query.bindValue(QStringLiteral(":error_code"),
+                    object.value(QStringLiteral("errorCode")).toInt(0));
+    query.bindValue(QStringLiteral(":error_text"),
+                    object.value(QStringLiteral("errorText")).toString());
+    query.bindValue(QStringLiteral(":detail_json"), detailJson);
+    query.bindValue(QStringLiteral(":raw_json"), QString::fromUtf8(payload));
+
+    if (!query.exec()) {
+        qWarning() << "[IoTStorageCollector] process event insert failed"
+                   << query.lastError().text()
+                   << "topic =" << topic;
+        return false;
+    }
+
+    query.finish();
+    return true;
+}
+
 void printUsage()
 {
     qInfo().noquote()
@@ -552,6 +724,8 @@ void printUsage()
         << "  snapshotEndpoint = tcp://127.0.0.1:5556\n"
         << "  topicPrefix      = robot/\n"
         << "  databasePath     = ./data/iot_storage_YYYY-MM-DD.db\n\n"
+        << "Notes:\n"
+        << "  The collector also subscribes to process/event for Modbus sequence events.\n\n"
         << "Example:\n"
         << "  iot_storage_collector tcp://192.168.57.100:5556 robot/ C:/Debug/IoTStorage/data/iot_storage.db";
 }
@@ -625,6 +799,8 @@ int main(int argc, char* argv[])
         socket.set(zmq::sockopt::linger, 0);
         socket.set(zmq::sockopt::rcvtimeo, 250);
         socket.set(zmq::sockopt::subscribe, topicPrefix.toStdString());
+        socket.set(zmq::sockopt::subscribe,
+                   std::string("process/event"));
         socket.connect(snapshotEndpoint.toStdString());
 
         qInfo() << "[IoTStorageCollector] started";
@@ -632,6 +808,7 @@ int main(int argc, char* argv[])
         quint64 receivedCount = 0;
         quint64 storedCount = 0;
         quint64 storedMetricCount = 0;
+        quint64 storedProcessEventCount = 0;
 
         while (g_running) {
             zmq::message_t topicMessage;
@@ -663,20 +840,28 @@ int main(int argc, char* argv[])
 
             ++receivedCount;
             int insertedMetrics = 0;
-            if (insertRawMessage(db,
-                                 QStringLiteral("zmq_snapshot"),
-                                 topic,
-                                 payload,
-                                 &insertedMetrics)) {
-                ++storedCount;
-                storedMetricCount += static_cast<quint64>(insertedMetrics);
+            if (topic == QStringLiteral("process/event")) {
+                if (insertProcessEvent(db, topic, payload)) {
+                    ++storedProcessEventCount;
+                }
+            } else {
+                if (insertRawMessage(db,
+                                     QStringLiteral("zmq_snapshot"),
+                                     topic,
+                                     payload,
+                                     &insertedMetrics)) {
+                    ++storedCount;
+                    storedMetricCount += static_cast<quint64>(insertedMetrics);
+                }
             }
 
-            if (storedCount == 1 || storedCount % 100 == 0) {
+            const quint64 storedTotal = storedCount + storedProcessEventCount;
+            if (storedTotal == 1 || storedTotal % 100 == 0) {
                 qInfo() << "[IoTStorageCollector]"
                         << "received =" << receivedCount
                         << "stored =" << storedCount
                         << "metrics =" << storedMetricCount
+                        << "processEvents =" << storedProcessEventCount
                         << "topic =" << topic;
             }
         }
@@ -684,7 +869,8 @@ int main(int argc, char* argv[])
         qInfo() << "[IoTStorageCollector] stopping"
                 << "received =" << receivedCount
                 << "stored =" << storedCount
-                << "metrics =" << storedMetricCount;
+                << "metrics =" << storedMetricCount
+                << "processEvents =" << storedProcessEventCount;
 
         socket.close();
         context.shutdown();

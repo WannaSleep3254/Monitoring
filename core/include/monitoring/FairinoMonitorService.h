@@ -20,6 +20,8 @@ public:
         int poll_period_ms;
         uint8_t robot_id;
         int logger_level;
+        int manual_mode_initial_speed_percent;
+        int auto_mode_initial_speed_percent;
 
         Options()
             : enable_reconnect(true)
@@ -28,6 +30,8 @@ public:
             , poll_period_ms(100)
             , robot_id(0)
             , logger_level(1)
+            , manual_mode_initial_speed_percent(30)
+            , auto_mode_initial_speed_percent(100)
         {}
     };
 
@@ -83,6 +87,7 @@ public:
     bool robotEnable(bool enable);
     bool setManualMode();
     bool setAutoMode();
+    bool setSpeedOverride(int speed_percent);
     bool clearError();
     // ---- Safe convenience wrapper ----
     bool startJointJog(int joint, bool positive, float vel, float acc, float max_deg);
@@ -95,6 +100,7 @@ public:
     CommandResult robotEnableEx(bool enable);
     CommandResult setManualModeEx();
     CommandResult setAutoModeEx();
+    CommandResult setSpeedOverrideEx(int speed_percent);
     CommandResult clearErrorEx();
     CommandResult setRobotDoEx(int do_index, bool state);
 
