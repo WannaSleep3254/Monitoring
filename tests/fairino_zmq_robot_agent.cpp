@@ -1122,6 +1122,27 @@ QByteArray executeCommand(const CommandRequest& request,
             request.params.value(QStringLiteral("speedPercent")).toInt(-1);
         result = robot->setSpeedOverrideEx(speedPercent);
 
+    } else if (request.command == QStringLiteral("recoverCommunication")) {
+        if (request.robotId >= 1 && request.robotId <= kMaxRobotCount) {
+            JogWatchdogState& state = jogStates[request.robotId];
+            state.active = false;
+            state.workspaceJog = false;
+            state.joint = 0;
+            state.axis.clear();
+            state.sessionId.clear();
+        }
+
+        if (masterState.active) {
+            qInfo() << "[FairinoZmqRobotAgent]"
+                    << "command master released by SDK communication recovery"
+                    << "owner =" << masterState.ownerId;
+
+            masterState.active = false;
+            masterState.ownerId.clear();
+        }
+
+        result = robot->recoverCommunicationEx();
+
     } else if (request.command == QStringLiteral("clearError")) {
         result = robot->clearErrorEx();
 

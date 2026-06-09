@@ -1,11 +1,45 @@
 #include "monitoring/FairinoMonitorService.h"
 
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <winsock2.h>
+#endif
+
 #include "robot.h"   // ✅ 오직 cpp에서만
 #include <atomic>
 #include <chrono>
 #include <iostream>
 #include <mutex>
 #include <thread>
+
+namespace {
+
+void retainProcessWinsockReferences(const char* reason)
+{
+#ifdef _WIN32
+    // Fairino SDK CloseRPC/RPC can internally call WSACleanup on Windows.
+    // Keep extra process-level Winsock references so ZeroMQ sockets in the
+    // same agent process do not hit "WSASTARTUP not yet performed".
+    for (int i = 0; i < 8; ++i) {
+        WSADATA data{};
+        const int rtn = WSAStartup(MAKEWORD(2, 2), &data);
+        if (rtn != 0) {
+            std::cerr << "[FairinoMonitorService] WSAStartup failed during "
+                      << reason
+                      << ": code="
+                      << rtn
+                      << "\n";
+            break;
+        }
+    }
+#else
+    (void)reason;
+#endif
+}
+
+} // namespace
 
 namespace monitoring {
 
@@ -77,6 +111,8 @@ struct FairinoMonitorService::Impl
 
     bool connectLocked()
     {
+        retainProcessWinsockReferences("SDK connect");
+
         robot.LoggerInit();
         robot.SetLoggerLevel(opt.logger_level);
 
@@ -137,11 +173,14 @@ struct FairinoMonitorService::Impl
         std::cerr << "[FairinoMonitorService] reconnect requested: "
                   << reason << "\n";
 
+        retainProcessWinsockReferences("SDK reconnect before CloseRPC");
         robot.CloseRPC();
+        retainProcessWinsockReferences("SDK reconnect after CloseRPC");
         const bool ok = connectLocked();
 
         if (ok) {
             consecutive_fast_poll_failures = 0;
+            sdk_session_disconnected = false;
             reconnecting = false;
             markRecoveryEvent(successMessage);
             std::cerr << "[FairinoMonitorService] reconnect succeeded\n";
@@ -1066,6 +1105,24 @@ struct FairinoMonitorService::Impl
     {
         return clearErrorEx().ok;
     }
+
+    CommandResult recoverCommunicationEx()
+    {
+        const bool ok = [&]()
+        {
+            std::lock_guard<std::mutex> lock(sdk_mutex);
+            return reconnectLocked("manual SDK communication recovery",
+                                   false,
+                                   "manual SDK communication recovered");
+        }();
+
+        return updateCommandResult(ok ? 0 : -12001, "recoverCommunication");
+    }
+
+    bool recoverCommunication()
+    {
+        return recoverCommunicationEx().ok;
+    }
     // fr_test의 queryStaticInfo() 내용을 그대로 옮김, 필요 시 start()에서 호출하거나 외부에 공개하는 함수로 분리 가능
     bool queryStaticInfo()
     {
@@ -1228,6 +1285,11 @@ bool FairinoMonitorService::clearError()
     return d->clearError();
 }
 
+bool FairinoMonitorService::recoverCommunication()
+{
+    return d->recoverCommunication();
+}
+
 FairinoMonitorService::CommandResult
 FairinoMonitorService::startJointJogEx(
     int joint,
@@ -1331,6 +1393,12 @@ FairinoMonitorService::CommandResult
 FairinoMonitorService::clearErrorEx()
 {
     return d->clearErrorEx();
+}
+
+FairinoMonitorService::CommandResult
+FairinoMonitorService::recoverCommunicationEx()
+{
+    return d->recoverCommunicationEx();
 }
 
 FairinoMonitorService::CommandResult

@@ -89,6 +89,7 @@ public:
     bool setAutoMode();
     bool setSpeedOverride(int speed_percent);
     bool clearError();
+    bool recoverCommunication();
     // ---- Safe convenience wrapper ----
     bool startJointJog(int joint, bool positive, float vel, float acc, float max_deg);
     bool stopJointJog();
@@ -102,6 +103,7 @@ public:
     CommandResult setAutoModeEx();
     CommandResult setSpeedOverrideEx(int speed_percent);
     CommandResult clearErrorEx();
+    CommandResult recoverCommunicationEx();
     CommandResult setRobotDoEx(int do_index, bool state);
 
     CommandResult startJointJogEx(int joint, bool positive, float vel, float acc, float max_deg);

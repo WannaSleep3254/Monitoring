@@ -25,6 +25,7 @@ target_link_libraries(monitoring_core PRIVATE
 # 플랫폼 define
 if (WIN32)
     target_compile_definitions(monitoring_core PRIVATE WINDOWS_OPTION=1)
+    target_link_libraries(monitoring_core PUBLIC ws2_32)
 else()
     target_compile_definitions(monitoring_core PRIVATE LINUX_OPTION=1)
 endif()
