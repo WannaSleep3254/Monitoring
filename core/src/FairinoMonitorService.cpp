@@ -1123,6 +1123,36 @@ struct FairinoMonitorService::Impl
     {
         return recoverCommunicationEx().ok;
     }
+
+    CommandResult startProgramEx()
+    {
+        return executeSdkCommandWithReconnect("ProgramLoad(main_pnp.lua)+ProgramRun", [&]() {
+            char programName[64] = "/fruser/main_pnp.lua";
+            const int loadResult = robot.ProgramLoad(programName);
+            if (loadResult != 0) {
+                return loadResult;
+            }
+            return robot.ProgramRun();
+        });
+    }
+
+    bool startProgram()
+    {
+        return startProgramEx().ok;
+    }
+
+    CommandResult stopProgramEx()
+    {
+        return executeSdkCommandWithReconnect("ProgramStop", [&]() {
+            return robot.ProgramStop();
+        });
+    }
+
+    bool stopProgram()
+    {
+        return stopProgramEx().ok;
+    }
+
     // fr_test의 queryStaticInfo() 내용을 그대로 옮김, 필요 시 start()에서 호출하거나 외부에 공개하는 함수로 분리 가능
     bool queryStaticInfo()
     {
@@ -1290,6 +1320,16 @@ bool FairinoMonitorService::recoverCommunication()
     return d->recoverCommunication();
 }
 
+bool FairinoMonitorService::startProgram()
+{
+    return d->startProgram();
+}
+
+bool FairinoMonitorService::stopProgram()
+{
+    return d->stopProgram();
+}
+
 FairinoMonitorService::CommandResult
 FairinoMonitorService::startJointJogEx(
     int joint,
@@ -1399,6 +1439,18 @@ FairinoMonitorService::CommandResult
 FairinoMonitorService::recoverCommunicationEx()
 {
     return d->recoverCommunicationEx();
+}
+
+FairinoMonitorService::CommandResult
+FairinoMonitorService::startProgramEx()
+{
+    return d->startProgramEx();
+}
+
+FairinoMonitorService::CommandResult
+FairinoMonitorService::stopProgramEx()
+{
+    return d->stopProgramEx();
 }
 
 FairinoMonitorService::CommandResult

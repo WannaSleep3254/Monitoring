@@ -742,6 +742,11 @@ bool isStopWorkspaceJogCommand(const QString& command)
            command == QStringLiteral("stopBaseJog");
 }
 
+bool isRecoverCommunicationCommand(const QString& command)
+{
+    return command == QStringLiteral("recoverCommunication");
+}
+
 std::vector<int> robotIoDoIndices(int robotId, const QString& ioName)
 {
     if (robotId == 1) {
@@ -821,6 +826,7 @@ bool requiresCommandMaster(const QString& command)
            command == QStringLiteral("setAutoMode") ||
            command == QStringLiteral("setSpeedOverride") ||
            command == QStringLiteral("clearError") ||
+           command == QStringLiteral("programStart") ||
            command == QStringLiteral("startJointJog") ||
            isStartWorkspaceJogCommand(command) ||
            command == QStringLiteral("jogHeartbeat");
@@ -830,7 +836,8 @@ bool isSafetyStopCommand(const QString& command)
 {
     return command == QStringLiteral("stopJointJog") ||
            isStopWorkspaceJogCommand(command) ||
-           command == QStringLiteral("stop");
+           command == QStringLiteral("stop") ||
+           command == QStringLiteral("programStop");
 }
 
 monitoring::FairinoMonitorService* selectRobot(
@@ -988,7 +995,7 @@ QByteArray executeCommand(const CommandRequest& request,
                              masterRejectMessage);
     }
 
-    if (!robot->isRunning()) {
+    if (!robot->isRunning() && !isRecoverCommunicationCommand(request.command)) {
         if (isStopWorkspaceJogCommand(request.command)) {
             if (request.robotId >= 1 && request.robotId <= kMaxRobotCount) {
                 JogWatchdogState& state = jogStates[request.robotId];
@@ -1145,6 +1152,12 @@ QByteArray executeCommand(const CommandRequest& request,
 
     } else if (request.command == QStringLiteral("clearError")) {
         result = robot->clearErrorEx();
+
+    } else if (request.command == QStringLiteral("programStart")) {
+        result = robot->startProgramEx();
+
+    } else if (request.command == QStringLiteral("programStop")) {
+        result = robot->stopProgramEx();
 
     } else if (request.command == QStringLiteral("stop")) {
         result = robot->immStopJogEx();
