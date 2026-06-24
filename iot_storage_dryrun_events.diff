@@ -1,0 +1,610 @@
+﻿diff --git a/tests/iot_storage_collector.cpp b/tests/iot_storage_collector.cpp
+index 97c943a..e98c6c5 100644
+--- a/tests/iot_storage_collector.cpp
++++ b/tests/iot_storage_collector.cpp
+@@ -70,6 +70,43 @@ bool execSql(QSqlQuery& query, const QString& sql)
+     return false;
+ }
+ 
++bool tableHasColumn(QSqlDatabase& db,
++                    const QString& tableName,
++                    const QString& columnName)
++{
++    QSqlQuery query(db);
++    if (!query.exec(QStringLiteral("PRAGMA table_info(%1)").arg(tableName))) {
++        qWarning() << "[IoTStorageCollector] table_info failed"
++                   << query.lastError().text()
++                   << "table =" << tableName;
++        return false;
++    }
++
++    while (query.next()) {
++        if (query.value(1).toString() == columnName) {
++            return true;
++        }
++    }
++
++    return false;
++}
++
++bool ensureColumn(QSqlDatabase& db,
++                  const QString& tableName,
++                  const QString& columnName,
++                  const QString& columnType)
++{
++    if (tableHasColumn(db, tableName, columnName)) {
++        return true;
++    }
++
++    QSqlQuery query(db);
++    return execSql(
++        query,
++        QStringLiteral("ALTER TABLE %1 ADD COLUMN %2 %3")
++            .arg(tableName, columnName, columnType));
++}
++
+ bool initializeSchema(QSqlDatabase& db)
+ {
+     QSqlQuery query(db);
+@@ -167,6 +204,18 @@ bool initializeSchema(QSqlDatabase& db)
+                 "result TEXT,"
+                 "error_code INTEGER,"
+                 "error_text TEXT,"
++                "message_type TEXT,"
++                "schema_version INTEGER,"
++                "command_id TEXT,"
++                "command TEXT,"
++                "run_id TEXT,"
++                "profile TEXT,"
++                "cycle INTEGER,"
++                "step_index INTEGER,"
++                "step TEXT,"
++                "event TEXT,"
++                "message TEXT,"
++                "ok INTEGER,"
+                 "detail_json TEXT,"
+                 "raw_json TEXT NOT NULL"
+                 ")")) &&
+@@ -184,7 +233,110 @@ bool initializeSchema(QSqlDatabase& db)
+             query,
+             QStringLiteral(
+                 "CREATE INDEX IF NOT EXISTS idx_process_events_phase_time "
+-                "ON process_events(phase, event_epoch_ms)"));
++                "ON process_events(phase, event_epoch_ms)")) &&
++        ensureColumn(db,
++                     QStringLiteral("process_events"),
++                     QStringLiteral("message_type"),
++                     QStringLiteral("TEXT")) &&
++        ensureColumn(db,
++                     QStringLiteral("process_events"),
++                     QStringLiteral("schema_version"),
++                     QStringLiteral("INTEGER")) &&
++        ensureColumn(db,
++                     QStringLiteral("process_events"),
++                     QStringLiteral("command_id"),
++                     QStringLiteral("TEXT")) &&
++        ensureColumn(db,
++                     QStringLiteral("process_events"),
++                     QStringLiteral("command"),
++                     QStringLiteral("TEXT")) &&
++        ensureColumn(db,
++                     QStringLiteral("process_events"),
++                     QStringLiteral("run_id"),
++                     QStringLiteral("TEXT")) &&
++        ensureColumn(db,
++                     QStringLiteral("process_events"),
++                     QStringLiteral("profile"),
++                     QStringLiteral("TEXT")) &&
++        ensureColumn(db,
++                     QStringLiteral("process_events"),
++                     QStringLiteral("cycle"),
++                     QStringLiteral("INTEGER")) &&
++        ensureColumn(db,
++                     QStringLiteral("process_events"),
++                     QStringLiteral("step_index"),
++                     QStringLiteral("INTEGER")) &&
++        ensureColumn(db,
++                     QStringLiteral("process_events"),
++                     QStringLiteral("step"),
++                     QStringLiteral("TEXT")) &&
++        ensureColumn(db,
++                     QStringLiteral("process_events"),
++                     QStringLiteral("event"),
++                     QStringLiteral("TEXT")) &&
++        ensureColumn(db,
++                     QStringLiteral("process_events"),
++                     QStringLiteral("message"),
++                     QStringLiteral("TEXT")) &&
++        ensureColumn(db,
++                     QStringLiteral("process_events"),
++                     QStringLiteral("ok"),
++                     QStringLiteral("INTEGER")) &&
++        execSql(
++            query,
++            QStringLiteral(
++                "CREATE INDEX IF NOT EXISTS idx_process_events_message_type_time "
++                "ON process_events(message_type, event_epoch_ms)")) &&
++        execSql(
++            query,
++            QStringLiteral(
++                "CREATE INDEX IF NOT EXISTS idx_process_events_run_step_time "
++                "ON process_events(run_id, step_index, event_epoch_ms)")) &&
++        execSql(
++            query,
++            QStringLiteral(
++                "CREATE INDEX IF NOT EXISTS idx_process_events_command_id "
++                "ON process_events(command_id)")) &&
++        execSql(
++            query,
++            QStringLiteral(
++                "CREATE TABLE IF NOT EXISTS dry_run_events ("
++                "id INTEGER PRIMARY KEY AUTOINCREMENT,"
++                "received_epoch_ms INTEGER NOT NULL,"
++                "received_at TEXT NOT NULL,"
++                "agent_received_epoch_ms INTEGER,"
++                "agent_received_at TEXT,"
++                "event_epoch_ms INTEGER,"
++                "event_at TEXT,"
++                "topic TEXT NOT NULL,"
++                "schema_version INTEGER,"
++                "robot_id INTEGER,"
++                "run_id TEXT,"
++                "profile TEXT,"
++                "cycle INTEGER,"
++                "event TEXT NOT NULL,"
++                "step TEXT,"
++                "step_index INTEGER,"
++                "ok INTEGER,"
++                "message TEXT,"
++                "detail_json TEXT,"
++                "raw_json TEXT NOT NULL"
++                ")")) &&
++        execSql(
++            query,
++            QStringLiteral(
++                "CREATE INDEX IF NOT EXISTS idx_dry_run_events_run_time "
++                "ON dry_run_events(run_id, event_epoch_ms)")) &&
++        execSql(
++            query,
++            QStringLiteral(
++                "CREATE INDEX IF NOT EXISTS idx_dry_run_events_step_time "
++                "ON dry_run_events(step, step_index, event_epoch_ms)")) &&
++        execSql(
++            query,
++            QStringLiteral(
++                "CREATE INDEX IF NOT EXISTS idx_dry_run_events_event_time "
++                "ON dry_run_events(event, event_epoch_ms)"));
+ }
+ 
+ qint64 timestampEpochMs(const QJsonObject& object, qint64 fallbackEpochMs)
+@@ -206,6 +358,53 @@ qint64 timestampEpochMs(const QJsonObject& object, qint64 fallbackEpochMs)
+     return fallbackEpochMs;
+ }
+ 
++QVariant jsonIntegerVariant(const QJsonValue& value)
++{
++    return value.isDouble()
++               ? QVariant(static_cast<qint64>(value.toDouble()))
++               : QVariant(QVariant::LongLong);
++}
++
++QVariant jsonBoolVariant(const QJsonValue& value)
++{
++    return value.isBool()
++               ? QVariant(value.toBool() ? 1 : 0)
++               : QVariant(QVariant::Int);
++}
++
++QString compactJsonValue(const QJsonValue& value)
++{
++    if (value.isObject()) {
++        return QString::fromUtf8(
++            QJsonDocument(value.toObject()).toJson(QJsonDocument::Compact));
++    }
++
++    if (value.isArray()) {
++        return QString::fromUtf8(
++            QJsonDocument(value.toArray()).toJson(QJsonDocument::Compact));
++    }
++
++    return QString();
++}
++
++QString payloadMessageType(const QByteArray& payload)
++{
++    QJsonParseError parseError;
++    const QJsonDocument doc = QJsonDocument::fromJson(payload, &parseError);
++
++    if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
++        return QString();
++    }
++
++    return doc.object().value(QStringLiteral("messageType")).toString();
++}
++
++bool isStructuredProcessMessageType(const QString& messageType)
++{
++    return messageType == QStringLiteral("processEvent") ||
++           messageType == QStringLiteral("processCommandEvent");
++}
++
+ bool insertMetric(QSqlDatabase& db,
+                   qint64 rawMessageId,
+                   qint64 sampleEpochMs,
+@@ -583,6 +782,143 @@ bool insertRawMessage(QSqlDatabase& db,
+     return true;
+ }
+ 
++bool insertDryRunEvent(QSqlDatabase& db,
++                       const QString& topic,
++                       const QByteArray& payload)
++{
++    QJsonParseError parseError;
++    const QJsonDocument doc = QJsonDocument::fromJson(payload, &parseError);
++
++    if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
++        qWarning() << "[IoTStorageCollector] invalid dryRunEvent JSON skipped"
++                   << parseError.errorString();
++        return false;
++    }
++
++    const QJsonObject object = doc.object();
++    const QString messageType =
++        object.value(QStringLiteral("messageType")).toString();
++    if (messageType != QStringLiteral("dryRunEvent")) {
++        qWarning() << "[IoTStorageCollector] non-dryRunEvent skipped"
++                   << "topic =" << topic
++                   << "messageType =" << messageType;
++        return false;
++    }
++
++    const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
++    const QString nowIso =
++        QDateTime::fromMSecsSinceEpoch(nowMs).toString(Qt::ISODateWithMs);
++    const qint64 eventEpochMs = timestampEpochMs(object, nowMs);
++    const QString eventAt =
++        object.value(QStringLiteral("timestamp")).toString(
++            QDateTime::fromMSecsSinceEpoch(eventEpochMs)
++                .toString(Qt::ISODateWithMs));
++
++    const QJsonValue agentReceivedEpochValue =
++        object.value(QStringLiteral("agentReceivedEpochMs"));
++    const QVariant agentReceivedEpochMs =
++        agentReceivedEpochValue.isDouble()
++            ? QVariant(static_cast<qint64>(agentReceivedEpochValue.toDouble()))
++            : QVariant(QVariant::LongLong);
++    const QVariant robotId =
++        object.contains(QStringLiteral("robotId"))
++            ? jsonIntegerVariant(object.value(QStringLiteral("robotId")))
++            : QVariant(QVariant::Int);
++    const QString event =
++        object.value(QStringLiteral("event")).toString();
++    const QString detailJson =
++        compactJsonValue(object.value(QStringLiteral("detail")));
++
++    QSqlQuery query(db);
++    query.prepare(
++        QStringLiteral(
++            "INSERT INTO dry_run_events ("
++            "received_epoch_ms,"
++            "received_at,"
++            "agent_received_epoch_ms,"
++            "agent_received_at,"
++            "event_epoch_ms,"
++            "event_at,"
++            "topic,"
++            "schema_version,"
++            "robot_id,"
++            "run_id,"
++            "profile,"
++            "cycle,"
++            "event,"
++            "step,"
++            "step_index,"
++            "ok,"
++            "message,"
++            "detail_json,"
++            "raw_json"
++            ") VALUES ("
++            ":received_epoch_ms,"
++            ":received_at,"
++            ":agent_received_epoch_ms,"
++            ":agent_received_at,"
++            ":event_epoch_ms,"
++            ":event_at,"
++            ":topic,"
++            ":schema_version,"
++            ":robot_id,"
++            ":run_id,"
++            ":profile,"
++            ":cycle,"
++            ":event,"
++            ":step,"
++            ":step_index,"
++            ":ok,"
++            ":message,"
++            ":detail_json,"
++            ":raw_json"
++            ")"));
++
++    query.bindValue(QStringLiteral(":received_epoch_ms"), nowMs);
++    query.bindValue(QStringLiteral(":received_at"), nowIso);
++    query.bindValue(QStringLiteral(":agent_received_epoch_ms"),
++                    agentReceivedEpochMs);
++    query.bindValue(QStringLiteral(":agent_received_at"),
++                    object.value(QStringLiteral("agentReceivedAt")).toString());
++    query.bindValue(QStringLiteral(":event_epoch_ms"), eventEpochMs);
++    query.bindValue(QStringLiteral(":event_at"), eventAt);
++    query.bindValue(QStringLiteral(":topic"), topic);
++    query.bindValue(QStringLiteral(":schema_version"),
++                    jsonIntegerVariant(
++                        object.value(QStringLiteral("schemaVersion"))));
++    query.bindValue(QStringLiteral(":robot_id"), robotId);
++    query.bindValue(QStringLiteral(":run_id"),
++                    object.value(QStringLiteral("runId")).toString());
++    query.bindValue(QStringLiteral(":profile"),
++                    object.value(QStringLiteral("profile")).toString());
++    query.bindValue(QStringLiteral(":cycle"),
++                    jsonIntegerVariant(object.value(QStringLiteral("cycle"))));
++    query.bindValue(QStringLiteral(":event"), event);
++    query.bindValue(QStringLiteral(":step"),
++                    object.value(QStringLiteral("step")).toString());
++    query.bindValue(QStringLiteral(":step_index"),
++                    jsonIntegerVariant(
++                        object.value(QStringLiteral("stepIndex"))));
++    query.bindValue(QStringLiteral(":ok"),
++                    jsonBoolVariant(object.value(QStringLiteral("ok"))));
++    query.bindValue(QStringLiteral(":message"),
++                    object.value(QStringLiteral("message")).toString());
++    query.bindValue(QStringLiteral(":detail_json"), detailJson);
++    query.bindValue(QStringLiteral(":raw_json"), QString::fromUtf8(payload));
++
++    if (!query.exec()) {
++        qWarning() << "[IoTStorageCollector] dryRunEvent insert failed"
++                   << query.lastError().text()
++                   << "runId =" << object.value(QStringLiteral("runId")).toString()
++                   << "event =" << event
++                   << "step =" << object.value(QStringLiteral("step")).toString();
++        return false;
++    }
++
++    query.finish();
++    return true;
++}
++
+ bool insertProcessEvent(QSqlDatabase& db,
+                         const QString& topic,
+                         const QByteArray& payload)
+@@ -598,12 +934,13 @@ bool insertProcessEvent(QSqlDatabase& db,
+     }
+ 
+     const QJsonObject object = doc.object();
+-    if (object.value(QStringLiteral("messageType")).toString() !=
+-        QStringLiteral("processEvent")) {
++    const QString messageType =
++        object.value(QStringLiteral("messageType")).toString();
++    if (!isStructuredProcessMessageType(messageType)) {
+         qWarning() << "[IoTStorageCollector] non-process event skipped"
+                    << "topic =" << topic
+                    << "messageType ="
+-                   << object.value(QStringLiteral("messageType")).toString();
++                   << messageType;
+         return false;
+     }
+ 
+@@ -623,12 +960,46 @@ bool insertProcessEvent(QSqlDatabase& db,
+             ? QVariant(static_cast<qint64>(agentReceivedEpochValue.toDouble()))
+             : QVariant(QVariant::LongLong);
+ 
+-    const QJsonObject detail = object.value(QStringLiteral("detail")).toObject();
++    const QString event =
++        object.value(QStringLiteral("event"))
++            .toString(object.value(QStringLiteral("phase")).toString());
++    const QString command = object.value(QStringLiteral("command")).toString();
++    const QString step = object.value(QStringLiteral("step")).toString();
++    const QString profile = object.value(QStringLiteral("profile")).toString();
++    const QString runId = object.value(QStringLiteral("runId")).toString();
++
++    QString type = object.value(QStringLiteral("type")).toString();
++    QString kind = object.value(QStringLiteral("kind")).toString();
++    QString phase = object.value(QStringLiteral("phase")).toString();
++    QString result = object.value(QStringLiteral("result")).toString();
++    QString errorText = object.value(QStringLiteral("errorText")).toString();
++
++    const QJsonValue seqValue = object.value(QStringLiteral("seq"));
++    const QJsonValue stepIndexValue = object.value(QStringLiteral("stepIndex"));
++    const QVariant seq =
++        seqValue.isDouble()
++            ? jsonIntegerVariant(seqValue)
++            : (stepIndexValue.isDouble()
++                   ? jsonIntegerVariant(stepIndexValue)
++                   : QVariant(QVariant::LongLong));
++
++    if (messageType == QStringLiteral("processCommandEvent")) {
++        type = QStringLiteral("processCommand");
++        kind = command;
++        phase = event;
++    }
++
++    if (result.isEmpty() && object.value(QStringLiteral("ok")).isBool()) {
++        result = object.value(QStringLiteral("ok")).toBool()
++                     ? QStringLiteral("ok")
++                     : QStringLiteral("failed");
++    }
++    if (errorText.isEmpty() && result == QStringLiteral("failed")) {
++        errorText = object.value(QStringLiteral("message")).toString();
++    }
++
+     const QString detailJson =
+-        detail.isEmpty()
+-            ? QString()
+-            : QString::fromUtf8(
+-                  QJsonDocument(detail).toJson(QJsonDocument::Compact));
++        compactJsonValue(object.value(QStringLiteral("detail")));
+ 
+     QSqlQuery query(db);
+     query.prepare(
+@@ -650,6 +1021,18 @@ bool insertProcessEvent(QSqlDatabase& db,
+             "result,"
+             "error_code,"
+             "error_text,"
++            "message_type,"
++            "schema_version,"
++            "command_id,"
++            "command,"
++            "run_id,"
++            "profile,"
++            "cycle,"
++            "step_index,"
++            "step,"
++            "event,"
++            "message,"
++            "ok,"
+             "detail_json,"
+             "raw_json"
+             ") VALUES ("
+@@ -669,6 +1052,18 @@ bool insertProcessEvent(QSqlDatabase& db,
+             ":result,"
+             ":error_code,"
+             ":error_text,"
++            ":message_type,"
++            ":schema_version,"
++            ":command_id,"
++            ":command,"
++            ":run_id,"
++            ":profile,"
++            ":cycle,"
++            ":step_index,"
++            ":step,"
++            ":event,"
++            ":message,"
++            ":ok,"
+             ":detail_json,"
+             ":raw_json"
+             ")"));
+@@ -687,20 +1082,36 @@ bool insertProcessEvent(QSqlDatabase& db,
+     query.bindValue(QStringLiteral(":robot_id"),
+                     object.value(QStringLiteral("robotId")).toInt(0));
+     query.bindValue(QStringLiteral(":type"),
+-                    object.value(QStringLiteral("type")).toString());
+-    query.bindValue(QStringLiteral(":kind"),
+-                    object.value(QStringLiteral("kind")).toString());
+-    query.bindValue(QStringLiteral(":seq"),
+-                    static_cast<qint64>(
+-                        object.value(QStringLiteral("seq")).toDouble(0.0)));
+-    query.bindValue(QStringLiteral(":phase"),
+-                    object.value(QStringLiteral("phase")).toString());
+-    query.bindValue(QStringLiteral(":result"),
+-                    object.value(QStringLiteral("result")).toString());
++                    type);
++    query.bindValue(QStringLiteral(":kind"), kind);
++    query.bindValue(QStringLiteral(":seq"), seq);
++    query.bindValue(QStringLiteral(":phase"), phase);
++    query.bindValue(QStringLiteral(":result"), result);
+     query.bindValue(QStringLiteral(":error_code"),
+-                    object.value(QStringLiteral("errorCode")).toInt(0));
+-    query.bindValue(QStringLiteral(":error_text"),
+-                    object.value(QStringLiteral("errorText")).toString());
++                    object.contains(QStringLiteral("errorCode"))
++                        ? object.value(QStringLiteral("errorCode")).toInt()
++                        : object.value(QStringLiteral("code")).toInt(0));
++    query.bindValue(QStringLiteral(":error_text"), errorText);
++    query.bindValue(QStringLiteral(":message_type"), messageType);
++    query.bindValue(QStringLiteral(":schema_version"),
++                    jsonIntegerVariant(
++                        object.value(QStringLiteral("schemaVersion"))));
++    query.bindValue(QStringLiteral(":command_id"),
++                    object.value(QStringLiteral("commandId")).toString());
++    query.bindValue(QStringLiteral(":command"), command);
++    query.bindValue(QStringLiteral(":run_id"), runId);
++    query.bindValue(QStringLiteral(":profile"), profile);
++    query.bindValue(QStringLiteral(":cycle"),
++                    jsonIntegerVariant(object.value(QStringLiteral("cycle"))));
++    query.bindValue(QStringLiteral(":step_index"),
++                    jsonIntegerVariant(
++                        object.value(QStringLiteral("stepIndex"))));
++    query.bindValue(QStringLiteral(":step"), step);
++    query.bindValue(QStringLiteral(":event"), event);
++    query.bindValue(QStringLiteral(":message"),
++                    object.value(QStringLiteral("message")).toString());
++    query.bindValue(QStringLiteral(":ok"),
++                    jsonBoolVariant(object.value(QStringLiteral("ok"))));
+     query.bindValue(QStringLiteral(":detail_json"), detailJson);
+     query.bindValue(QStringLiteral(":raw_json"), QString::fromUtf8(payload));
+ 
+@@ -725,7 +1136,7 @@ void printUsage()
+         << "  topicPrefix      = robot/\n"
+         << "  databasePath     = ./data/iot_storage_YYYY-MM-DD.db\n\n"
+         << "Notes:\n"
+-        << "  The collector also subscribes to process/event for Modbus sequence events.\n\n"
++        << "  The collector also subscribes to process/event, robot/processCommandEvent, and robot/dryrun/event.\n\n"
+         << "Example:\n"
+         << "  iot_storage_collector tcp://192.168.57.100:5556 robot/ C:/Debug/IoTStorage/data/iot_storage.db";
+ }
+@@ -801,6 +1212,10 @@ int main(int argc, char* argv[])
+         socket.set(zmq::sockopt::subscribe, topicPrefix.toStdString());
+         socket.set(zmq::sockopt::subscribe,
+                    std::string("process/event"));
++        socket.set(zmq::sockopt::subscribe,
++                   std::string("robot/dryrun/event"));
++        socket.set(zmq::sockopt::subscribe,
++                   std::string("robot/processCommandEvent"));
+         socket.connect(snapshotEndpoint.toStdString());
+ 
+         qInfo() << "[IoTStorageCollector] started";
+@@ -809,6 +1224,7 @@ int main(int argc, char* argv[])
+         quint64 storedCount = 0;
+         quint64 storedMetricCount = 0;
+         quint64 storedProcessEventCount = 0;
++        quint64 storedDryRunEventCount = 0;
+ 
+         while (g_running) {
+             zmq::message_t topicMessage;
+@@ -840,7 +1256,12 @@ int main(int argc, char* argv[])
+ 
+             ++receivedCount;
+             int insertedMetrics = 0;
+-            if (topic == QStringLiteral("process/event")) {
++            const QString messageType = payloadMessageType(payload);
++            if (messageType == QStringLiteral("dryRunEvent")) {
++                if (insertDryRunEvent(db, topic, payload)) {
++                    ++storedDryRunEventCount;
++                }
++            } else if (topic == QStringLiteral("process/event")) {
+                 if (insertProcessEvent(db, topic, payload)) {
+                     ++storedProcessEventCount;
+                 }
+@@ -853,15 +1274,22 @@ int main(int argc, char* argv[])
+                     ++storedCount;
+                     storedMetricCount += static_cast<quint64>(insertedMetrics);
+                 }
++                if (isStructuredProcessMessageType(messageType)) {
++                    if (insertProcessEvent(db, topic, payload)) {
++                        ++storedProcessEventCount;
++                    }
++                }
+             }
+ 
+-            const quint64 storedTotal = storedCount + storedProcessEventCount;
++            const quint64 storedTotal =
++                storedCount + storedProcessEventCount + storedDryRunEventCount;
+             if (storedTotal == 1 || storedTotal % 100 == 0) {
+                 qInfo() << "[IoTStorageCollector]"
+                         << "received =" << receivedCount
+                         << "stored =" << storedCount
+                         << "metrics =" << storedMetricCount
+                         << "processEvents =" << storedProcessEventCount
++                        << "dryRunEvents =" << storedDryRunEventCount
+                         << "topic =" << topic;
+             }
+         }
+@@ -870,7 +1298,8 @@ int main(int argc, char* argv[])
+                 << "received =" << receivedCount
+                 << "stored =" << storedCount
+                 << "metrics =" << storedMetricCount
+-                << "processEvents =" << storedProcessEventCount;
++                << "processEvents =" << storedProcessEventCount
++                << "dryRunEvents =" << storedDryRunEventCount;
+ 
+         socket.close();
+         context.shutdown();

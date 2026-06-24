@@ -1,0 +1,251 @@
+﻿# iot_storage_dryrun_events.diff part 1/3
+diff --git a/tests/iot_storage_collector.cpp b/tests/iot_storage_collector.cpp
+index 97c943a..e98c6c5 100644
+--- a/tests/iot_storage_collector.cpp
++++ b/tests/iot_storage_collector.cpp
+@@ -70,6 +70,43 @@ bool execSql(QSqlQuery& query, const QString& sql)
+     return false;
+ }
+ 
++bool tableHasColumn(QSqlDatabase& db,
++                    const QString& tableName,
++                    const QString& columnName)
++{
++    QSqlQuery query(db);
++    if (!query.exec(QStringLiteral("PRAGMA table_info(%1)").arg(tableName))) {
++        qWarning() << "[IoTStorageCollector] table_info failed"
++                   << query.lastError().text()
++                   << "table =" << tableName;
++        return false;
++    }
++
++    while (query.next()) {
++        if (query.value(1).toString() == columnName) {
++            return true;
++        }
++    }
++
++    return false;
++}
++
++bool ensureColumn(QSqlDatabase& db,
++                  const QString& tableName,
++                  const QString& columnName,
++                  const QString& columnType)
++{
++    if (tableHasColumn(db, tableName, columnName)) {
++        return true;
++    }
++
++    QSqlQuery query(db);
++    return execSql(
++        query,
++        QStringLiteral("ALTER TABLE %1 ADD COLUMN %2 %3")
++            .arg(tableName, columnName, columnType));
++}
++
+ bool initializeSchema(QSqlDatabase& db)
+ {
+     QSqlQuery query(db);
+@@ -167,6 +204,18 @@ bool initializeSchema(QSqlDatabase& db)
+                 "result TEXT,"
+                 "error_code INTEGER,"
+                 "error_text TEXT,"
++                "message_type TEXT,"
++                "schema_version INTEGER,"
++                "command_id TEXT,"
++                "command TEXT,"
++                "run_id TEXT,"
++                "profile TEXT,"
++                "cycle INTEGER,"
++                "step_index INTEGER,"
++                "step TEXT,"
++                "event TEXT,"
++                "message TEXT,"
++                "ok INTEGER,"
+                 "detail_json TEXT,"
+                 "raw_json TEXT NOT NULL"
+                 ")")) &&
+@@ -184,7 +233,110 @@ bool initializeSchema(QSqlDatabase& db)
+             query,
+             QStringLiteral(
+                 "CREATE INDEX IF NOT EXISTS idx_process_events_phase_time "
+-                "ON process_events(phase, event_epoch_ms)"));
++                "ON process_events(phase, event_epoch_ms)")) &&
++        ensureColumn(db,
++                     QStringLiteral("process_events"),
++                     QStringLiteral("message_type"),
++                     QStringLiteral("TEXT")) &&
++        ensureColumn(db,
++                     QStringLiteral("process_events"),
++                     QStringLiteral("schema_version"),
++                     QStringLiteral("INTEGER")) &&
++        ensureColumn(db,
++                     QStringLiteral("process_events"),
++                     QStringLiteral("command_id"),
++                     QStringLiteral("TEXT")) &&
++        ensureColumn(db,
++                     QStringLiteral("process_events"),
++                     QStringLiteral("command"),
++                     QStringLiteral("TEXT")) &&
++        ensureColumn(db,
++                     QStringLiteral("process_events"),
++                     QStringLiteral("run_id"),
++                     QStringLiteral("TEXT")) &&
++        ensureColumn(db,
++                     QStringLiteral("process_events"),
++                     QStringLiteral("profile"),
++                     QStringLiteral("TEXT")) &&
++        ensureColumn(db,
++                     QStringLiteral("process_events"),
++                     QStringLiteral("cycle"),
++                     QStringLiteral("INTEGER")) &&
++        ensureColumn(db,
++                     QStringLiteral("process_events"),
++                     QStringLiteral("step_index"),
++                     QStringLiteral("INTEGER")) &&
++        ensureColumn(db,
++                     QStringLiteral("process_events"),
++                     QStringLiteral("step"),
++                     QStringLiteral("TEXT")) &&
++        ensureColumn(db,
++                     QStringLiteral("process_events"),
++                     QStringLiteral("event"),
++                     QStringLiteral("TEXT")) &&
++        ensureColumn(db,
++                     QStringLiteral("process_events"),
++                     QStringLiteral("message"),
++                     QStringLiteral("TEXT")) &&
++        ensureColumn(db,
++                     QStringLiteral("process_events"),
++                     QStringLiteral("ok"),
++                     QStringLiteral("INTEGER")) &&
++        execSql(
++            query,
++            QStringLiteral(
++                "CREATE INDEX IF NOT EXISTS idx_process_events_message_type_time "
++                "ON process_events(message_type, event_epoch_ms)")) &&
++        execSql(
++            query,
++            QStringLiteral(
++                "CREATE INDEX IF NOT EXISTS idx_process_events_run_step_time "
++                "ON process_events(run_id, step_index, event_epoch_ms)")) &&
++        execSql(
++            query,
++            QStringLiteral(
++                "CREATE INDEX IF NOT EXISTS idx_process_events_command_id "
++                "ON process_events(command_id)")) &&
++        execSql(
++            query,
++            QStringLiteral(
++                "CREATE TABLE IF NOT EXISTS dry_run_events ("
++                "id INTEGER PRIMARY KEY AUTOINCREMENT,"
++                "received_epoch_ms INTEGER NOT NULL,"
++                "received_at TEXT NOT NULL,"
++                "agent_received_epoch_ms INTEGER,"
++                "agent_received_at TEXT,"
++                "event_epoch_ms INTEGER,"
++                "event_at TEXT,"
++                "topic TEXT NOT NULL,"
++                "schema_version INTEGER,"
++                "robot_id INTEGER,"
++                "run_id TEXT,"
++                "profile TEXT,"
++                "cycle INTEGER,"
++                "event TEXT NOT NULL,"
++                "step TEXT,"
++                "step_index INTEGER,"
++                "ok INTEGER,"
++                "message TEXT,"
++                "detail_json TEXT,"
++                "raw_json TEXT NOT NULL"
++                ")")) &&
++        execSql(
++            query,
++            QStringLiteral(
++                "CREATE INDEX IF NOT EXISTS idx_dry_run_events_run_time "
++                "ON dry_run_events(run_id, event_epoch_ms)")) &&
++        execSql(
++            query,
++            QStringLiteral(
++                "CREATE INDEX IF NOT EXISTS idx_dry_run_events_step_time "
++                "ON dry_run_events(step, step_index, event_epoch_ms)")) &&
++        execSql(
++            query,
++            QStringLiteral(
++                "CREATE INDEX IF NOT EXISTS idx_dry_run_events_event_time "
++                "ON dry_run_events(event, event_epoch_ms)"));
+ }
+ 
+ qint64 timestampEpochMs(const QJsonObject& object, qint64 fallbackEpochMs)
+@@ -206,6 +358,53 @@ qint64 timestampEpochMs(const QJsonObject& object, qint64 fallbackEpochMs)
+     return fallbackEpochMs;
+ }
+ 
++QVariant jsonIntegerVariant(const QJsonValue& value)
++{
++    return value.isDouble()
++               ? QVariant(static_cast<qint64>(value.toDouble()))
++               : QVariant(QVariant::LongLong);
++}
++
++QVariant jsonBoolVariant(const QJsonValue& value)
++{
++    return value.isBool()
++               ? QVariant(value.toBool() ? 1 : 0)
++               : QVariant(QVariant::Int);
++}
++
++QString compactJsonValue(const QJsonValue& value)
++{
++    if (value.isObject()) {
++        return QString::fromUtf8(
++            QJsonDocument(value.toObject()).toJson(QJsonDocument::Compact));
++    }
++
++    if (value.isArray()) {
++        return QString::fromUtf8(
++            QJsonDocument(value.toArray()).toJson(QJsonDocument::Compact));
++    }
++
++    return QString();
++}
++
++QString payloadMessageType(const QByteArray& payload)
++{
++    QJsonParseError parseError;
++    const QJsonDocument doc = QJsonDocument::fromJson(payload, &parseError);
++
++    if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
++        return QString();
++    }
++
++    return doc.object().value(QStringLiteral("messageType")).toString();
++}
++
++bool isStructuredProcessMessageType(const QString& messageType)
++{
++    return messageType == QStringLiteral("processEvent") ||
++           messageType == QStringLiteral("processCommandEvent");
++}
++
+ bool insertMetric(QSqlDatabase& db,
+                   qint64 rawMessageId,
+                   qint64 sampleEpochMs,
+@@ -583,6 +782,143 @@ bool insertRawMessage(QSqlDatabase& db,
+     return true;
+ }
+ 
++bool insertDryRunEvent(QSqlDatabase& db,
++                       const QString& topic,
++                       const QByteArray& payload)
++{
++    QJsonParseError parseError;
++    const QJsonDocument doc = QJsonDocument::fromJson(payload, &parseError);
++
++    if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
++        qWarning() << "[IoTStorageCollector] invalid dryRunEvent JSON skipped"
++                   << parseError.errorString();
++        return false;
++    }
++

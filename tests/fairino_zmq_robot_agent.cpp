@@ -500,6 +500,28 @@ bool publishProcessEvent(zmq::socket_t& socket,
         payload);
 }
 
+bool publishDryRunEvent(zmq::socket_t& socket,
+                        std::mutex& publishMutex,
+                        const QByteArray& payload)
+{
+    return publishMultipartPayload(
+        socket,
+        publishMutex,
+        QStringLiteral("robot/dryrun/event"),
+        payload);
+}
+
+bool publishProcessCommandEvent(zmq::socket_t& socket,
+                                std::mutex& publishMutex,
+                                const QByteArray& payload)
+{
+    return publishMultipartPayload(
+        socket,
+        publishMutex,
+        QStringLiteral("robot/processCommandEvent"),
+        payload);
+}
+
 int robotIdFromProcessEvent(const QJsonObject& object)
 {
     const int robotId = object.value(QStringLiteral("robotId")).toInt(0);
@@ -525,10 +547,16 @@ QJsonObject compactProcessState(const QJsonObject& object)
     const QStringList keys{
         QStringLiteral("robot"),
         QStringLiteral("robotId"),
+        QStringLiteral("commandId"),
+        QStringLiteral("command"),
+        QStringLiteral("event"),
         QStringLiteral("type"),
         QStringLiteral("kind"),
         QStringLiteral("seq"),
         QStringLiteral("phase"),
+        QStringLiteral("ok"),
+        QStringLiteral("code"),
+        QStringLiteral("message"),
         QStringLiteral("result"),
         QStringLiteral("errorCode"),
         QStringLiteral("errorText"),
@@ -547,6 +575,86 @@ QJsonObject compactProcessState(const QJsonObject& object)
     return state;
 }
 
+bool handleDryRunEventPayload(QJsonObject object,
+                              zmq::socket_t& pubSocket,
+                              std::mutex& publishMutex)
+{
+    if (object.value(QStringLiteral("messageType")).toString()
+        != QStringLiteral("dryRunEvent")) {
+        qWarning() << "[FairinoZmqRobotAgent] invalid dryRun event skipped";
+        return false;
+    }
+
+    const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
+    object[QStringLiteral("agentReceivedEpochMs")] =
+        static_cast<double>(nowMs);
+    object[QStringLiteral("agentReceivedAt")] =
+        QDateTime::fromMSecsSinceEpoch(nowMs).toString(Qt::ISODateWithMs);
+
+    const QByteArray republished =
+        QJsonDocument(object).toJson(QJsonDocument::Compact);
+
+    if (!publishDryRunEvent(pubSocket, publishMutex, republished)) {
+        qWarning() << "[FairinoZmqRobotAgent] dryRun event publish failed";
+        return false;
+    }
+
+    qInfo() << "[FairinoZmqRobotAgent] dryRun event republished topic ="
+            << QStringLiteral("robot/dryrun/event")
+            << "payload =" << republished;
+    return true;
+}
+
+bool handleProcessCommandEventPayload(QJsonObject object,
+                                      ProcessStateCache& processStateCache,
+                                      zmq::socket_t& pubSocket,
+                                      std::mutex& publishMutex)
+{
+    qInfo() << "[FairinoZmqRobotAgent] agent received processCommandEvent from 5562"
+            << "commandId =" << object.value(QStringLiteral("commandId")).toString()
+            << "command =" << object.value(QStringLiteral("command")).toString()
+            << "robotId =" << object.value(QStringLiteral("robotId")).toInt(0)
+            << "event =" << object.value(QStringLiteral("event")).toString();
+
+    if (!object.contains(QStringLiteral("event"))
+        && object.contains(QStringLiteral("phase"))) {
+        object[QStringLiteral("event")] =
+            object.value(QStringLiteral("phase")).toString();
+    }
+    if (!object.contains(QStringLiteral("phase"))
+        && object.contains(QStringLiteral("event"))) {
+        object[QStringLiteral("phase")] =
+            object.value(QStringLiteral("event")).toString();
+    }
+
+    const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
+    object[QStringLiteral("agentReceivedEpochMs")] =
+        static_cast<double>(nowMs);
+    object[QStringLiteral("agentReceivedAt")] =
+        QDateTime::fromMSecsSinceEpoch(nowMs).toString(Qt::ISODateWithMs);
+
+    const int robotId = robotIdFromProcessEvent(object);
+    if (robotId > 0) {
+        std::lock_guard<std::mutex> lock(processStateCache.mutex);
+        processStateCache.latestByRobot[static_cast<size_t>(robotId)] =
+            compactProcessState(object);
+    }
+
+    const QByteArray republished =
+        QJsonDocument(object).toJson(QJsonDocument::Compact);
+
+    if (!publishProcessCommandEvent(pubSocket, publishMutex, republished)) {
+        qWarning() << "[FairinoZmqRobotAgent] processCommandEvent publish failed"
+                   << "topic =" << QStringLiteral("robot/processCommandEvent");
+        return false;
+    }
+
+    qInfo() << "[FairinoZmqRobotAgent] agent republished processCommandEvent to topic"
+            << QStringLiteral("robot/processCommandEvent")
+            << "payload =" << republished;
+    return true;
+}
+
 bool handleProcessEventPayload(const QByteArray& payload,
                                ProcessStateCache& processStateCache,
                                zmq::socket_t& pubSocket,
@@ -561,8 +669,20 @@ bool handleProcessEventPayload(const QByteArray& payload,
     }
 
     QJsonObject object = doc.object();
-    if (object.value(QStringLiteral("messageType")).toString()
-        != QStringLiteral("processEvent")) {
+    const QString messageType =
+        object.value(QStringLiteral("messageType")).toString();
+    if (messageType == QStringLiteral("dryRunEvent")) {
+        return handleDryRunEventPayload(object, pubSocket, publishMutex);
+    }
+    if (messageType == QStringLiteral("processCommandEvent")) {
+        return handleProcessCommandEventPayload(
+            object,
+            processStateCache,
+            pubSocket,
+            publishMutex);
+    }
+
+    if (messageType != QStringLiteral("processEvent")) {
         qWarning() << "[FairinoZmqRobotAgent] non processEvent skipped";
         return false;
     }

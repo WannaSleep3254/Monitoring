@@ -1,6 +1,8 @@
 #include "ZeroMqRemoteTransportClient.h"
 
 #include <QDebug>
+#include <QJsonDocument>
+#include <QJsonObject>
 
 #ifdef ENABLE_ZEROMQ_TRANSPORT
 #include <zmq.hpp>
@@ -162,8 +164,16 @@ void ZeroMqRemoteTransportClient::sendCommand(const QByteArray& requestPayload)
 
         emit commandResponsePayloadReceived(responsePayload);
 
-        qDebug() << "[ZeroMqTransport] command response received bytes ="
-                 << responsePayload.size();
+        const QJsonDocument responseDoc = QJsonDocument::fromJson(responsePayload);
+        const QString responseCommand = responseDoc.isObject()
+            ? responseDoc.object().value(QStringLiteral("command")).toString()
+            : QString();
+        // gantryReadPosition is high-frequency UI polling; keep the response path
+        // active but suppress the repetitive transport debug line.
+        if (responseCommand != QStringLiteral("gantryReadPosition")) {
+            qDebug() << "[ZeroMqTransport] command response received bytes ="
+                     << responsePayload.size();
+        }
 
     } catch (const zmq::error_t& error) {
         const QString message =

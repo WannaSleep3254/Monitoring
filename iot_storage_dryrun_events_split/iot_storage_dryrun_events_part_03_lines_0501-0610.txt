@@ -1,0 +1,111 @@
+﻿# iot_storage_dryrun_events.diff part 3/3
++    query.bindValue(QStringLiteral(":seq"), seq);
++    query.bindValue(QStringLiteral(":phase"), phase);
++    query.bindValue(QStringLiteral(":result"), result);
+     query.bindValue(QStringLiteral(":error_code"),
+-                    object.value(QStringLiteral("errorCode")).toInt(0));
+-    query.bindValue(QStringLiteral(":error_text"),
+-                    object.value(QStringLiteral("errorText")).toString());
++                    object.contains(QStringLiteral("errorCode"))
++                        ? object.value(QStringLiteral("errorCode")).toInt()
++                        : object.value(QStringLiteral("code")).toInt(0));
++    query.bindValue(QStringLiteral(":error_text"), errorText);
++    query.bindValue(QStringLiteral(":message_type"), messageType);
++    query.bindValue(QStringLiteral(":schema_version"),
++                    jsonIntegerVariant(
++                        object.value(QStringLiteral("schemaVersion"))));
++    query.bindValue(QStringLiteral(":command_id"),
++                    object.value(QStringLiteral("commandId")).toString());
++    query.bindValue(QStringLiteral(":command"), command);
++    query.bindValue(QStringLiteral(":run_id"), runId);
++    query.bindValue(QStringLiteral(":profile"), profile);
++    query.bindValue(QStringLiteral(":cycle"),
++                    jsonIntegerVariant(object.value(QStringLiteral("cycle"))));
++    query.bindValue(QStringLiteral(":step_index"),
++                    jsonIntegerVariant(
++                        object.value(QStringLiteral("stepIndex"))));
++    query.bindValue(QStringLiteral(":step"), step);
++    query.bindValue(QStringLiteral(":event"), event);
++    query.bindValue(QStringLiteral(":message"),
++                    object.value(QStringLiteral("message")).toString());
++    query.bindValue(QStringLiteral(":ok"),
++                    jsonBoolVariant(object.value(QStringLiteral("ok"))));
+     query.bindValue(QStringLiteral(":detail_json"), detailJson);
+     query.bindValue(QStringLiteral(":raw_json"), QString::fromUtf8(payload));
+ 
+@@ -725,7 +1136,7 @@ void printUsage()
+         << "  topicPrefix      = robot/\n"
+         << "  databasePath     = ./data/iot_storage_YYYY-MM-DD.db\n\n"
+         << "Notes:\n"
+-        << "  The collector also subscribes to process/event for Modbus sequence events.\n\n"
++        << "  The collector also subscribes to process/event, robot/processCommandEvent, and robot/dryrun/event.\n\n"
+         << "Example:\n"
+         << "  iot_storage_collector tcp://192.168.57.100:5556 robot/ C:/Debug/IoTStorage/data/iot_storage.db";
+ }
+@@ -801,6 +1212,10 @@ int main(int argc, char* argv[])
+         socket.set(zmq::sockopt::subscribe, topicPrefix.toStdString());
+         socket.set(zmq::sockopt::subscribe,
+                    std::string("process/event"));
++        socket.set(zmq::sockopt::subscribe,
++                   std::string("robot/dryrun/event"));
++        socket.set(zmq::sockopt::subscribe,
++                   std::string("robot/processCommandEvent"));
+         socket.connect(snapshotEndpoint.toStdString());
+ 
+         qInfo() << "[IoTStorageCollector] started";
+@@ -809,6 +1224,7 @@ int main(int argc, char* argv[])
+         quint64 storedCount = 0;
+         quint64 storedMetricCount = 0;
+         quint64 storedProcessEventCount = 0;
++        quint64 storedDryRunEventCount = 0;
+ 
+         while (g_running) {
+             zmq::message_t topicMessage;
+@@ -840,7 +1256,12 @@ int main(int argc, char* argv[])
+ 
+             ++receivedCount;
+             int insertedMetrics = 0;
+-            if (topic == QStringLiteral("process/event")) {
++            const QString messageType = payloadMessageType(payload);
++            if (messageType == QStringLiteral("dryRunEvent")) {
++                if (insertDryRunEvent(db, topic, payload)) {
++                    ++storedDryRunEventCount;
++                }
++            } else if (topic == QStringLiteral("process/event")) {
+                 if (insertProcessEvent(db, topic, payload)) {
+                     ++storedProcessEventCount;
+                 }
+@@ -853,15 +1274,22 @@ int main(int argc, char* argv[])
+                     ++storedCount;
+                     storedMetricCount += static_cast<quint64>(insertedMetrics);
+                 }
++                if (isStructuredProcessMessageType(messageType)) {
++                    if (insertProcessEvent(db, topic, payload)) {
++                        ++storedProcessEventCount;
++                    }
++                }
+             }
+ 
+-            const quint64 storedTotal = storedCount + storedProcessEventCount;
++            const quint64 storedTotal =
++                storedCount + storedProcessEventCount + storedDryRunEventCount;
+             if (storedTotal == 1 || storedTotal % 100 == 0) {
+                 qInfo() << "[IoTStorageCollector]"
+                         << "received =" << receivedCount
+                         << "stored =" << storedCount
+                         << "metrics =" << storedMetricCount
+                         << "processEvents =" << storedProcessEventCount
++                        << "dryRunEvents =" << storedDryRunEventCount
+                         << "topic =" << topic;
+             }
+         }
+@@ -870,7 +1298,8 @@ int main(int argc, char* argv[])
+                 << "received =" << receivedCount
+                 << "stored =" << storedCount
+                 << "metrics =" << storedMetricCount
+-                << "processEvents =" << storedProcessEventCount;
++                << "processEvents =" << storedProcessEventCount
++                << "dryRunEvents =" << storedDryRunEventCount;
+ 
+         socket.close();
+         context.shutdown();
